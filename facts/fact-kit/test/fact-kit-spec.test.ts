@@ -123,7 +123,7 @@ describe('fact-kit.cli', () => {
     const sections: Record<string, string[]> = {}
     let current: string | undefined
     for (const line of stdout.split('\n')) {
-      const header = /^Options for (\w+)/.exec(line)
+      const header = /^Options for ([\w-]+)/.exec(line)
       if (header) current = header[1]
       else if (/^\S/.test(line) || line.trim() === '') current = line.trim() === '' ? undefined : current
       else if (current) {
@@ -136,12 +136,12 @@ describe('fact-kit.cli', () => {
 
   it('has the commands and flags of the help text', async () => {
     const { text, sections } = await helpFlags()
-    for (const name of ['check', 'build', 'diff']) {
+    for (const name of ['check', 'build', 'diff', 'pin', 'merge-since']) {
       expect(text, name).toMatch(new RegExp(`^  ${name}\\b`, 'm'))
       const flags = (commands[name].options as { flag: string }[]).map((o) => o.flag).sort()
       expect(flags, name).toEqual([...(sections[name] ?? [])].sort())
     }
-    expect(Object.keys(commands).sort()).toEqual(['build', 'check', 'diff', 'global'])
+    expect(Object.keys(commands).sort()).toEqual(['build', 'check', 'diff', 'global', 'merge-since', 'pin'])
     for (const o of commands.global.options) {
       expect(text).toContain(o.flag)
       expect(text).toContain(o.alias)
@@ -169,6 +169,11 @@ describe('fact-kit.cli', () => {
     expect((await cli([])).code).toBe(2)
     expect((await cli(['nope'])).code).toBe(2)
     expect((await cli(['diff', 'only-one'])).code).toBe(2)
+    expect((await cli(['pin', '--cwd', dir])).code).toBe(2)
+    expect((await cli(['pin', '--version', '1', '--cwd', dir])).code).toBe(2)
+    expect((await cli(['pin', '--version', '1.0.0', '--version', '1.0.1', '--cwd', dir])).code).toBe(2)
+    expect((await cli(['pin', '--version', '1.0.0', '--cwd', dir])).code).toBe(0)
+    expect((await cli(['merge-since', '--cwd', dir])).code).toBe(2)
     expect((await cli(['--help'])).code).toBe(0)
     writeTree(dir, {
       'facts/bad/index.ts': 'export default { facts: [{}] }\n',

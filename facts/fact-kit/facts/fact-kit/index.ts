@@ -337,8 +337,8 @@ const commands = {
     ],
     exitCodes: {
       '0': 'No problem found.',
-      '1': 'A problem was found, or the command failed.',
-      '2': 'Wrong usage or input: no command, an unknown command or option, the wrong number of arguments, a `--train` that is not `<component>=<version>`, or a config or index file that can not be read.',
+      '1': 'A problem was found, or the command failed. For `merge-since`: a conflict is left.',
+      '2': 'Wrong usage or input: no command, an unknown command or option, the wrong number of arguments, a `--train` that is not `<component>=<version>`, a `pin` with no `--version`, with more than one, or with one that is not semver, a config or index file that can not be read, a source file that can not be parsed, `oxc-parser` that is not installed, or a `merge-since` outside a git merge.',
     },
   },
   check: {
@@ -405,6 +405,36 @@ const commands = {
           'Take no files. Read the built indexes of the components in the aggregate config, follow derivedFrom downstream, and search docsDirs for references. Needs oxc-parser when docsDirs hold TypeScript.',
       },
       dirOption('--cwd', '<dir>', 'the current directory', 'With --impact: the aggregate package directory.'),
+    ],
+  },
+  pin: {
+    summary:
+      'Turn every `next` in the `since` of the rows under the facts directory into one version: a `since` that is `next`, or an array that ends in `next`. A row with a `pending` label stays, so do `describes` and `<facts-dir>/_lib`. Only the text of the literal changes, so a second run changes nothing. Needs oxc-parser.',
+    arguments: [],
+    options: [
+      {
+        flag: '--version',
+        value: '<v>',
+        default: 'none',
+        summary:
+          'The version `next` becomes. Required, and given once. It must be semver 2.0.0, and a pre-release such as `0.49.0-alpha.1` is written whole.',
+      },
+      dirOption('--cwd', '<dir>', 'the current directory', 'Package directory.'),
+      dirOption('--config', '<file>', 'fact-kit.config.json when present', 'Config file.'),
+      dirOption('--facts-dir', '<dir>', 'facts', 'Fact sources, relative to --cwd.'),
+    ],
+  },
+  'merge-since': {
+    summary:
+      'Run after `git merge`. In the files that `git diff --name-only --diff-filter=U` lists under --cwd, settle each conflict block whose two sides differ only in `since` (normal, `diff3` and `zdiff3` markers): the union of the versions, the smaller one when two are on one release line, ordered by release line with `next` last. Then rewrite a row that only the merged-in side has (the same fact has no row with that `since` in HEAD) whose `since` is one patch version `X.Y.Z` (`Z` above 0, no pre-release) and has no `pending` into `["X.Y.Z", "next"]`. It writes what it settled, stages nothing, and prints each conflict left as `<file>:<line> <reason>`. A second run changes nothing. Needs oxc-parser.',
+    arguments: [],
+    options: [
+      dirOption(
+        '--cwd',
+        '<dir>',
+        'the current directory',
+        'A directory in the repository. Only files under it are read.',
+      ),
     ],
   },
 }
@@ -941,7 +971,7 @@ const facts: Fact[] = [
   }),
   fact({
     id: 'fact-kit.cli',
-    topics: ['cli', 'check', 'build', 'diff'],
+    topics: ['cli', 'check', 'build', 'diff', 'pin', 'merge-since'],
     title: { en: 'fact-kit commands and options' },
     content: { value: commands },
   }),
