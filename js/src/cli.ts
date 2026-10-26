@@ -1,0 +1,162 @@
+import { readFileSync } from 'node:fs'
+import { parseArgs } from 'node:util'
+import { buildFacts } from './build.ts'
+import { diffIndexFiles } from './diff.ts'
+import { LoadError } from './load.ts'
+import { checkProject } from './project.ts'
+import type { CheckProjectOptions } from './project.ts'
+
+export interface CliIo {
+  out(text: string): void
+  err(text: string): void
+}
+
+const HELP = `fact-kit <command> [options]
+
+Commands
+  check                 Validate facts, examples and what must not ship (local paths, unregistered domains)
+  build                 Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/
+  diff <old> <new>      List the fact ids added, removed and changed between two index.json files
+
+Options for check
+  --cwd <dir>           Package directory (default: current directory)
+  --config <file>       Config file (default: fact-kit.config.json when present)
+  --facts-dir <dir>     Fact sources, relative to --cwd (default: facts)
+  --examples-dir <dir>  Example files, relative to --cwd (default: examples)
+  --index <path>        A built index.json (or its directory) to check too; repeatable
+  --allow-domain <host> Host URLs may point at, subdomains included; repeatable
+
+Options for build
+  --cwd <dir>           Package directory (default: current directory)
+  --facts-dir <dir>     Fact sources (default: facts)
+  --out-dir <dir>       Output directory (default: dist)
+  --write-exports       Add the missing "exports" entries to package.json
+
+Options for diff
+  --json                Print the result as JSON
+
+  -h, --help            Show this help
+  -v, --version         Show the version
+`
+
+function version(): string {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+  return pkg.version
+}
+
+async function runCheck(argv: string[], io: CliIo): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      cwd: { type: 'string' },
+      config: { type: 'string' },
+      'facts-dir': { type: 'string' },
+      'examples-dir': { type: 'string' },
+      index: { type: 'string', multiple: true },
+      'allow-domain': { type: 'string', multiple: true },
+    },
+  })
+  const options: CheckProjectOptions = {
+    ...(values.cwd !== undefined ? { cwd: values.cwd } : {}),
+    ...(values.config !== undefined ? { configFile: values.config } : {}),
+    ...(values['facts-dir'] !== undefined ? { factsDir: values['facts-dir'] } : {}),
+    ...(values['examples-dir'] !== undefined ? { examplesDir: values['examples-dir'] } : {}),
+    ...(values.index ? { indexFiles: values.index } : {}),
+    ...(values['allow-domain'] ? { allowedDomains: values['allow-domain'] } : {}),
+  }
+  const { problems, counts } = await checkProject(options)
+  if (problems.length > 0) {
+    for (const p of problems) io.err(`${p.code}: ${p.message}${p.location ? `\n  at ${p.location}` : ''}\n`)
+    io.err(`fact-kit check: ${problems.length} problem${problems.length === 1 ? '' : 's'}\n`)
+    return 1
+  }
+  io.out(
+    `fact-kit check: ok (${counts.facts} facts in ${counts.indexes} indexes, ${counts.schemas} schema files, ${counts.examples} example groups)\n`,
+  )
+  return 0
+}
+
+async function runBuild(argv: string[], io: CliIo): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      cwd: { type: 'string' },
+      'facts-dir': { type: 'string' },
+      'out-dir': { type: 'string' },
+      'write-exports': { type: 'boolean' },
+    },
+  })
+  const result = await buildFacts({
+    ...(values.cwd !== undefined ? { cwd: values.cwd } : {}),
+    ...(values['facts-dir'] !== undefined ? { factsDir: values['facts-dir'] } : {}),
+    ...(values['out-dir'] !== undefined ? { outDir: values['out-dir'] } : {}),
+    ...(values['write-exports'] ? { writeExports: true } : {}),
+  })
+  if (result.problems.length > 0) {
+    for (const p of result.problems) io.err(`${p.code}: ${p.message}${p.location ? `\n  at ${p.location}` : ''}\n`)
+    io.err(`fact-kit build: ${result.problems.length} problem(s), nothing was written\n`)
+    return 1
+  }
+  for (const f of result.files) io.out(`wrote ${f}\n`)
+  if (result.exportsUpdated) io.out(`updated package.json exports: ${result.missingExports.join(', ')}\n`)
+  else if (result.missingExports.length > 0) {
+    io.err(
+      `package.json "exports" lacks: ${result.missingExports.join(', ')}\nAdd them, or run fact-kit build --write-exports\n`,
+    )
+    return 1
+  }
+  io.out(`fact-kit build: ${result.entries.length} entr${result.entries.length === 1 ? 'y' : 'ies'}\n`)
+  return 0
+}
+
+async function runDiff(argv: string[], io: CliIo): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    options: { json: { type: 'boolean' } },
+    allowPositionals: true,
+  })
+  if (positionals.length !== 2) {
+    io.err('fact-kit diff: expected <old> <new>\n')
+    return 2
+  }
+  const diff = await diffIndexFiles(positionals[0] as string, positionals[1] as string)
+  if (values.json) io.out(`${JSON.stringify(diff, null, 2)}\n`)
+  else {
+    for (const id of diff.added) io.out(`added    ${id}\n`)
+    for (const id of diff.removed) io.out(`removed  ${id}\n`)
+    for (const id of diff.changed) io.out(`changed  ${id}\n`)
+    if (diff.added.length + diff.removed.length + diff.changed.length === 0) io.out('no differences\n')
+  }
+  return 0
+}
+
+/** Runs the CLI and returns the exit code. `argv` excludes `node` and the script path. */
+export async function runCli(argv: string[], io: CliIo): Promise<number> {
+  const [command, ...rest] = argv
+  try {
+    switch (command) {
+      case 'check':
+        return await runCheck(rest, io)
+      case 'build':
+        return await runBuild(rest, io)
+      case 'diff':
+        return await runDiff(rest, io)
+      case '-v':
+      case '--version':
+        io.out(`${version()}\n`)
+        return 0
+      case undefined:
+      case '-h':
+      case '--help':
+        io.out(HELP)
+        return command === undefined ? 2 : 0
+      default:
+        io.err(`fact-kit: unknown command "${command}"\n\n${HELP}`)
+        return 2
+    }
+  } catch (error) {
+    if (error instanceof LoadError) io.err(`fact-kit ${command}: ${error.message}\n  at ${error.file}\n`)
+    else io.err(`fact-kit ${command}: ${(error as Error).message}\n`)
+    return 1
+  }
+}
