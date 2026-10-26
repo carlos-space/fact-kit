@@ -3,7 +3,8 @@ name: ci
 # A pull request gets the checks that block the merge; a push to main or to a release branch runs the same
 # set, and a release branch additionally runs the assembled-system check, which GA gates on. The
 # release-branch run is what the ci gate of advance-release.sh and finalize-release.sh waits for. Three
-# jobs (check, build, test) so each shows as its own check.
+# jobs (check, build, test) so each shows as its own check. Two more jobs (convert-linux, convert-macos) run
+# the converter on TypeScript 7.1, whose compiler is a platform-specific native package, once per platform.
 #
 # Whether a run checks anything is decided by content, in the scope job (scripts/ci/ci-scope.sh), not by
 # path filters here: every push gets a run, so "the latest ci run" is always the run of the tip, which is
@@ -53,6 +54,7 @@ jobs:
       pull-requests: read # commits/<sha>/pulls: the pull request a push came from
     outputs:
       run: ${{ steps.s.outputs.run }}
+      native: ${{ steps.s.outputs.native }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -103,6 +105,34 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
       - run: pnpm test
+
+  # The converter starts the native compiler of TypeScript 7.1, which comes as one package per platform.
+  # These two jobs install the workspace on each platform and run the converter tests there, so a platform
+  # package that does not install or does not start fails here and not in a user's project. macOS runs only
+  # when the scope job says native: ci-scope.conf lists the converter's files.
+  convert-linux:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm vitest run js/test/convert.test.ts js/test/convert-agent-sdk.test.ts
+
+  convert-macos:
+    needs: scope
+    if: needs.scope.outputs.run == 'true' && needs.scope.outputs.native == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm vitest run js/test/convert.test.ts js/test/convert-agent-sdk.test.ts
 
   # Assembled-system check against packed tarballs. Only on a release branch: this is the stabilisation
   # window, and finalize-release.sh --phase ga refuses to proceed until this run is green.

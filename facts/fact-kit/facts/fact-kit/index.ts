@@ -537,6 +537,40 @@ const moduleApi = {
   ],
 }
 
+const converters = {
+  requires: {
+    peerDependency: 'typescript',
+    range: '>=7.1.0-beta',
+    optional: true,
+    install: 'pnpm add -D typescript@7.1.0-beta',
+  },
+  exports: [
+    {
+      name: 'readStringTuples',
+      signature: 'readStringTuples(source: string) => Promise<Record<string, string[]>>',
+      summary:
+        'The string literal tuples exported by a TypeScript source, by name: `export declare const X: readonly [...]` and `export const X = [...] as const`. Parses only, so imports do not have to resolve.',
+    },
+    {
+      name: 'readStringTuplesFromFile',
+      signature: 'readStringTuplesFromFile(path: string) => Promise<Record<string, string[]>>',
+      summary: 'Reads the file and returns `readStringTuples` of it.',
+    },
+    {
+      name: 'interfaceToJsonSchema',
+      signature:
+        'interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? }) => Promise<JsonSchema>',
+      summary:
+        'An interface or type alias as a JSON Schema 2020-12 document. Referenced types become `$defs`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported.',
+    },
+    {
+      name: 'readJsonSchemaFile',
+      signature: 'readJsonSchemaFile(path: string) => Promise<JsonSchema>',
+      summary: 'Reads a JSON Schema file. Does not need TypeScript.',
+    },
+  ],
+}
+
 const exampleGroupSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'urn:fact-kit:example-group',
@@ -674,6 +708,15 @@ const facts: Fact[] = [
     title: { en: 'Functions fact-kit exports for authoring and rendering' },
     description: { en: 'The exports a facts package, its docs and its examples call, and the fields of `SchemaRow`.' },
     content: { value: moduleApi },
+  }),
+  fact({
+    id: 'fact-kit.converters',
+    topics: ['convert', 'authoring'],
+    title: { en: 'Converters and the optional TypeScript peer dependency' },
+    description: {
+      en: 'The converters read TypeScript with the TypeScript 7.1 API, which starts a native compiler process. `typescript` is an optional peer dependency that is loaded when a converter runs, and a converter throws an error that names the package to install when it is missing.',
+    },
+    content: { value: converters },
   }),
   fact({
     id: 'fact-kit.example-group',

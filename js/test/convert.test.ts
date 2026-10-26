@@ -86,6 +86,34 @@ describe('c006 .d.ts reading', () => {
     expect(schema.properties.name.description).toBe('Name doc.')
   })
 
+  test('a tsconfig resolves imports through paths', async () => {
+    const dir = makeTmp('tsconfig')
+    writeTree(dir, {
+      'tsconfig.json': { compilerOptions: { baseUrl: '.', paths: { '@lib/*': ['lib/*'] } } },
+      'lib/item.d.ts': "export interface Item { kind: 'b' | 'a' }\n",
+      'a.d.ts': "import type { Item } from '@lib/item'\nexport interface Root { item: Item }\n",
+    })
+    const schema = (await interfaceToJsonSchema({
+      path: `${dir}/a.d.ts`,
+      type: 'Root',
+      tsconfig: `${dir}/tsconfig.json`,
+    })) as Record<string, any>
+    expect(schema.$defs.Item.properties.kind.enum).toEqual(['b', 'a'])
+  })
+
+  test('additionalProperties: true leaves objects open', async () => {
+    const dir = makeTmp('open')
+    writeTree(dir, { 'a.d.ts': 'export interface Root { a: string }\n' })
+    const closed = (await interfaceToJsonSchema({ path: `${dir}/a.d.ts`, type: 'Root' })) as Record<string, any>
+    const open = (await interfaceToJsonSchema({
+      path: `${dir}/a.d.ts`,
+      type: 'Root',
+      additionalProperties: true,
+    })) as Record<string, any>
+    expect(closed.additionalProperties).toBe(false)
+    expect('additionalProperties' in open).toBe(false)
+  })
+
   test('definitions become $defs and refs follow', async () => {
     const dir = makeTmp('refs')
     writeTree(dir, {

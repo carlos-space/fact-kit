@@ -11,6 +11,10 @@ Add it as a dev dependency of the package that declares facts, and as a dependen
 pnpm add -D fact-kit
 ```
 
+`typescript` (7.1.0-beta or later) and `oxc-parser` are optional peer dependencies. They are not installed
+with fact-kit. Install `typescript` to use the converters (see Converting). `oxc-parser` is loaded by `diff --impact`
+when it scans TypeScript source.
+
 ## Authoring
 
 A package holds one directory per entry: `facts/<entry>/index.ts`, which default-exports
@@ -118,14 +122,20 @@ between two builds, the same as `fact-kit diff`.
 
 ## Converting
 
-Converters turn machine-readable upstream resources into fact content. The TypeScript ones load
-TypeScript 5 on demand, so `readFacts` and `check` do not pull it in.
+Converters turn machine-readable upstream resources into fact content. The TypeScript ones need the
+optional peer dependency `typescript` 7.1.0-beta or later (`pnpm add -D typescript@7.1.0-beta`). It is
+loaded when a converter runs, so `readFacts` and `check` never pull it in, and a project that does not
+convert does not install it. Without it, a converter throws an error that names the package to install.
 
-| Function                                                                                 | Reads                                                      | Returns                                                                                                                                         |
-| :--------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `readStringTuplesFromFile(path)`, `readStringTuples(source)`                             | `export declare const X: readonly ['a', 'b']` in a `.d.ts` | Each tuple's name and values                                                                                                                    |
-| `interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? })` | An interface or type alias in a `.d.ts`                    | A JSON Schema 2020-12 document; referenced types become `$defs`. JSDoc becomes `description`; `descriptions: false` removes every `description` |
-| `readJsonSchemaFile(path)`                                                               | A JSON Schema file                                         | The parsed schema                                                                                                                               |
+TypeScript 7 runs its compiler as a native process, which `interfaceToJsonSchema` starts and closes
+before it returns. Install the `typescript` package on the platform that runs the conversion, because
+the native binary comes as a platform package.
+
+| Function                                                                                 | Reads                                                      | Returns                                                                                                                                                                                                                                        |
+| :--------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readStringTuplesFromFile(path)`, `readStringTuples(source)`                             | `export declare const X: readonly ['a', 'b']` in a `.d.ts` | Each tuple's name and values                                                                                                                                                                                                                   |
+| `interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? })` | An interface or type alias in a `.d.ts`                    | A JSON Schema 2020-12 document; referenced types become `$defs`. JSDoc becomes `description`; `descriptions: false` removes every `description`. Union members and enum values keep the order of the source, and a tuple becomes `prefixItems` |
+| `readJsonSchemaFile(path)`                                                               | A JSON Schema file                                         | The parsed schema                                                                                                                                                                                                                              |
 
 ## Tables
 
