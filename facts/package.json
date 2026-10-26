@@ -1,0 +1,25 @@
+{
+  "name": "fact-kit-facts",
+  "version": "0.0.0",
+  "description": "Facts about fact-kit: the spec of its index format, commands and API",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carlos-space/fact-kit",
+    "directory": "facts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ../js/src/bin.ts build"
+  },
+  "devDependencies": {
+    "@component/fact-kit": "workspace:*"
+  },
+  "exports": {
+    "./index.json": "./dist/index.json",
+    "./schemas/*": "./dist/schemas/*"
+  }
+}
