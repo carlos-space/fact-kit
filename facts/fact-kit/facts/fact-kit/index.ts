@@ -205,7 +205,15 @@ const indexSchema = {
       description: '`1.1` for what this version builds. A missing field reads as `1.0`. Readers take any `1.x`.',
     },
     package: nonEmpty,
-    entry: { ...nonEmpty, description: 'Sub-path of the entry, e.g. `claude-code`.' },
+    entry: {
+      ...nonEmpty,
+      description:
+        'Sub-path of the entry, e.g. `claude-code`. In an aggregate package it is the path of the index in that package, and `.` for the root.',
+    },
+    component: {
+      ...nonEmpty,
+      description: 'Aggregate package only: the name of the component package the index was built in.',
+    },
     formatVersion: nonEmpty,
     describes: {
       description:
@@ -249,6 +257,17 @@ const configSchema = {
     allowedDomains: {
       ...list,
       description: 'Hosts URLs in facts may point at. A subdomain of an entry is allowed too.',
+    },
+    aggregate: {
+      type: 'object',
+      additionalProperties: nonEmpty,
+      description:
+        'Aggregate package only: sub-path (`.` for the root) -> the component package whose built indexes `build` copies there. See `fact-kit.aggregate-layout`.',
+    },
+    docsDirs: {
+      ...list,
+      description:
+        'Directories, relative to the config file, that `diff --impact` searches for `fact:<id>` in markdown and for `get`, `value` and `has` calls in TypeScript.',
     },
   },
 }
@@ -302,7 +321,8 @@ const commands = {
     ],
   },
   build: {
-    summary: 'Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/.',
+    summary:
+      'Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/. In an aggregate package (`aggregate` in the config) copy the built indexes of its component packages into dist/ instead.',
     arguments: [],
     options: [
       dirOption('--cwd', '<dir>', 'the current directory', 'Package directory.'),
@@ -312,10 +332,52 @@ const commands = {
     ],
   },
   diff: {
-    summary: 'List the fact ids added, removed and changed between two index.json files.',
+    summary:
+      'List the fact ids added, removed and changed between two index.json files. With --impact, list instead what a change to one fact reaches.',
     arguments: ['<old>', '<new>'],
-    options: [{ flag: '--json', summary: 'Print the result as JSON: { added, removed, changed }.' }],
+    options: [
+      {
+        flag: '--json',
+        summary:
+          'Print the result as JSON: { added, removed, changed }, or with --impact { id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }.',
+      },
+      {
+        flag: '--impact',
+        value: '<id>',
+        summary:
+          'Take no files. Read the built indexes of the components in the aggregate config, follow derivedFrom downstream, and search docsDirs for references. Needs oxc-parser when docsDirs hold TypeScript.',
+      },
+      dirOption('--cwd', '<dir>', 'the current directory', 'With --impact: the aggregate package directory.'),
+    ],
   },
+}
+
+/** Where `build` puts a component's indexes in an aggregate package, by the shape of the component. */
+const aggregateLayout = {
+  config: { aggregate: { '.': '<component package>', '<sub-path>': '<component package>' } },
+  componentPackage: {
+    name: '@component/<directory name>',
+    private: true,
+    dependedOnBy: 'devDependencies of the aggregate, "workspace:*"',
+  },
+  placement: [
+    { component: 'root, one entry', dir: '.', spec: '<aggregate>' },
+    {
+      component: 'root, several entries',
+      dir: '<entry>',
+      spec: '<aggregate>/<entry>',
+      conflict: 'the entry has the name of another sub-path',
+    },
+    { component: 'sub-path, one entry', dir: '<sub-path>', spec: '<aggregate>/<sub-path>' },
+    { component: 'sub-path, several entries', dir: '<sub-path>/<entry>', spec: '<aggregate>/<sub-path>/<entry>' },
+  ],
+  exports: ['./<dir>/index.json', './<dir>/schemas/*'],
+  rewrittenInIndex: {
+    package: 'the aggregate package name',
+    entry: 'the path of <dir>, `.` for the root',
+    component: 'the component package name',
+  },
+  rewrittenInFacts: 'derivedFrom and movedTo that name a component package become the published spec',
 }
 
 const readFactsSpec = {
@@ -590,6 +652,15 @@ const facts: Fact[] = [
     title: { en: 'Problem codes of check and build' },
     description: { en: 'The stable `code` of each problem. The message is for people and can change.' },
     content: { value: problemCodes },
+  }),
+  fact({
+    id: 'fact-kit.aggregate-layout',
+    topics: ['build', 'config'],
+    title: { en: 'Layout of an aggregate package' },
+    description: {
+      en: 'How `build` places the indexes of component packages in the published package, and what it rewrites in them.',
+    },
+    content: { value: aggregateLayout },
   }),
   fact({
     id: 'fact-kit.read-facts',

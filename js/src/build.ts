@@ -1,9 +1,11 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { aggregateExports, planAggregate, writeAggregate } from './aggregate.ts'
 import { checkFacts } from './check.ts'
 import type { IndexInput } from './check.ts'
 import { loadEntries, readPackageName } from './load.ts'
 import type { LoadedEntry } from './load.ts'
+import { readConfig } from './project.ts'
 import { topLevelContent } from './select.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
 
@@ -100,6 +102,9 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
   const outDir = options.outDir ?? 'dist'
   const result: BuildResult = { problems: [], entries: [], files: [], missingExports: [], exportsUpdated: false }
 
+  const { aggregate } = await readConfig(cwd)
+  if (aggregate) return buildAggregate(cwd, aggregate, outDir, options.writeExports)
+
   const packageName = await readPackageName(cwd)
   const loaded = await loadEntries(join(cwd, factsDir))
   const indexes: IndexInput[] = loaded.map((e) => ({
@@ -126,15 +131,47 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     result.entries.push(e.entry)
   }
 
+  await syncExports(cwd, expectedExports(loaded, outDir), options.writeExports, result)
+  return result
+}
+
+/** Reports (or with `writeExports`, adds) the `exports` keys package.json lacks. */
+async function syncExports(
+  cwd: string,
+  wanted: Record<string, string>,
+  writeExports: boolean | undefined,
+  result: BuildResult,
+): Promise<void> {
   const pkgFile = join(cwd, 'package.json')
   const pkg = JSON.parse(await readFile(pkgFile, 'utf8')) as { exports?: Record<string, unknown> }
-  const wanted = expectedExports(loaded, outDir)
   const missing = Object.entries(wanted).filter(([key, target]) => !exportsCover(pkg.exports, key, target))
   result.missingExports = missing.map(([key]) => key)
-  if (options.writeExports && missing.length > 0) {
+  if (writeExports && missing.length > 0) {
     pkg.exports = { ...(pkg.exports ?? {}), ...Object.fromEntries(missing) }
     await writeFile(pkgFile, `${JSON.stringify(pkg, null, 2)}\n`)
     result.exportsUpdated = true
   }
+}
+
+/**
+ * Builds an aggregate package: copies the built indexes of its component packages into `<outDir>`, as
+ * `fact-kit.config.json` `aggregate` says, and writes them with the published `package`, `entry` and `component`.
+ */
+async function buildAggregate(
+  cwd: string,
+  aggregate: Record<string, string>,
+  outDir: string,
+  writeExports: boolean | undefined,
+): Promise<BuildResult> {
+  const result: BuildResult = { problems: [], entries: [], files: [], missingExports: [], exportsUpdated: false }
+  const plan = await planAggregate(cwd, await readPackageName(cwd), aggregate, outDir)
+  result.problems = plan.problems
+  if (result.problems.length > 0) return result
+  const written = await writeAggregate(cwd, outDir, plan)
+  result.problems = written.problems
+  if (result.problems.length > 0) return result
+  result.files = written.files
+  result.entries = plan.placed.map((p) => p.dir || '.')
+  await syncExports(cwd, aggregateExports(plan.placed, outDir), writeExports, result)
   return result
 }

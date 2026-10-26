@@ -201,6 +201,7 @@ export const indexSchema = {
     indexFormat: { type: 'string', pattern: '^[0-9]+\\.[0-9]+$' },
     package: nonEmptyString,
     entry: nonEmptyString,
+    component: nonEmptyString,
     formatVersion: nonEmptyString,
     describes: { type: 'object', additionalProperties: nonEmptyString },
     facts: { type: 'array', items: { $ref: FACT_SCHEMA_ID } },

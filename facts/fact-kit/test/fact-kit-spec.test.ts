@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { cli, cleanTmp, makeTmp, writeTree } from '../../../js/test/helpers.ts'
 import * as kitModule from '../../../js/src/index.ts'
 import {
+  aggregateExports,
   X_KEYWORDS,
   buildIndex,
   exampleGroupSchema as implExampleGroupSchema,
@@ -353,5 +354,22 @@ describe('fact-kit.example-group', () => {
     for (const sample of samples) {
       expect(validate(sample) as boolean, JSON.stringify(sample)).toBe(validateExampleGroup(sample).length === 0)
     }
+  })
+})
+
+describe('fact-kit.aggregate-layout', () => {
+  it('names the exports and the placements that aggregateExports writes', () => {
+    const layout = content('fact-kit.aggregate-layout')
+    const place = (component: string, subpath: string, dir: string) =>
+      ({ component, subpath, dir }) as unknown as Parameters<typeof aggregateExports>[0][number]
+    const exports = aggregateExports([place('@component/a', '.', ''), place('@component/b', 'sub', 'sub')], 'dist')
+    expect(Object.keys(exports)).toEqual(['./index.json', './schemas/*', './sub/index.json', './sub/schemas/*'])
+    expect(layout.exports).toEqual(['./<dir>/index.json', './<dir>/schemas/*'])
+    expect(layout.placement.map((p: { dir: string }) => p.dir)).toEqual([
+      '.',
+      '<entry>',
+      '<sub-path>',
+      '<sub-path>/<entry>',
+    ])
   })
 })

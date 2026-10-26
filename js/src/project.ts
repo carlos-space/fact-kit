@@ -16,6 +16,10 @@ export interface ProjectConfig {
   indexFiles?: string[]
   /** Hosts URLs may point at. See `CheckOptions.allowedDomains`. */
   allowedDomains?: string[]
+  /** Aggregate package only: sub-path (`.` for the root) -> the component package whose built indexes go there. */
+  aggregate?: Record<string, string>
+  /** Directories, relative to the config file, that `diff --impact` searches for references to a fact. */
+  docsDirs?: string[]
 }
 
 export interface CheckProjectOptions extends ProjectConfig {
