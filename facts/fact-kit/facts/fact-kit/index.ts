@@ -171,8 +171,9 @@ const factSchema = {
         },
         movedTo: {
           type: 'string',
-          pattern: '^[^:\\s]+:[^:\\s]+$',
-          description: '`<spec>:<id>`: where the fact lives now, when that is another package or entry.',
+          pattern: '^(?:[^:\\s]+:)?[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$',
+          description:
+            'Where the fact lives now: `<id>` in the same entry, or `<spec>:<id>` in another package or entry.',
         },
       },
     },

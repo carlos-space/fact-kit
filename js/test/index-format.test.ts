@@ -71,20 +71,23 @@ describe('c004 derivedFrom, replacement and movedTo', () => {
     expect(read[1]?.derivedFrom).toEqual(['demo.new2', 'other-facts/git:git.cmd'])
   })
 
-  test('a single replacement string still builds, and a movedTo without a spec is rejected', async () => {
+  test('a single replacement string and a movedTo in the same entry build, and a movedTo that is not a fact location is rejected', async () => {
     const dir = makeTmp('relations-bad')
     writeTree(dir, {
       'package.json': pkg,
       'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [
         fact('demo.old', ", when: { replacement: 'demo.new' }"),
         fact('demo.new'),
+        fact('demo.gone', ", when: { movedTo: 'demo.new' }"),
       ]),
     })
     expect((await buildFacts({ cwd: dir })).problems).toEqual([])
     const badDir = makeTmp('relations-moved')
     writeTree(badDir, {
       'package.json': pkg,
-      'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [fact('demo.old', ", when: { movedTo: 'git.cmd' }")]),
+      'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [
+        fact('demo.old', ", when: { movedTo: 'other-facts/git:git' }"),
+      ]),
     })
     const bad = await buildFacts({ cwd: badDir })
     expect(bad.problems.map((p) => p.code)).toEqual(['format'])

@@ -53,6 +53,9 @@ const stringList = { type: 'array', items: nonEmptyString }
 const osList = { type: 'array', items: { enum: ['macos', 'linux', 'windows'] } }
 /** A version, `'next'`, or one version per release line. Whether each is a valid version is checked by `check`. */
 const since = { oneOf: [nonEmptyString, { type: 'array', minItems: 1, items: nonEmptyString }] }
+const factId = '[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*'
+/** `<id>` in the same entry, or `<spec>:<id>` in another package or entry. */
+const factLocation = { type: 'string', pattern: `^(?:[^:\\s]+:)?${factId}$` }
 
 const factContent = {
   type: 'object',
@@ -70,7 +73,7 @@ export const factSchema = {
   required: ['id', 'tool', 'topics', 'title', 'content', 'source'],
   // Fields this version does not know are allowed, so a later 1.x minor can add some and readers skip them.
   properties: {
-    id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$' },
+    id: { type: 'string', pattern: `^${factId}$` },
     tool: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
     topics: stringList,
     title: text,
@@ -93,7 +96,7 @@ export const factSchema = {
         },
       },
     },
-    derivedFrom: stringList,
+    derivedFrom: { type: 'array', items: factLocation },
     when: {
       type: 'object',
       additionalProperties: false,
@@ -104,7 +107,7 @@ export const factSchema = {
         deprecatedIn: nonEmptyString,
         removeIn: nonEmptyString,
         replacement: { oneOf: [nonEmptyString, { type: 'array', minItems: 1, items: nonEmptyString }] },
-        movedTo: { type: 'string', pattern: '^[^:\\s]+:[^:\\s]+$' },
+        movedTo: factLocation,
       },
     },
     source: {
