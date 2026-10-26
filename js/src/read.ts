@@ -76,7 +76,7 @@ function owningVersion(file: string, name: string): string {
  * Read from the directory rather than resolved, because a package whose `exports` omit `./package.json`
  * cannot be resolved to it.
  */
-function installedVersion(root: string, name: string): string | undefined {
+export function installedVersion(root: string, name: string): string | undefined {
   for (let dir = root; ; dir = dirname(dir)) {
     const manifest = join(dir, 'node_modules', name, 'package.json')
     if (existsSync(manifest)) return (JSON.parse(readFileSync(manifest, 'utf8')) as { version?: string }).version
@@ -84,22 +84,25 @@ function installedVersion(root: string, name: string): string | undefined {
   }
 }
 
+/** An installed index, parsed and checked to be an index, with where it came from. */
+export interface InstalledIndex {
+  index: FactIndex
+  /** Path of the `index.json` that was read. */
+  file: string
+  packageName: string
+  /** Sub-path of the spec, empty when it names only the package. */
+  entry: string
+  /** `package.json` version of the fact package. */
+  packageVersion: string
+}
+
 /**
- * Reads the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, so each hub gets
- * the version its own lockfile pins. The fact package is resolved at call time with `createRequire` based at
- * `root`, never imported at the top of a module. The package must export `./index.json` or `./<path>/index.json`.
- * The index may be format 1.0 or 1.1.
- *
- * `version`, `include`, `platform` and `os` choose what the reader sees, see {@link selectFacts}. Without
- * `version`, a described product that is installed under `root` sets it: the facts of the installed version are
- * read, and facts for an older version than the one `describes` names still work. An installed product that is
- * newer than the facts cover makes reading throw, because the facts do not say anything about that version yet.
- * A product that is not installed there, such as a CLI or a service, sets nothing, and the reader gets the
- * latest published facts.
+ * Finds and parses the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`.
+ * Resolved at call time with `createRequire` based at `root`. Throws `FactReadError` when it can not be found
+ * or is not an index.
  */
-export function readFacts(spec: string, options: ReadFactsOptions = {}): FactReader {
+export function loadInstalledIndex(spec: string, root: string): InstalledIndex {
   const { packageName, entry } = splitSpec(spec)
-  const root = options.root ?? process.cwd()
   const require = createRequire(join(root, 'noop.js'))
   const target = entry ? `${packageName}/${entry}/index.json` : `${packageName}/index.json`
   let file: string
@@ -119,7 +122,25 @@ export function readFacts(spec: string, options: ReadFactsOptions = {}): FactRea
     throw new FactReadError('not-an-index', `readFacts: ${file} is not a fact index (${(error as Error).message})`)
   }
   assertIndex(parsed, `readFacts: ${file}`)
-  const index = parsed as FactIndex
+  return { index: parsed as FactIndex, file, packageName, entry, packageVersion: owningVersion(file, packageName) }
+}
+
+/**
+ * Reads the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, so each hub gets
+ * the version its own lockfile pins. The fact package is resolved at call time with `createRequire` based at
+ * `root`, never imported at the top of a module. The package must export `./index.json` or `./<path>/index.json`.
+ * The index may be format 1.0 or 1.1.
+ *
+ * `version`, `include`, `platform` and `os` choose what the reader sees, see {@link selectFacts}. Without
+ * `version`, a described product that is installed under `root` sets it: the facts of the installed version are
+ * read, and facts for an older version than the one `describes` names still work. An installed product that is
+ * newer than the facts cover makes reading throw, because the facts do not say anything about that version yet.
+ * A product that is not installed there, such as a CLI or a service, sets nothing, and the reader gets the
+ * latest published facts.
+ */
+export function readFacts(spec: string, options: ReadFactsOptions = {}): FactReader {
+  const root = options.root ?? process.cwd()
+  const { index, packageName, entry, packageVersion } = loadInstalledIndex(spec, root)
   const describes = index.describes ?? {}
 
   let version = options.version
@@ -148,7 +169,6 @@ export function readFacts(spec: string, options: ReadFactsOptions = {}): FactRea
     ...(options.os !== undefined ? { os: options.os } : {}),
   })
   const byId = new Map(facts.map((f) => [f.id, f]))
-  const packageVersion = owningVersion(file, packageName)
   const entryName = index.entry ?? entry
   const { onRead } = options
   const note = (fact: SelectedFact): void => {

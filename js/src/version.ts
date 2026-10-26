@@ -80,24 +80,36 @@ export function compareLines(a: Semver, b: Semver): -1 | 0 | 1 {
   return sign(a.major - b.major) || sign(a.minor - b.minor)
 }
 
+/** What is wrong with a `since` value: a form that is not allowed, or two versions on one release line. */
+export interface SinceIssue {
+  code: 'since-format' | 'same-line'
+  message: string
+}
+
 /** Why a `since` value is not one of the three allowed forms, or undefined when it is fine. */
-export function sinceProblem(since: Since): string | undefined {
+export function sinceIssue(since: Since): SinceIssue | undefined {
+  const format = (message: string): SinceIssue => ({ code: 'since-format', message })
   if (typeof since === 'string') {
-    return since === 'next' || parseVersion(since) ? undefined : `"${since}" is neither a version nor "next"`
+    return since === 'next' || parseVersion(since) ? undefined : format(`"${since}" is neither a version nor "next"`)
   }
-  if (!Array.isArray(since) || since.length === 0) return 'an array of versions must not be empty'
+  if (!Array.isArray(since) || since.length === 0) return format('an array of versions must not be empty')
   const lines = new Set<string>()
   for (const [i, item] of since.entries()) {
     if (item === 'next') {
-      if (i !== since.length - 1) return '"next" may only be the last item of an array'
+      if (i !== since.length - 1) return format('"next" may only be the last item of an array')
       continue
     }
     const v = typeof item === 'string' ? parseVersion(item) : undefined
-    if (!v) return `"${String(item)}" is not a version`
+    if (!v) return format(`"${String(item)}" is not a version`)
     const line = `${v.major}.${v.minor}`
-    if (lines.has(line)) return `two versions on release line ${line}`
+    if (lines.has(line)) {
+      return { code: 'same-line', message: `two versions on release line ${line}` }
+    }
     lines.add(line)
   }
-  if (since.length === 1 && since[0] === 'next') return 'use "next", not ["next"]'
+  if (since.length === 1 && since[0] === 'next') return format('use "next", not ["next"]')
   return undefined
 }
+
+/** Same as {@link sinceIssue}, the message only. */
+export const sinceProblem = (since: Since): string | undefined => sinceIssue(since)?.message

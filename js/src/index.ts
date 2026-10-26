@@ -1,11 +1,15 @@
 export type {
+  DerivedFact,
   Fact,
+  FactDecl,
+  FactLike,
   FactContent,
   FactIndex,
   FactProbe,
   FactSource,
   FactVariant,
   FactsModule,
+  FactsSource,
   JsonSchema,
   Os,
   Problem,
@@ -13,6 +17,9 @@ export type {
   Text,
 } from './types.ts'
 export { defineFacts } from './define.ts'
+export { HistoryError, history, keyed } from './history.ts'
+export type { HistoryRow } from './history.ts'
+export { derive, factLink } from './author.ts'
 export {
   EXAMPLE_GROUP_SCHEMA_ID,
   FACT_SCHEMA_ID,
@@ -28,7 +35,7 @@ export { validateExampleGroup, validateFact, validateIndex, validateSchemaDocume
 export type { ValidationIssue } from './validate.ts'
 export { checkFacts, findLocalPaths, findUrlHosts, isAllowedHost } from './check.ts'
 export type { CheckOptions, CheckResult, ExampleInput, IndexInput } from './check.ts'
-export { checkProject, readConfig } from './project.ts'
+export { checkProject, parseTrain, readConfig } from './project.ts'
 export type { CheckProjectOptions, ProjectConfig } from './project.ts'
 export { INDEX_FORMAT, buildFacts, buildIndex, expectedExports, exportsCover } from './build.ts'
 export type { BuildOptions, BuildResult } from './build.ts'
@@ -36,7 +43,7 @@ export { aggregateExports, planAggregate, writeAggregate } from './aggregate.ts'
 export type { AggregatePlan, PlacedIndex } from './aggregate.ts'
 export { impactOf } from './impact.ts'
 export type { Impact, ImpactOptions } from './impact.ts'
-export { loadEntries } from './load.ts'
+export { InputError, LoadError, loadEntries } from './load.ts'
 export type { LoadedEntry } from './load.ts'
 export { readFacts } from './read.ts'
 export type { FactRead, FactReader, ReadFactsOptions } from './read.ts'

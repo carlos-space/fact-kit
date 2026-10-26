@@ -182,6 +182,15 @@ export async function planAggregate(
       if (spec === undefined) return location
       return spec === p.spec ? location.slice(at + 1) : `${spec}:${location.slice(at + 1)}`
     }
+    // `factLink` writes a location inside a sentence of the content. It is rewritten the same way.
+    const keys = [...published.keys()]
+      .sort((a, b) => b.length - a.length)
+      .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    const inText = keys.length > 0 ? new RegExp(`(?<![\\w@/.-])(${keys.join('|')}):(?=[a-z0-9])`, 'g') : undefined
+    const rewriteText = (text: string): string =>
+      inText
+        ? text.replace(inText, (_m, key: string) => (published.get(key) === p.spec ? '' : `${published.get(key)}:`))
+        : text
     const { indexFormat, package: _package, entry: _entry, ...rest } = p.index
     p.index = {
       ...(indexFormat !== undefined ? { indexFormat } : {}),
@@ -189,14 +198,36 @@ export async function planAggregate(
       entry: p.dir || '.',
       component: p.component,
       ...rest,
-      facts: p.index.facts.map((fact) => rewriteFact(fact, rewrite)),
+      facts: p.index.facts.map((fact) =>
+        rewriteFact(fact, rewrite, (spec) => published.get(spec) ?? spec, rewriteText),
+      ),
     } as FactIndex
   }
   return { aggregate: aggregateName, placed, problems }
 }
 
-function rewriteFact(fact: Fact, rewrite: (location: string) => string): Fact {
-  const out: Fact = { ...fact }
+/** Copy of `value` with every string passed through `fn`. */
+function mapStrings(value: unknown, fn: (text: string) => string): unknown {
+  if (typeof value === 'string') return fn(value)
+  if (Array.isArray(value)) return value.map((v) => mapStrings(v, fn))
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapStrings(v, fn)]))
+  }
+  return value
+}
+
+function rewriteFact(
+  fact: Fact,
+  rewrite: (location: string) => string,
+  rewriteSpec: (spec: string) => string,
+  rewriteText: (text: string) => string,
+): Fact {
+  const out = { ...fact } as Fact & Record<string, unknown>
+  for (const key of ['title', 'description', 'content', 'variants'] as const) {
+    if (fact[key] !== undefined) out[key] = mapStrings(fact[key], rewriteText) as never
+  }
+  // A derived fact names its upstream by spec. That spec is published under the aggregate name too.
+  if (fact.source?.kind === 'derived') out.source = { ...fact.source, from: rewriteSpec(fact.source.from) }
   if (Array.isArray(fact.derivedFrom)) out.derivedFrom = fact.derivedFrom.map(rewrite)
   if (typeof fact.when?.movedTo === 'string') out.when = { ...fact.when, movedTo: rewrite(fact.when.movedTo) }
   return out

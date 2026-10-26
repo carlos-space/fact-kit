@@ -30,15 +30,17 @@ The TypeScript runs with Node's built-in type stripping (Node 24 or later). Use 
 
 ```text
 fact-kit check [--cwd dir] [--config file] [--facts-dir dir] [--examples-dir dir]
-               [--index path]... [--allow-domain host]...
-fact-kit build [--cwd dir] [--facts-dir dir] [--out-dir dir] [--write-exports]
+               [--index path]... [--allow-domain host]... [--train component=version]... [--json]
+fact-kit build [--cwd dir] [--facts-dir dir] [--out-dir dir] [--write-exports] [--accept-upstream]
 fact-kit diff <old> <new> [--json]
 fact-kit diff --impact <id> [--cwd dir] [--json]
 ```
 
 `check` validates every fact against the meta-schema, rejects duplicate ids, local absolute paths and
-domains that are not in the allowed list, and checks that examples only reference existing fact ids.
-Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`, `indexFiles`, `allowedDomains`, and for the aggregate package below, `aggregate` and `docsDirs`).
+domains that are not in the allowed list, and checks that examples only reference existing fact ids. The other
+rules are in [Check rules](#check-rules). Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`,
+`indexFiles`, `allowedDomains`, `repoRoot`, `testDirs`, `docsDirs`, `implDirs`, and for the aggregate package below, `aggregate`). The three directory lists are
+relative to the package, and `repoRoot` defaults to the nearest parent that holds `.git`.
 
 A fact whose content changes over versions, or differs by platform, lists rows in `variants`
 (`{ since, content, pending?, stability?, platforms?, os? }`). `since` is a version, `'next'`, or one version per
@@ -81,6 +83,95 @@ read them.
 in TypeScript the string argument of `get`, `value` and `has` calls and imports of a fact object. An import counts when its relative module, loaded the way `build` loads fact sources,
 exports a fact object with the id, whatever name it is imported under; a module that fails to load is skipped. Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
 loaded only then.
+
+### History, keys and relations
+
+A fact with several versions writes `variants: history(...rows)`. The first row gives the content (`value`,
+`schema` or `statement`). Each later row either rewrites it whole, or changes the content of the row before it
+with `remove`, `replace`, `add` and `set`, applied in that order. Targets are JSON Pointers (RFC 6901, `~0` and `~1`
+escape, `''` is the root). `since`, `pending`, `stability`, `platforms` and `os` go to the variant as written.
+`content` may be left out, and the build fills it with the latest published row.
+
+```ts
+import { defineFacts, history, keyed } from 'fact-kit'
+
+const edge = (from: string, to: string) => ({ from, to })
+
+export default defineFacts({
+  describes: { demo: '1.2.0' },
+  facts: [
+    {
+      id: 'demo.flow',
+      tool: 'demo',
+      topics: ['flow'],
+      title: 'Flow',
+      source: { kind: 'published' },
+      variants: history(
+        { since: '1.0.0', value: { transitions: keyed([edge('draft', 'active')], ['from', 'to']), max: 10 } },
+        { since: '1.1.0', add: { '/transitions': [edge('active', 'done')] }, set: { '/max': 40 } },
+        { since: 'next', remove: { '/transitions': [['draft', 'active']] } },
+      ),
+    },
+  ],
+})
+```
+
+`keyed(items, keys)` declares which fields identify an item, so `add`, `remove` and `replace` can name items. One
+key field is written as its value, several as an array in the declared order (`['draft', 'active']`), so no field
+value is ambiguous. Without `keys` the items are scalars and identify themselves. An array that is not keyed can
+only be replaced whole, and `add` or `remove` on it fails. `replace` on a keyed array with a list of items swaps
+them in by key. Anywhere else it replaces the value at the pointer, which must exist, and `set` puts a value there
+even when the last member is new. A row that does not fit fails the build and names the key. `check` reports it as
+`history`.
+
+To relate facts, import the other fact object and put it in `relates: [fact]`, or write `factLink(fact)` inside
+the content, which becomes the fact location (`<id>` in the same entry, `<spec>:<id>` in another). The build
+lists them in `derivedFrom` by object identity, so renaming an id or moving a file does not break the link. A fact
+object that is not one of this package's facts, such as one imported from another package, fails `check` with
+`relates-foreign`.
+
+A fact of another package is brought in with `derive(upstreamSpec, id, map?)` as an item of `facts`:
+
+```ts
+import { derive } from 'fact-kit'
+
+derive('@scope/tool-facts/cli', 'tool.limits', (up) => ({ id: 'mine.limits', tool: 'mine', title: up.title }))
+```
+
+The build reads the installed index of `upstreamSpec`, copies the fact, lets `map` return the fields to change, and
+writes `source: { kind: 'derived', from, version }` with the version of the installed upstream package, and
+`derivedFrom: ['<upstreamSpec>:<id>']`.
+
+The build also writes `derived.lock.json` next to package.json, which maps each upstream spec to the version it
+used (`{ "@scope/tool-facts/cli": "1.2.0" }`). Commit it. When the installed upstream version differs from the
+lock, the build fails with `derive-version` and names both versions. Look at what changed upstream, then build with
+`--accept-upstream`, which rewrites the lock. A missing lock is written from the installed versions and is not a
+failure, and a package without derived facts gets none. `check` makes the same comparison, and
+`check --index dist/<entry>` compares the version a built index records with the installed upstream.
+
+## Check rules
+
+`check` exits with 0 when it finds no problem, 1 when it finds problems and 2 when it can not run: an unknown
+option, a `--train` that is not `<component>=<version>`, a config or `--index` file that can not be read. `--json`
+prints `{ problems: [{ code, message, location }] }` on stdout. `build` runs the first group only, because it must
+work on a release branch.
+
+| Code                                                                                                                 | Rule                                                                                                                                                               | Reads                                           |
+| :------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------- |
+| `format`, `duplicate-id`, `id-prefix`, `missing-schema-file`, `unknown-fact-id`, `local-path`, `unregistered-domain` | The fact format, ids, `$ref` files, references, paths and domains                                                                                                  | sources, built indexes                          |
+| `since-format`, `same-line`, `ambiguous-rows`, `describes`                                                           | `since` is a version, `next` or an array of versions on different release lines. Rows are not a tie. `describes` names at most one component and the entries agree | sources, built indexes                          |
+| `relation-cycle`, `relates-foreign`, `history`, `derive`                                                             | `derivedFrom` is a DAG. Relations stay in the package. `history` rows fit. `derive` finds its upstream fact                                                        | sources, installed upstream                     |
+| `derive-version`                                                                                                     | `derived.lock.json` and a built index record the installed upstream version                                                                                        | installed upstream, `derived.lock.json`         |
+| `lib-rows`                                                                                                           | `facts/_lib` holds functions and constants, no row with `since`                                                                                                    | `facts/_lib`, parsed with oxc                   |
+| `since-ahead`                                                                                                        | `since` is not newer than `describes`, or than `--train <component>=<version>`                                                                                     | sources, `--train`                              |
+| `train-next`                                                                                                         | A component named by `--train` has no `next` left, except in a `pending` row                                                                                       | sources, `--train`                              |
+| `pending-untested`                                                                                                   | A `pending` label is passed as `include` by a test in `testDirs`                                                                                                   | `testDirs`, parsed with oxc                     |
+| `doc-unknown-id`                                                                                                     | `fact:<id>` and `fact:<spec>:<id>` in the markdown of `docsDirs` name facts that exist                                                                             | `docsDirs`                                      |
+| `impl-imports-facts`, `impl-depends-on-facts`                                                                        | The implementation does not import a `-facts` package in `implDirs`, and a package that is not a facts package does not list one in `dependencies`                 | `implDirs`, every package.json under `repoRoot` |
+
+The rules that read code use `oxc-parser`, an optional peer dependency. Add it (`pnpm add -D oxc-parser`) to a
+package whose `check` uses `testDirs`, `implDirs` or `facts/_lib`. `--train` is for the release flow: a component
+being released as `X.Y.Z` allows `since` up to `X.Y.Z` even though `describes` still names the last release.
 
 ## Reading
 
