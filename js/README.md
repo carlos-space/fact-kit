@@ -38,7 +38,8 @@ Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`, `indexFi
 A fact whose content changes over versions, or differs by platform, lists rows in `variants`
 (`{ since, content, pending?, stability?, platforms?, os? }`). `since` is a version, `'next'`, or one version per
 release line (`['0.48.1', '0.49.1']`, which may end in `'next'`). `when.replacement` takes one id or several,
-`when.movedTo` is `<spec>:<id>`, and `derivedFrom` lists the fact locations a fact is computed from.
+`when.movedTo` is a fact location (`<id>`, or `<spec>:<id>` in another package or entry), and `derivedFrom` lists
+the fact locations a fact is computed from.
 `check` also rejects a `since` that is not a version, and rows that a reader can not tell apart; it warns when
 the top-level `content` has to be a guess. The rules are in [`conformance/README.md`](../conformance/README.md).
 
