@@ -150,3 +150,7 @@ vite.config.ts.timestamp-*
 
 # Scratch area for local experiments
 tmp/
+
+# The resolve samples of conformance/ hold installed packages on purpose
+!conformance/resolve/**/node_modules/
+!conformance/resolve/**/dist/

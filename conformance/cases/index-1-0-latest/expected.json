@@ -1,0 +1,25 @@
+{
+  "facts": [
+    {
+      "id": "demo.a",
+      "content": {
+        "value": "a"
+      },
+      "since": "0.0.0"
+    },
+    {
+      "id": "demo.b",
+      "content": {
+        "value": "b"
+      },
+      "since": "0.40.0"
+    },
+    {
+      "id": "demo.c",
+      "content": {
+        "value": "c"
+      },
+      "since": "0.60.0"
+    }
+  ]
+}

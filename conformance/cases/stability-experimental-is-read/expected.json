@@ -1,0 +1,19 @@
+{
+  "facts": [
+    {
+      "id": "demo.e",
+      "content": {
+        "value": "experimental"
+      },
+      "since": "0.45.0",
+      "stability": "experimental"
+    },
+    {
+      "id": "demo.f",
+      "content": {
+        "value": "f"
+      },
+      "since": "0.40.0"
+    }
+  ]
+}

@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "build": "pnpm -r build",
     "test": "vitest run",
+    "conformance:js": "vitest run js/test/conformance.test.ts",
     "snapshot": "bash scripts/release/snapshot.sh"
   },
   "devDependencies": {

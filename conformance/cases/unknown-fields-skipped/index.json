@@ -1,0 +1,49 @@
+{
+  "indexFormat": "1.9",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "facts": [
+    {
+      "id": "demo.a",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.a",
+      "content": {
+        "value": "a"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "future": {
+        "x": 1
+      },
+      "derivedFrom": ["demo.b"]
+    },
+    {
+      "id": "demo.b",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.b",
+      "content": {
+        "value": "top-level"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "variants": [
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "b"
+          },
+          "later": true
+        }
+      ],
+      "another": [1, 2]
+    }
+  ],
+  "newTopLevel": "x"
+}
