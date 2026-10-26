@@ -30,7 +30,6 @@ describe('c001 meta-schema', () => {
         when: { platforms: ['claude-code'], os: ['macos'], since: '1.0.0', replacement: 'claude-code.hook-exit-3' },
         source: { kind: 'observed', basis: 'doc', url: 'https://docs.example.com/hooks' },
         verify: { probe: { kind: 'hash', anchor: 'exit code 2', hash: 'abc' }, verifiedOn: '2.1.308' },
-        ac: ['ac001'],
       }),
     ).toEqual([])
     expect(
@@ -101,7 +100,9 @@ describe('c001 meta-schema', () => {
   })
 
   test('structural mistakes are rejected', () => {
-    expect(validateFact({ ...valid, extra: 1 }).map((i) => i.message)).toContain('unknown property "extra"')
+    // A field this version does not know is allowed at the top of a fact, so a later 1.x can add some.
+    expect(validateFact({ ...valid, extra: 1 })).toEqual([])
+    expect(validateFact({ ...valid, when: { extra: 1 } }).map((i) => i.message)).toContain('unknown property "extra"')
     expect(validateFact({ ...valid, id: 'NoDot' })).not.toEqual([])
     expect(validateFact({ ...valid, content: { value: 1, statement: 'x' } })).not.toEqual([])
     expect(validateFact({ ...valid, source: { kind: 'observed' } })).not.toEqual([])

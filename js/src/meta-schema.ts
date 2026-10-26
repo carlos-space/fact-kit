@@ -50,6 +50,16 @@ const text = {
 
 const nonEmptyString = { type: 'string', minLength: 1 }
 const stringList = { type: 'array', items: nonEmptyString }
+const osList = { type: 'array', items: { enum: ['macos', 'linux', 'windows'] } }
+/** A version, `'next'`, or one version per release line. Whether each is a valid version is checked by `check`. */
+const since = { oneOf: [nonEmptyString, { type: 'array', minItems: 1, items: nonEmptyString }] }
+
+const factContent = {
+  type: 'object',
+  properties: { value: true, schema: { $ref: SCHEMA_DIALECT_ID }, statement: text },
+  additionalProperties: false,
+  oneOf: [{ required: ['value'] }, { required: ['schema'] }, { required: ['statement'] }],
+}
 
 /** Meta-schema for one fact. */
 export const factSchema = {
@@ -58,29 +68,43 @@ export const factSchema = {
   title: 'Fact',
   type: 'object',
   required: ['id', 'tool', 'topics', 'title', 'content', 'source'],
-  additionalProperties: false,
+  // Fields this version does not know are allowed, so a later 1.x minor can add some and readers skip them.
   properties: {
     id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$' },
     tool: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
     topics: stringList,
     title: text,
     description: text,
-    content: {
-      type: 'object',
-      properties: { value: true, schema: { $ref: SCHEMA_DIALECT_ID }, statement: text },
-      additionalProperties: false,
-      oneOf: [{ required: ['value'] }, { required: ['schema'] }, { required: ['statement'] }],
+    content: factContent,
+    variants: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['since', 'content'],
+        additionalProperties: false,
+        properties: {
+          since,
+          content: factContent,
+          pending: nonEmptyString,
+          stability: { enum: ['experimental'] },
+          platforms: stringList,
+          os: osList,
+        },
+      },
     },
+    derivedFrom: stringList,
     when: {
       type: 'object',
       additionalProperties: false,
       properties: {
         platforms: stringList,
-        os: { type: 'array', items: { enum: ['macos', 'linux', 'windows'] } },
-        since: nonEmptyString,
+        os: osList,
+        since,
         deprecatedIn: nonEmptyString,
         removeIn: nonEmptyString,
-        replacement: nonEmptyString,
+        replacement: { oneOf: [nonEmptyString, { type: 'array', minItems: 1, items: nonEmptyString }] },
+        movedTo: { type: 'string', pattern: '^[^:\\s]+:[^:\\s]+$' },
       },
     },
     source: {
@@ -156,7 +180,6 @@ export const factSchema = {
         },
       },
     },
-    ac: stringList,
   },
   // `verify` belongs to observed facts only.
   if: { required: ['verify'] },
@@ -170,8 +193,9 @@ export const indexSchema = {
   title: 'Fact index',
   type: 'object',
   required: ['package', 'entry', 'describes', 'facts'],
-  additionalProperties: false,
+  // Fields this version does not know are allowed, see the fact schema.
   properties: {
+    indexFormat: { type: 'string', pattern: '^[0-9]+\\.[0-9]+$' },
     package: nonEmptyString,
     entry: nonEmptyString,
     formatVersion: nonEmptyString,

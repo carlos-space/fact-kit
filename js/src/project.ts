@@ -50,6 +50,7 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
   if (file instanceof LoadError) {
     return {
       problems: [{ code: 'load', message: file.message, location: file.file }],
+      warnings: [],
       counts: { indexes: 0, facts: 0, schemas: 0, examples: 0 },
     }
   }
@@ -77,7 +78,12 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
     if (entries.length === 0) return
     const packageName = await readPackageName(cwd)
     for (const e of entries) {
-      indexes.push({ origin: `${factsDir}/${e.entry}/index.ts`, index: buildIndex(packageName, e), schemas: e.schemas })
+      indexes.push({
+        origin: `${factsDir}/${e.entry}/index.ts`,
+        index: buildIndex(packageName, e),
+        schemas: e.schemas,
+        source: true,
+      })
     }
   })
 

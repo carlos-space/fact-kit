@@ -14,7 +14,8 @@ pnpm add -D fact-kit
 ## Authoring
 
 A package holds one directory per entry: `facts/<entry>/index.ts`, which default-exports
-`{ describes, facts }`. Optional `facts/<entry>/schemas/*.schema.json` hold field shapes that facts `$ref`.
+`{ describes, facts }`. `describes` names exactly one component, such as `{ mainflow: '1.2.0' }`, and `check`
+rejects an entry that names none or several, and entries of one package that name different components. Optional `facts/<entry>/schemas/*.schema.json` hold field shapes that facts `$ref`.
 Directories starting with `_` are helpers, not entries.
 
 The TypeScript runs with Node's built-in type stripping (Node 24 or later). Use erasable syntax only
@@ -34,8 +35,16 @@ fact-kit diff <old> <new> [--json]
 domains that are not in the allowed list, and checks that examples only reference existing fact ids.
 Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`, `indexFiles`, `allowedDomains`).
 
+A fact whose content changes over versions, or differs by platform, lists rows in `variants`
+(`{ since, content, pending?, stability?, platforms?, os? }`). `since` is a version, `'next'`, or one version per
+release line (`['0.48.1', '0.49.1']`, which may end in `'next'`). `when.replacement` takes one id or several,
+`when.movedTo` is `<spec>:<id>`, and `derivedFrom` lists the fact locations a fact is computed from.
+`check` also rejects a `since` that is not a version, and rows that a reader can not tell apart; it warns when
+the top-level `content` has to be a guess. The rules are in [`conformance/README.md`](../conformance/README.md).
+
 `build` writes `dist/<entry>/index.json` and `dist/<entry>/schemas/`, and reports the `exports` entries
-package.json needs (`--write-exports` adds them). `build` validates format and ids only; it does not scan
+package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.1"`, and a fact with `variants`
+gets the latest published row as its top-level `content`, which is what a reader of format 1.0 uses. `build` validates format and ids only; it does not scan
 for local paths or domains, so run `check` before publishing.
 
 ## Reading
@@ -44,16 +53,34 @@ for local paths or domains, so run `check` before publishing.
 import { readFacts } from 'fact-kit'
 
 // Resolved from `root` (default: process.cwd()), so each hub reads the version its lockfile pins.
-const facts = readFacts('@scope/some-facts/cli', { root: hubRoot })
+const facts = readFacts('@scope/some-facts/cli', { root: hubRoot, version: '0.48.0', platform: 'claude-code' })
 facts.value('tool.some-fact')
 ```
 
+`spec` is `<package>` or `<package>/<path>`, and the path may have several segments. The package must export
+`./index.json` or `./<path>/index.json`. Both index format 1.0 and 1.1 are read.
+
+| Option     | Meaning                                                                                                          |
+| :--------- | :--------------------------------------------------------------------------------------------------------------- |
+| `root`     | Directory the package is resolved from                                                                           |
+| `version`  | Version of the described component the reader runs, or `'head'`. Rows that start later are not read              |
+| `include`  | Labels of `pending` rows that a reader on `head` also gets                                                       |
+| `platform` | Platform of the reader. A row with a `platforms` condition is read only when it lists this one                   |
+| `os`       | `'macos'`, `'linux'` or `'windows'`, same idea for `os` conditions                                               |
+| `onRead`   | Called synchronously once per `get`, `value` and found `has`, and once per field other than `id` read on `facts` |
+
+Without `version`, a described component that is installed under `root` sets it: the facts of the installed
+version are read, and facts for an older version than `describes` names work too. An installed component that is
+newer than `describes` makes `readFacts` throw, because the facts do not cover that version yet. When the
+component is not installed (a CLI or a service), the reader gets the latest published rows.
+
+`selectFacts(index, { version, include, platform, os })` is the same selection as a pure function over a parsed
+`index.json`. Each fact in the result is flattened to the row that applies, with that row's `since` and
+`stability`. Errors are `FactReadError` with a stable `code`: `not-an-index`, `unsupported-index-format`,
+`not-found` and `invalid-version`.
+
 `get(id)` and `value(id)` throw for an unknown id, so a misspelled id fails the build; `has(id)` tests for
 one. `version` is the installed fact package's version, for citing where a fact came from.
-
-Each key of an entry's `describes` is an npm package name. When `root` has that package installed, its
-version must equal the described one, or `readFacts` throws: the facts would describe another version than
-the hub runs. A product that is not an installed package, such as a CLI or a service, is not checked.
 
 `diffIndexFiles(oldPath, newPath)` and `diffIndexes(old, new)` list the added, removed and changed ids
 between two builds, the same as `fact-kit diff`.
