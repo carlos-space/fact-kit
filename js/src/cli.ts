@@ -39,7 +39,7 @@ Options for build
   --facts-dir <dir>     Fact sources (default: facts)
   --out-dir <dir>       Output directory (default: dist)
   --write-exports       Add the missing "exports" entries to package.json
-  --accept-upstream     Build facts derived from a newer upstream version than the last build recorded
+  --accept-upstream     Build facts derived from another upstream version than derived.lock.json records, and rewrite it
 
 Options for diff
   --json                Print the result as JSON

@@ -140,9 +140,14 @@ derive('@scope/tool-facts/cli', 'tool.limits', (up) => ({ id: 'mine.limits', too
 
 The build reads the installed index of `upstreamSpec`, copies the fact, lets `map` return the fields to change, and
 writes `source: { kind: 'derived', from, version }` with the version of the installed upstream package, and
-`derivedFrom: ['<upstreamSpec>:<id>']`. When the last build in `dist/` recorded another upstream version than the
-installed one, the build fails and names both versions. Look at what changed upstream, then build with
-`--accept-upstream`. `check --index dist/<entry>` compares a built index with the installed upstream the same way.
+`derivedFrom: ['<upstreamSpec>:<id>']`.
+
+The build also writes `derived.lock.json` next to package.json, which maps each upstream spec to the version it
+used (`{ "@scope/tool-facts/cli": "1.2.0" }`). Commit it. When the installed upstream version differs from the
+lock, the build fails with `derive-version` and names both versions. Look at what changed upstream, then build with
+`--accept-upstream`, which rewrites the lock. A missing lock is written from the installed versions and is not a
+failure, and a package without derived facts gets none. `check` makes the same comparison, and
+`check --index dist/<entry>` compares the version a built index records with the installed upstream.
 
 ## Check rules
 
@@ -156,7 +161,7 @@ work on a release branch.
 | `format`, `duplicate-id`, `id-prefix`, `missing-schema-file`, `unknown-fact-id`, `local-path`, `unregistered-domain` | The fact format, ids, `$ref` files, references, paths and domains                                                                                                  | sources, built indexes                          |
 | `since-format`, `same-line`, `ambiguous-rows`, `describes`                                                           | `since` is a version, `next` or an array of versions on different release lines. Rows are not a tie. `describes` names at most one component and the entries agree | sources, built indexes                          |
 | `relation-cycle`, `relates-foreign`, `history`, `derive`                                                             | `derivedFrom` is a DAG. Relations stay in the package. `history` rows fit. `derive` finds its upstream fact                                                        | sources, installed upstream                     |
-| `derive-version`                                                                                                     | A derived fact records the installed upstream version                                                                                                              | installed upstream, `dist/`                     |
+| `derive-version`                                                                                                     | `derived.lock.json` and a built index record the installed upstream version                                                                                        | installed upstream, `derived.lock.json`         |
 | `lib-rows`                                                                                                           | `facts/_lib` holds functions and constants, no row with `since`                                                                                                    | `facts/_lib`, parsed with oxc                   |
 | `since-ahead`                                                                                                        | `since` is not newer than `describes`, or than `--train <component>=<version>`                                                                                     | sources, `--train`                              |
 | `train-next`                                                                                                         | A component named by `--train` has no `next` left, except in a `pending` row                                                                                       | sources, `--train`                              |

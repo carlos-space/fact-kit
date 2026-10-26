@@ -384,7 +384,7 @@ const commands = {
       {
         flag: '--accept-upstream',
         summary:
-          'Build facts derived from a newer upstream version than the last build recorded. Without it the build fails and names both versions.',
+          'Build facts derived from another upstream version than `derived.lock.json` records, and rewrite the lock. Without it the build fails and names both versions.',
       },
     ],
   },
@@ -546,7 +546,7 @@ const moduleApi = {
       name: 'derive',
       signature: 'derive(upstreamSpec: string, id: string, map?: (upstream: Fact) => Partial<Fact>) => DerivedFact',
       summary:
-        "A fact computed from a fact of another package, listed in `facts`. The build reads the installed index of `upstreamSpec`, copies the fact `id`, lets `map` change the copy, and sets `source` to `{ kind: 'derived', from: upstreamSpec, version }` with the upstream version installed, and `derivedFrom` to `<upstreamSpec>:<id>`. Building again with another upstream version installed fails with `derive-version` until `--accept-upstream`.",
+        "A fact computed from a fact of another package, listed in `facts`. The build reads the installed index of `upstreamSpec`, copies the fact `id`, lets `map` change the copy, and sets `source` to `{ kind: 'derived', from: upstreamSpec, version }` with the upstream version installed, and `derivedFrom` to `<upstreamSpec>:<id>`. The build records each upstream spec and version in `derived.lock.json`, which goes into version control. Building with another upstream version installed fails with `derive-version` until `--accept-upstream` rewrites the lock.",
     },
     {
       name: 'defineExamples',
@@ -831,8 +831,8 @@ const checkRules = [
   },
   {
     code: 'derive-version',
-    rule: 'A derived fact records another upstream version than the one installed. `build` also compares with the index of its last build.',
-    reads: 'the installed upstream package, the last build',
+    rule: '`derived.lock.json`, or a built index passed with `--index`, records another upstream version than the one installed.',
+    reads: 'the installed upstream package, `derived.lock.json`',
   },
   {
     code: 'lib-rows',

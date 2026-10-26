@@ -7,7 +7,7 @@ import { buildIndex } from './build.ts'
 import { docRefProblems, findRepoRoot, implProblems, libRowProblems, testIncludes } from './rules.ts'
 import type { KnownFacts } from './rules.ts'
 import type { FactIndex, Problem } from './types.ts'
-import { installedVersionProblems } from './upstream.ts'
+import { derivedSources, installedVersionProblems, lockProblems, readLock } from './upstream.ts'
 import { parseVersion } from './version.ts'
 
 /** The settings of `fact-kit.config.json`. Command-line options override the file. */
@@ -169,6 +169,13 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
     for (const loaded of await loadExamples(join(cwd, examplesDir), examplesDir)) {
       for (const group of loaded.groups) examples.push({ origin: loaded.origin, group })
     }
+  })
+
+  // The same comparison the build makes: the sources built now against `derived.lock.json`.
+  await guard(async () => {
+    problems.push(
+      ...lockProblems(await readLock(cwd), derivedSources(indexes.filter((i) => i.source).map((i) => i.index))),
+    )
   })
 
   const pendingTested = hasPending(indexes) ? await testIncludes(config.testDirs ?? [], cwd) : undefined

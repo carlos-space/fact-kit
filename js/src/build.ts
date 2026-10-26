@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { aggregateExports, planAggregate, writeAggregate } from './aggregate.ts'
@@ -8,7 +9,7 @@ import type { LoadedEntry } from './load.ts'
 import { readConfig } from './project.ts'
 import { topLevelContent } from './select.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
-import { staleDerivedProblems } from './upstream.ts'
+import { LOCK_FILE, derivedSources, lockProblems, lockText, readLock } from './upstream.ts'
 
 export interface BuildOptions {
   /** Package directory, holding package.json. Defaults to `process.cwd()`. */
@@ -20,7 +21,7 @@ export interface BuildOptions {
   /** Add the `exports` entries that are missing from package.json. Otherwise missing entries are only reported. */
   writeExports?: boolean
   /**
-   * Build facts derived from a newer version of their upstream package than the last build recorded.
+   * Build facts derived from another upstream version than `derived.lock.json` records, and rewrite the lock.
    * Without it the build fails and says what version changed.
    */
   acceptUpstream?: boolean
@@ -122,16 +123,9 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     ...loaded.flatMap((e) => e.problems.map((p) => ({ ...p }))),
     ...checkFacts({ indexes, scan: false, strict: false }).problems,
   ]
-  if (!options.acceptUpstream) {
-    for (const [i, e] of loaded.entries()) {
-      const previous = await readFile(join(cwd, outDir, e.entry, 'index.json'), 'utf8')
-        .then((text) => JSON.parse(text) as unknown)
-        .catch(() => undefined)
-      if (previous !== undefined) {
-        result.problems.push(...staleDerivedProblems(previous, indexes[i]?.index, `${outDir}/${e.entry}/index.json`))
-      }
-    }
-  }
+  const sources = derivedSources(indexes.map((i) => i.index))
+  const lock = await readLock(cwd)
+  if (!options.acceptUpstream) result.problems.push(...lockProblems(lock, sources))
   if (result.problems.length > 0) return result
 
   for (const [i, e] of loaded.entries()) {
@@ -148,6 +142,15 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
       result.files.push(`${outDir}/${e.entry}/schemas/${s.file}`)
     }
     result.entries.push(e.entry)
+  }
+
+  // The lock records the upstream versions this build used, and goes into version control.
+  if (sources.size > 0) {
+    const text = lockText(sources)
+    if (!existsSync(join(cwd, LOCK_FILE)) || (await readFile(join(cwd, LOCK_FILE), 'utf8')) !== text) {
+      await writeFile(join(cwd, LOCK_FILE), text)
+      result.files.push(LOCK_FILE)
+    }
   }
 
   await syncExports(cwd, expectedExports(loaded, outDir), options.writeExports, result)

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, test } from 'vitest'
@@ -138,13 +138,14 @@ describe('c003 derive', () => {
     ].join('\n'),
   })
 
-  test('records the upstream spec and version, and the build fails once another version is installed', async () => {
+  test('derived.lock.json records the upstream version, and the build fails once another version is installed', async () => {
     const dir = makeTmp('derive')
     writeTree(dir, { ...files(), ...upstream('1.0.0') })
     const first = await cli(['build', '--cwd', dir, '--write-exports'])
     expect(first.stderr).toBe('')
     expect(first.code).toBe(0)
-    const fact = readJson(join(dir, 'dist/d/index.json')).facts[0]
+    const built = readJson(join(dir, 'dist/d/index.json'))
+    const fact = built.facts[0]
     expect(fact).toMatchObject({
       id: 'up.thing',
       content: { value: ['a', 'b'] },
@@ -152,29 +153,60 @@ describe('c003 derive', () => {
       source: { kind: 'derived', from: '@up/x-facts/cli', version: '1.0.0' },
     })
     expect('verify' in fact).toBe(false)
-    console.log('first build ->', JSON.stringify(fact.source), `exit ${first.code}`)
+    expect(readJson(join(dir, 'derived.lock.json'))).toEqual({ '@up/x-facts/cli': '1.0.0' })
+    console.log(
+      'first build ->',
+      JSON.stringify(fact.source),
+      JSON.stringify(readJson(join(dir, 'derived.lock.json'))),
+      `exit ${first.code}`,
+    )
 
-    // Another version is installed. The old build recorded 1.0.0.
+    // Another version is installed. The lock still says 1.0.0.
     writeTree(dir, upstream('1.1.0'))
     const second = await cli(['build', '--cwd', dir])
     expect(second.code).toBe(1)
     expect(second.stderr).toContain('derive-version')
-    expect(second.stderr).toContain('@up/x-facts/cli 1.0.0')
-    expect(second.stderr).toContain('1.1.0 is installed')
+    expect(second.stderr).toContain('@up/x-facts/cli 1.0.0 (derived.lock.json), but 1.1.0 is installed')
     console.log('second build ->', second.stderr.trim().replace(/\n/g, '\n    '), `\n    exit ${second.code}`)
+    expect(readJson(join(dir, 'derived.lock.json'))).toEqual({ '@up/x-facts/cli': '1.0.0' })
 
-    // check reads the built index against the installed package.
-    const checked = await cli(['check', '--cwd', dir, '--facts-dir', 'none', '--index', 'dist/d'])
+    // The old dist plays no part: the same failure without it.
+    rmSync(join(dir, 'dist'), { recursive: true })
+    expect((await cli(['build', '--cwd', dir])).code).toBe(1)
+
+    // check compares the lock with the installed upstream too, and so does check on a built index.
+    const checked = await cli(['check', '--cwd', dir, '--json'])
     expect(checked.code).toBe(1)
-    expect(checked.stderr).toContain('derived from @up/x-facts/cli 1.0.0, but 1.1.0 is installed')
+    expect(JSON.parse(checked.stdout).problems.map((p: any) => p.code)).toEqual(['derive-version'])
+    writeTree(dir, { 'built/d/index.json': built })
+    const viaIndex = await cli(['check', '--cwd', dir, '--facts-dir', 'none', '--index', 'built/d'])
+    expect(viaIndex.code).toBe(1)
+    expect(viaIndex.stderr).toContain('derived from @up/x-facts/cli 1.0.0, but 1.1.0 is installed')
 
-    // After looking at the upstream change, the build can accept it.
+    // After looking at the upstream change, the build rewrites the lock.
     const accepted = await cli(['build', '--cwd', dir, '--accept-upstream'])
     expect(accepted.code).toBe(0)
-    expect(readJson(join(dir, 'dist/d/index.json')).facts[0].source.version).toBe('1.1.0')
-    const again = await cli(['check', '--cwd', dir, '--facts-dir', 'none', '--index', 'dist/d'])
-    expect(again.stderr).toBe('')
-    expect(again.code).toBe(0)
+    expect(readJson(join(dir, 'derived.lock.json'))).toEqual({ '@up/x-facts/cli': '1.1.0' })
+    const after = readJson(join(dir, 'dist/d/index.json'))
+    expect(after.facts[0].source.version).toBe('1.1.0')
+    expect((await cli(['check', '--cwd', dir])).code).toBe(0)
+
+    // Without the old dist the build gives the same result.
+    rmSync(join(dir, 'dist'), { recursive: true })
+    const rebuilt = await cli(['build', '--cwd', dir])
+    expect(rebuilt.code).toBe(0)
+    expect(readJson(join(dir, 'dist/d/index.json'))).toEqual(after)
+  })
+
+  test('a missing lock is written from the installed version, and a package without derived facts gets none', async () => {
+    const dir = makeTmp('derive-nolock')
+    writeTree(dir, { ...files(), ...upstream('3.0.0') })
+    expect((await cli(['build', '--cwd', dir, '--write-exports'])).code).toBe(0)
+    expect(readJson(join(dir, 'derived.lock.json'))).toEqual({ '@up/x-facts/cli': '3.0.0' })
+    const plain = makeTmp('derive-plain')
+    writeTree(plain, { 'package.json': pkg, 'facts/a/index.ts': 'export default { describes: {}, facts: [] }\n' })
+    expect((await cli(['build', '--cwd', plain, '--write-exports'])).code).toBe(0)
+    expect(existsSync(join(plain, 'derived.lock.json'))).toBe(false)
   })
 
   test('map changes the fields of the copy', async () => {
