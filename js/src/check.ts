@@ -1,6 +1,8 @@
 import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
+import { ambiguousRows, topLevelContent } from './select.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
+import { sinceProblem } from './version.ts'
 import { validateExampleGroup, validateIndex, validateSchemaDocument } from './validate.ts'
 import type { ValidationIssue } from './validate.ts'
 
@@ -10,6 +12,11 @@ export interface IndexInput {
   origin: string
   index: unknown
   schemas?: { file: string; schema: unknown }[]
+  /**
+   * Built from this package's own fact sources, not read from a published index. Only these get the `describes`
+   * rule, because a published index of format 1.0 may describe several products.
+   */
+  source?: boolean
 }
 
 export interface ExampleInput {
@@ -31,6 +38,8 @@ export interface CheckOptions {
 
 export interface CheckResult {
   problems: Problem[]
+  /** Things worth a look that do not fail the check. */
+  warnings: Problem[]
   /** How many facts, examples and schema files were looked at. */
   counts: { indexes: number; facts: number; schemas: number; examples: number }
 }
@@ -103,6 +112,38 @@ function scan(value: unknown, file: string, allowed: readonly string[], out: Pro
   }
 }
 
+/** Rows of one fact: `since` forms, rows a reader can not tell apart, and a top-level content that is a guess. */
+function checkRows(fact: Fact, location: string, problems: Problem[], warnings: Problem[]): void {
+  let valid = true
+  const sinceOf = (since: unknown, pointer: string) => {
+    if (since === undefined) return
+    const why = sinceProblem(since as never)
+    if (why) {
+      valid = false
+      problems.push({ code: 'since-format', message: `${fact.id}: since ${why}`, location: `${location}${pointer}` })
+    }
+  }
+  sinceOf(fact.when?.since, '/when/since')
+  const variants = Array.isArray(fact.variants) ? fact.variants : []
+  for (const [k, v] of variants.entries()) sinceOf((v as { since?: unknown } | null)?.since, `/variants/${k}/since`)
+  if (!valid || variants.length === 0) return
+  const pair = ambiguousRows(fact)
+  if (pair) {
+    problems.push({
+      code: 'ambiguous-rows',
+      message: `${fact.id}: variants ${pair[0]} and ${pair[1]} apply to the same readers with the same bound and conditions, so the reader can not choose`,
+      location: `${location}/variants/${pair[1]}`,
+    })
+  }
+  if (topLevelContent(fact)?.tier === 3) {
+    warnings.push({
+      code: 'top-level-content',
+      message: `${fact.id}: no row applies to a reader that names no platform, so the top-level content is the row with the largest bound`,
+      location: `${location}/content`,
+    })
+  }
+}
+
 // --- the check --------------------------------------------------------------------------------------
 const at = (file: string, pointer: string) => (pointer ? `${file}#${pointer}` : file)
 
@@ -135,10 +176,12 @@ export function schemaFileOfRef(ref: string): string | undefined {
  */
 export function checkFacts(options: CheckOptions): CheckResult {
   const problems: Problem[] = []
+  const warnings: Problem[] = []
   const allowed = options.allowedDomains ?? []
   const doScan = options.scan !== false
   const idOrigin = new Map<string, string>()
-  const replacements: { id: string; replacement: string; location: string }[] = []
+  const references: { id: string; field: string; target: string; location: string }[] = []
+  let component: { name: string | null; file: string } | undefined
   let factCount = 0
   let schemaCount = 0
 
@@ -176,13 +219,25 @@ export function checkFacts(options: CheckOptions): CheckResult {
             location: at(file, `/facts/${i}/id`),
           })
         }
-        if (typeof fact.when?.replacement === 'string') {
-          replacements.push({
+        const replacement = fact.when?.replacement
+        for (const [k, target] of (Array.isArray(replacement) ? replacement : [replacement]).entries()) {
+          if (typeof target !== 'string') continue
+          const pointer = Array.isArray(replacement)
+            ? `/facts/${i}/when/replacement/${k}`
+            : `/facts/${i}/when/replacement`
+          references.push({ id: fact.id, field: 'replacement', target, location: at(file, pointer) })
+        }
+        // A location with a colon points into another package or entry, which this check does not read.
+        for (const [k, target] of (Array.isArray(fact.derivedFrom) ? fact.derivedFrom : []).entries()) {
+          if (typeof target !== 'string' || target.includes(':')) continue
+          references.push({
             id: fact.id,
-            replacement: fact.when.replacement,
-            location: at(file, `/facts/${i}/when/replacement`),
+            field: 'derivedFrom',
+            target,
+            location: at(file, `/facts/${i}/derivedFrom/${k}`),
           })
         }
+        checkRows(fact as Fact, at(file, `/facts/${i}`), problems, warnings)
         // Inline schemas may $ref a file under schemas/.
         const shipped = new Set((input.schemas ?? []).map((s) => s.file))
         const inline = (fact.content as { schema?: unknown } | undefined)?.schema
@@ -200,6 +255,30 @@ export function checkFacts(options: CheckOptions): CheckResult {
         }
       }
     }
+    if (input.source) {
+      const describes = (input.index as Partial<FactIndex> | null)?.describes
+      const keys = describes && typeof describes === 'object' ? Object.keys(describes) : []
+      if (describes && typeof describes === 'object') {
+        // `{}` says the described thing has no version. Every entry of a package must agree.
+        const name = keys[0] ?? null
+        const show = (n: string | null) => (n === null ? 'nothing ({})' : `"${n}"`)
+        if (keys.length > 1) {
+          problems.push({
+            code: 'describes',
+            message: `describes must name at most one component, and this one names ${keys.length} (${keys.join(', ')})`,
+            location: at(file, '/describes'),
+          })
+        } else if (component && component.name !== name) {
+          problems.push({
+            code: 'describes',
+            message: `describes ${show(name)}, but ${component.file} of the same package describes ${show(component.name)}`,
+            location: at(file, '/describes'),
+          })
+        } else if (!component) {
+          component = { name, file }
+        }
+      }
+    }
     if (doScan) scan(input.index, file, allowed, problems)
 
     for (const s of input.schemas ?? []) {
@@ -210,11 +289,11 @@ export function checkFacts(options: CheckOptions): CheckResult {
     }
   }
 
-  for (const r of replacements) {
-    if (!idOrigin.has(r.replacement)) {
+  for (const r of references) {
+    if (!idOrigin.has(r.target)) {
       problems.push({
         code: 'unknown-fact-id',
-        message: `${r.id}: replacement "${r.replacement}" is not a known fact id`,
+        message: `${r.id}: ${r.field} "${r.target}" is not a known fact id`,
         location: r.location,
       })
     }
@@ -241,6 +320,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
 
   return {
     problems,
+    warnings,
     counts: { indexes: options.indexes.length, facts: factCount, schemas: schemaCount, examples: exampleCount },
   }
 }

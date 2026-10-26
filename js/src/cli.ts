@@ -64,7 +64,8 @@ async function runCheck(argv: string[], io: CliIo): Promise<number> {
     ...(values.index ? { indexFiles: values.index } : {}),
     ...(values['allow-domain'] ? { allowedDomains: values['allow-domain'] } : {}),
   }
-  const { problems, counts } = await checkProject(options)
+  const { problems, warnings, counts } = await checkProject(options)
+  for (const w of warnings) io.err(`warning ${w.code}: ${w.message}${w.location ? `\n  at ${w.location}` : ''}\n`)
   if (problems.length > 0) {
     for (const p of problems) io.err(`${p.code}: ${p.message}${p.location ? `\n  at ${p.location}` : ''}\n`)
     io.err(`fact-kit check: ${problems.length} problem${problems.length === 1 ? '' : 's'}\n`)

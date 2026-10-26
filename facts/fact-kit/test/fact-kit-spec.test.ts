@@ -247,8 +247,8 @@ describe('fact-kit.read-facts', () => {
     expect(() => reader.value('demo.said')).toThrow()
   })
 
-  it('throws in the four documented cases', () => {
-    expect(sample.throws).toHaveLength(4)
+  it('throws in the documented cases', () => {
+    expect(sample.throws).toHaveLength(5)
     const hub = makeTmp('read-facts-throws')
     writeTree(hub, {
       'package.json': { name: 'hub', private: true },
@@ -271,7 +271,8 @@ describe('fact-kit.read-facts', () => {
       },
       'node_modules/demo/package.json': { name: 'demo', version: '2.0.0' },
     })
-    expect(() => readFacts('no-entry', { root: hub })).toThrow(/<package>\/<entry>/)
+    expect(() => readFacts('', { root: hub })).toThrow(/not of the form/)
+    expect(() => readFacts('@demo/old-facts/sdk', { root: hub, version: 'latest' })).toThrow(/invalid-version/)
     expect(() => readFacts('@demo/missing-facts/sdk', { root: hub })).toThrow(/cannot resolve/)
     expect(() => readFacts('@demo/bad-facts/sdk', { root: hub })).toThrow(/not a fact index/)
     expect(() => readFacts('@demo/old-facts/sdk', { root: hub })).toThrow(

@@ -1,0 +1,11 @@
+{
+  "facts": [
+    {
+      "id": "demo.hook",
+      "content": {
+        "value": "macos"
+      },
+      "since": "0.40.0"
+    }
+  ]
+}

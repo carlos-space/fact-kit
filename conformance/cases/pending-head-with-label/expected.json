@@ -1,0 +1,18 @@
+{
+  "facts": [
+    {
+      "id": "demo.only",
+      "content": {
+        "value": "only"
+      },
+      "since": "next"
+    },
+    {
+      "id": "demo.p",
+      "content": {
+        "value": "planned x"
+      },
+      "since": "next"
+    }
+  ]
+}

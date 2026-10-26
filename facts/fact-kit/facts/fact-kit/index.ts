@@ -8,6 +8,11 @@ const nonEmpty = { type: 'string', minLength: 1 }
 const list = { type: 'array', items: nonEmpty }
 
 const defs = {
+  Since: {
+    description:
+      'When a row starts to apply: a version (a pre-release such as `0.49.0-alpha.1` is fine), `"next"` for the release that is not out yet, or an array with one version per release line `X.Y`. The array may end in `"next"`, which only a reader on `head` uses.',
+    oneOf: [nonEmpty, { type: 'array', minItems: 1, items: nonEmpty }],
+  },
   Text: {
     description: 'A string, or one string per language. Prompts take `zh-TW` and fall back to `en`.',
     oneOf: [
@@ -93,7 +98,7 @@ const factSchema = {
   title: 'Fact',
   type: 'object',
   required: ['id', 'tool', 'topics', 'title', 'content', 'source'],
-  additionalProperties: false,
+  // Fields this version does not know are allowed. A reader skips them.
   $defs: defs,
   properties: {
     id: {
@@ -115,16 +120,60 @@ const factSchema = {
       },
       oneOf: [{ required: ['value'] }, { required: ['schema'] }, { required: ['statement'] }],
     },
+    variants: {
+      description:
+        'Rows of a fact whose content changes by version or differs by platform. `content` then holds the latest published row, for readers of index format 1.0. Without `variants` the whole fact is one row that starts at `when.since` and has the conditions `when.platforms` and `when.os`.',
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        required: ['since', 'content'],
+        additionalProperties: false,
+        properties: {
+          since: { $ref: '#/$defs/Since' },
+          content: { $ref: '#/properties/content' },
+          pending: {
+            ...nonEmpty,
+            description: 'Label of planned content. Only a reader on `head` that includes the label gets the row.',
+          },
+          stability: {
+            enum: ['experimental'],
+            description: 'Experimental rows are read by default and carry the mark.',
+          },
+          platforms: {
+            ...list,
+            description: 'Platforms the row applies to. A reader that names none does not get it.',
+          },
+          os: {
+            type: 'array',
+            items: { enum: ['macos', 'linux', 'windows'] },
+            description: 'Operating systems the row applies to. A reader that names none does not get it.',
+          },
+        },
+      },
+    },
+    derivedFrom: {
+      ...list,
+      description: 'Locations of the facts this one is computed from: `<id>`, or `<spec>:<id>` for another package.',
+    },
     when: {
       type: 'object',
       additionalProperties: false,
       properties: {
         platforms: list,
         os: { type: 'array', items: { enum: ['macos', 'linux', 'windows'] } },
-        since: nonEmpty,
+        since: { $ref: '#/$defs/Since' },
         deprecatedIn: nonEmpty,
         removeIn: nonEmpty,
-        replacement: { ...nonEmpty, description: 'Id of the fact that replaces this one.' },
+        replacement: {
+          description: 'Id, or ids, of the facts that replace this one.',
+          oneOf: [nonEmpty, { type: 'array', minItems: 1, items: nonEmpty }],
+        },
+        movedTo: {
+          type: 'string',
+          pattern: '^[^:\\s]+:[^:\\s]+$',
+          description: '`<spec>:<id>`: where the fact lives now, when that is another package or entry.',
+        },
       },
     },
     source: { $ref: '#/$defs/Source' },
@@ -139,7 +188,6 @@ const factSchema = {
         screenedThrough: nonEmpty,
       },
     },
-    ac: list,
   },
 }
 
@@ -148,13 +196,19 @@ const indexSchema = {
   title: 'Fact index (dist/<entry>/index.json)',
   type: 'object',
   required: ['package', 'entry', 'describes', 'facts'],
-  additionalProperties: false,
+  // Fields this version does not know are allowed. A reader skips them.
   properties: {
+    indexFormat: {
+      type: 'string',
+      pattern: '^[0-9]+\\.[0-9]+$',
+      description: '`1.1` for what this version builds. A missing field reads as `1.0`. Readers take any `1.x`.',
+    },
     package: nonEmpty,
     entry: { ...nonEmpty, description: 'Sub-path of the entry, e.g. `claude-code`.' },
     formatVersion: nonEmpty,
     describes: {
-      description: 'Products this entry describes, with the version, e.g. `{ "claude-code": "2.1.308" }`.',
+      description:
+        'The component this entry describes and the latest published version it covers, e.g. `{ "claude-code": "2.1.308" }`. `{}` means the described thing has no version. `check` rejects an entry with several keys, and entries of one package that disagree (different components, or `{}` mixed with a component).',
       type: 'object',
       additionalProperties: nonEmpty,
     },
@@ -272,7 +326,8 @@ const readFactsSpec = {
       name: 'spec',
       type: 'string',
       required: true,
-      summary: '`<package>/<entry>` or `@scope/<package>/<entry>`. The package must export `./<entry>/index.json`.',
+      summary:
+        '`<package>` or `<package>/<path>`, scoped names included, and the path may have several segments. The package must export `./index.json` or `./<path>/index.json`.',
     },
     {
       name: 'options.root',
@@ -281,6 +336,40 @@ const readFactsSpec = {
       default: 'process.cwd()',
       summary: 'Directory the package is resolved from, normally the hub being built.',
     },
+    {
+      name: 'options.version',
+      type: 'string',
+      required: false,
+      default: 'the installed version of the described component, else the latest published',
+      summary:
+        'Version of the described component the reader runs, or `head` for the unreleased state. Without it, an installed described component sets the version, and one that is not installed leaves the latest published facts.',
+    },
+    {
+      name: 'options.include',
+      type: 'string[]',
+      required: false,
+      default: '[]',
+      summary: 'Labels of `pending` rows that a reader on `head` also gets.',
+    },
+    {
+      name: 'options.platform',
+      type: 'string',
+      required: false,
+      summary: 'Platform of the reader. A row with a `platforms` condition applies only when it lists this one.',
+    },
+    {
+      name: 'options.os',
+      type: '"macos" | "linux" | "windows"',
+      required: false,
+      summary: 'Operating system of the reader. A row with an `os` condition applies only when it lists this one.',
+    },
+    {
+      name: 'options.onRead',
+      type: '(read: { package, version, entry, id, since }) => void',
+      required: false,
+      summary:
+        'Called synchronously once per `get`, `value` and `has` that finds the fact, and once per read of a field other than `id` on an element of `facts`. Filtering `facts` by `id` does not call it.',
+    },
   ],
   returns: {
     members: [
@@ -288,9 +377,9 @@ const readFactsSpec = {
       { name: 'version', type: 'string', summary: 'Version of the installed fact package, from its `package.json`.' },
       { name: 'entry', type: 'string' },
       { name: 'describes', type: 'Record<string, string>' },
-      { name: 'facts', type: 'Fact[]' },
+      { name: 'facts', type: 'SelectedFact[]', summary: 'The facts this reader sees, each flattened to its row.' },
       { name: 'has', type: '(id: string) => boolean' },
-      { name: 'get', type: '(id: string) => Fact', summary: 'Throws when there is no such fact.' },
+      { name: 'get', type: '(id: string) => SelectedFact', summary: 'Throws when there is no such fact.' },
       {
         name: 'value',
         type: '<T>(id: string) => T',
@@ -299,10 +388,11 @@ const readFactsSpec = {
     ],
   },
   throws: [
-    'The spec is not of the form `<package>/<entry>`.',
-    'The package cannot be resolved from `root`.',
-    'The resolved file is not a fact index.',
-    'A package named in `describes` is installed under `root` with another version than the described one.',
+    'The spec is not of the form `<package>` or `<package>/<path>` (`not-found`).',
+    'The package cannot be resolved from `root` (`not-found`).',
+    'The resolved file is not a fact index (`not-an-index`) or has an index format other than 1.x (`unsupported-index-format`).',
+    'A version is not semver (`invalid-version`).',
+    'No `version` is given, and the described component is installed under `root` in a newer version than the facts describe.',
   ],
 }
 
@@ -352,6 +442,12 @@ const moduleApi = {
       name: 'readFacts',
       signature: 'readFacts(spec, options?) => FactReader',
       summary: 'Reads an installed fact package. Parameters and members are in `fact-kit.read-facts`.',
+    },
+    {
+      name: 'selectFacts',
+      signature: 'selectFacts(index, { version?, include?, platform?, os? }) => SelectedFact[]',
+      summary:
+        'The facts one reader sees in a parsed index of format 1.0 or 1.1. A pure function; `readFacts` is built on it.',
     },
   ],
   schemaRow: [
@@ -433,6 +529,10 @@ const problemCodes = [
   'unregistered-domain',
   'unknown-fact-id',
   'missing-schema-file',
+  'describes',
+  'since-format',
+  'ambiguous-rows',
+  'top-level-content',
   'load',
 ]
 

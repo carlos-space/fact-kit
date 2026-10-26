@@ -1,0 +1,42 @@
+{
+  "indexFormat": "1.1",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "facts": [
+    {
+      "id": "demo.limit",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.limit",
+      "content": {
+        "value": "top-level"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "variants": [
+        {
+          "since": "0.52.0",
+          "content": {
+            "value": 30
+          }
+        },
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": 10
+          }
+        },
+        {
+          "since": "0.49.0",
+          "content": {
+            "value": 20
+          }
+        }
+      ]
+    }
+  ]
+}

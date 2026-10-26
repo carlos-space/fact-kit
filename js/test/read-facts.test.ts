@@ -161,7 +161,11 @@ describe('c004 readFacts', () => {
       packageName: '@scope/pkg-facts',
       entry: 'hooks/events',
     })
-    expect(() => splitSpec('pkg-facts')).toThrow('<package>/<entry>')
-    expect(() => splitSpec('@scope/pkg')).toThrow('<package>/<entry>')
+    expect(splitSpec('pkg-facts')).toEqual({ packageName: 'pkg-facts', entry: '' })
+    expect(splitSpec('@scope/pkg')).toEqual({ packageName: '@scope/pkg', entry: '' })
+    expect(splitSpec('pkg-facts/macos/examples')).toEqual({ packageName: 'pkg-facts', entry: 'macos/examples' })
+    expect(() => splitSpec('')).toThrow('not of the form')
+    expect(() => splitSpec('@scope')).toThrow('not of the form')
+    expect(() => splitSpec('pkg-facts/')).toThrow('not of the form')
   })
 })

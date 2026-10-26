@@ -1,0 +1,94 @@
+{
+  "indexFormat": "1.1",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "facts": [
+    {
+      "id": "demo.hook",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.hook",
+      "content": {
+        "value": "top-level"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "variants": [
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "any"
+          }
+        },
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "claude"
+          },
+          "platforms": ["claude-code"]
+        },
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "claude on macos"
+          },
+          "platforms": ["claude-code"],
+          "os": ["macos"]
+        },
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "macos"
+          },
+          "os": ["macos"]
+        }
+      ]
+    },
+    {
+      "id": "demo.claude-only",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.claude-only",
+      "content": {
+        "value": "top-level"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "variants": [
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "c"
+          },
+          "platforms": ["claude-code"]
+        }
+      ]
+    },
+    {
+      "id": "demo.linux-only",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.linux-only",
+      "content": {
+        "value": "top-level"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "variants": [
+        {
+          "since": "0.40.0",
+          "content": {
+            "value": "l"
+          },
+          "os": ["linux"]
+        }
+      ]
+    }
+  ]
+}

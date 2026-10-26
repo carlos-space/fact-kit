@@ -9,7 +9,7 @@
 | `js/`                         | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具 | npm（公開） |
 | `facts/fact-kit/`             | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                        | 不發布      |
 | `py/`、`rs/`、`go/`、`swift/` | 其他語言的實作，之後加入                                                              | 之後決定    |
-| `conformance/`                | 跨語言共用的測試資料，之後加入                                                        | 不發布      |
+| `conformance/`                | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                | 不發布      |
 
 ## 開發
 

@@ -1,0 +1,37 @@
+name: conformance
+
+# Every language reads the same samples in conformance/ and must produce the expected output. One job per
+# language, named after it. Only JS exists so far; a language joins by adding a job here that installs its
+# toolchain and runs its conformance test against the same directory (conformance/README.md, last section).
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'release/**'
+      - '!release/**--to-main'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # release-please opens its PRs with GITHUB_TOKEN, which does not trigger workflows (see ci.yml).
+  js:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm conformance:js

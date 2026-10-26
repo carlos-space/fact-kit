@@ -1,0 +1,5 @@
+{
+  "version": "head",
+  "include": ["p"],
+  "platform": "codex"
+}

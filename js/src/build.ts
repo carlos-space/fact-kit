@@ -4,7 +4,8 @@ import { checkFacts } from './check.ts'
 import type { IndexInput } from './check.ts'
 import { loadEntries, readPackageName } from './load.ts'
 import type { LoadedEntry } from './load.ts'
-import type { FactIndex, Problem } from './types.ts'
+import { topLevelContent } from './select.ts'
+import type { Fact, FactIndex, Problem } from './types.ts'
 
 export interface BuildOptions {
   /** Package directory, holding package.json. Defaults to `process.cwd()`. */
@@ -29,15 +30,34 @@ export interface BuildResult {
   exportsUpdated: boolean
 }
 
+/** The index format this version writes. Readers also take 1.0, which has no `indexFormat`. */
+export const INDEX_FORMAT = '1.1'
+
+/**
+ * A fact as it goes into the index. A fact with `variants` gets the top-level `content` that a reader of format
+ * 1.0 uses: the latest published row, else the row on `head`, else the row with the largest bound.
+ */
+function indexFact(fact: Fact): Fact {
+  if (!Array.isArray(fact.variants) || fact.variants.length === 0) return fact
+  try {
+    const top = topLevelContent(fact)
+    return top ? { ...fact, content: top.content } : fact
+  } catch {
+    // A `since` that is not a version. `check` reports it, and the build stops on it.
+    return fact
+  }
+}
+
 /** The index of one entry, with the top-level fields in the order of the format. */
 export function buildIndex(packageName: string, loaded: LoadedEntry): FactIndex {
   const { module } = loaded
   return {
+    indexFormat: INDEX_FORMAT,
     package: packageName,
     entry: loaded.entry,
     ...(module.formatVersion !== undefined ? { formatVersion: module.formatVersion } : {}),
     describes: module.describes,
-    facts: module.facts,
+    facts: module.facts.map(indexFact),
   }
 }
 

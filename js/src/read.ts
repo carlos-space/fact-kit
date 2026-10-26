@@ -1,37 +1,61 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import type { Fact, FactIndex } from './types.ts'
+import { assertIndex, selectFacts } from './select.ts'
+import type { SelectOptions, SelectedFact } from './select.ts'
+import type { FactIndex, Since } from './types.ts'
+import { FactReadError, compareSemver, parseVersion } from './version.ts'
+
+/** What `onRead` is told: the fact that was read and the fact package it came from. */
+export interface FactRead {
+  package: string
+  /** Version of the installed fact package. It is not the version the reader asked for. */
+  version: string
+  entry: string
+  id: string
+  /** The `since` of the row that was read. */
+  since: Since
+}
 
 export interface FactReader {
   package: string
   /** Version of the installed fact package, from its `package.json`. */
   version: string
   entry: string
-  /** The products and versions this entry describes. */
+  /** The component this entry describes and the version it covers. */
   describes: Readonly<Record<string, string>>
-  facts: readonly Fact[]
+  /** The facts this reader sees, each flattened to the row that applies. */
+  facts: readonly SelectedFact[]
   /** Whether a fact with this id exists. */
   has(id: string): boolean
   /** The fact with this id. Throws when there is none, so a typo fails the build instead of reading nothing. */
-  get(id: string): Fact
+  get(id: string): SelectedFact
   /** The `content.value` of the fact with this id. Throws when the fact has no value content. */
   value<T = unknown>(id: string): T
 }
 
-export interface ReadFactsOptions {
+export interface ReadFactsOptions extends SelectOptions {
   /** Directory the package is resolved from, normally the hub being built. Defaults to `process.cwd()`. */
   root?: string
+  /**
+   * Called, synchronously, each time a fact is read through this reader: once per `get` and `value`, once per
+   * `has` that finds the fact, and once per read of a field other than `id` on an element of `facts`.
+   * Filtering `facts` by `id` alone does not call it.
+   */
+  onRead?: (read: FactRead) => void
 }
 
-/** Splits `@scope/name/entry/sub` or `name/entry` into the package name and the sub-path. */
+/**
+ * Splits `@scope/name/path/to/entry` or `name/path` into the package name and the sub-path. The sub-path is
+ * empty for a spec that names only the package.
+ */
 export function splitSpec(spec: string): { packageName: string; entry: string } {
   const parts = spec.split('/')
   const nameLength = spec.startsWith('@') ? 2 : 1
   const packageName = parts.slice(0, nameLength).join('/')
   const entry = parts.slice(nameLength).join('/')
-  if (!packageName || (spec.startsWith('@') && parts.length < 2) || !entry) {
-    throw new Error(`readFacts: "${spec}" is not of the form "<package>/<entry>"`)
+  if (parts.length < nameLength || parts.some((p) => !p)) {
+    throw new FactReadError('not-found', `readFacts: "${spec}" is not of the form "<package>" or "<package>/<path>"`)
   }
   return { packageName, entry }
 }
@@ -61,55 +85,107 @@ function installedVersion(root: string, name: string): string | undefined {
 }
 
 /**
- * Reads the built `index.json` of `<package>/<entry>` as installed under `root`, so each hub gets the
- * version its own lockfile pins. The fact package is resolved at call time with `createRequire` based at
- * `root`, never imported at the top of a module. The package must export `./<entry>/index.json`.
+ * Reads the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, so each hub gets
+ * the version its own lockfile pins. The fact package is resolved at call time with `createRequire` based at
+ * `root`, never imported at the top of a module. The package must export `./index.json` or `./<path>/index.json`.
+ * The index may be format 1.0 or 1.1.
  *
- * Each key of `describes` is taken as an npm package name. When that package is installed under `root`, its
- * version must equal the described one, or the facts describe another version than the hub runs and reading
- * throws. A product that is not installed there, such as a CLI or a service, is not checked.
+ * `version`, `include`, `platform` and `os` choose what the reader sees, see {@link selectFacts}. Without
+ * `version`, a described product that is installed under `root` sets it: the facts of the installed version are
+ * read, and facts for an older version than the one `describes` names still work. An installed product that is
+ * newer than the facts cover makes reading throw, because the facts do not say anything about that version yet.
+ * A product that is not installed there, such as a CLI or a service, sets nothing, and the reader gets the
+ * latest published facts.
  */
 export function readFacts(spec: string, options: ReadFactsOptions = {}): FactReader {
   const { packageName, entry } = splitSpec(spec)
   const root = options.root ?? process.cwd()
   const require = createRequire(join(root, 'noop.js'))
+  const target = entry ? `${packageName}/${entry}/index.json` : `${packageName}/index.json`
   let file: string
   try {
-    file = require.resolve(`${packageName}/${entry}/index.json`)
+    file = require.resolve(target)
   } catch (error) {
-    throw new Error(
-      `readFacts: cannot resolve "${packageName}/${entry}/index.json" from ${root}. ` +
-        `Install ${packageName} there and check that it exports "./${entry}/index.json". (${(error as Error).message})`,
+    throw new FactReadError(
+      'not-found',
+      `readFacts: cannot resolve "${target}" from ${root}. ` +
+        `Install ${packageName} there and check that it exports "./${entry ? `${entry}/` : ''}index.json". (${(error as Error).message})`,
     )
   }
-  const index = JSON.parse(readFileSync(file, 'utf8')) as Partial<FactIndex>
-  if (!index || !Array.isArray(index.facts) || typeof index.package !== 'string') {
-    throw new Error(`readFacts: ${file} is not a fact index`)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'))
+  } catch (error) {
+    throw new FactReadError('not-an-index', `readFacts: ${file} is not a fact index (${(error as Error).message})`)
   }
+  assertIndex(parsed, `readFacts: ${file}`)
+  const index = parsed as FactIndex
   const describes = index.describes ?? {}
-  for (const [product, described] of Object.entries(describes)) {
+
+  let version = options.version
+  let productVersion: string | undefined
+  for (const [product, described] of version === undefined ? Object.entries(describes) : []) {
     const installed = installedVersion(root, product)
-    if (installed !== undefined && installed !== described) {
+    if (installed === undefined) continue
+    const a = parseVersion(installed)
+    const b = parseVersion(described)
+    // Versions that are not semver can only be told apart by equality.
+    const newer = a && b ? compareSemver(a, b) > 0 : installed !== described
+    if (newer) {
       throw new Error(
         `readFacts: ${spec} describes ${product} ${described}, but ${root} has ${product} ${installed}. ` +
           `Install the ${packageName} version that describes ${product} ${installed}.`,
       )
     }
+    if (a && productVersion === undefined) productVersion = installed
   }
-  const facts = index.facts
+  if (version === undefined && productVersion !== undefined) version = productVersion
+
+  const facts = selectFacts(index, {
+    ...(version !== undefined ? { version } : {}),
+    ...(options.include !== undefined ? { include: options.include } : {}),
+    ...(options.platform !== undefined ? { platform: options.platform } : {}),
+    ...(options.os !== undefined ? { os: options.os } : {}),
+  })
   const byId = new Map(facts.map((f) => [f.id, f]))
-  const get = (id: string): Fact => {
+  const packageVersion = owningVersion(file, packageName)
+  const entryName = index.entry ?? entry
+  const { onRead } = options
+  const note = (fact: SelectedFact): void => {
+    onRead?.({ package: index.package, version: packageVersion, entry: entryName, id: fact.id, since: fact.since })
+  }
+  const get = (id: string): SelectedFact => {
     const fact = byId.get(id)
     if (!fact) throw new Error(`readFacts: no fact "${id}" in ${spec}`)
+    note(fact)
     return fact
   }
+  // Elements of `facts` tell onRead only when a field other than `id` is read, so a listing that filters by id
+  // is not counted as a use.
+  const listed: readonly SelectedFact[] = onRead
+    ? Object.freeze(
+        facts.map(
+          (fact) =>
+            new Proxy(fact, {
+              get(target, key, receiver) {
+                if (typeof key === 'string' && key !== 'id') note(target)
+                return Reflect.get(target, key, receiver)
+              },
+            }),
+        ),
+      )
+    : facts
   return {
     package: index.package,
-    version: owningVersion(file, packageName),
-    entry: index.entry ?? entry,
+    version: packageVersion,
+    entry: entryName,
     describes,
-    facts,
-    has: (id) => byId.has(id),
+    facts: listed,
+    has: (id) => {
+      const fact = byId.get(id)
+      if (fact) note(fact)
+      return fact !== undefined
+    },
     get,
     value: <T>(id: string): T => {
       const fact = get(id)

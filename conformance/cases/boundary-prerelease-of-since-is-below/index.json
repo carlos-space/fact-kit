@@ -1,0 +1,25 @@
+{
+  "indexFormat": "1.1",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "facts": [
+    {
+      "id": "demo.a",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.a",
+      "content": {
+        "value": "a"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "when": {
+        "since": "0.49.0"
+      }
+    }
+  ]
+}

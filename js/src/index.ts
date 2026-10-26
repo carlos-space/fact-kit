@@ -4,9 +4,12 @@ export type {
   FactIndex,
   FactProbe,
   FactSource,
+  FactVariant,
   FactsModule,
   JsonSchema,
+  Os,
   Problem,
+  Since,
   Text,
 } from './types.ts'
 export { defineFacts } from './define.ts'
@@ -27,12 +30,16 @@ export { checkFacts, findLocalPaths, findUrlHosts, isAllowedHost } from './check
 export type { CheckOptions, CheckResult, ExampleInput, IndexInput } from './check.ts'
 export { checkProject, readConfig } from './project.ts'
 export type { CheckProjectOptions, ProjectConfig } from './project.ts'
-export { buildFacts, buildIndex, expectedExports, exportsCover } from './build.ts'
+export { INDEX_FORMAT, buildFacts, buildIndex, expectedExports, exportsCover } from './build.ts'
 export type { BuildOptions, BuildResult } from './build.ts'
 export { loadEntries } from './load.ts'
 export type { LoadedEntry } from './load.ts'
 export { readFacts } from './read.ts'
-export type { FactReader, ReadFactsOptions } from './read.ts'
+export type { FactRead, FactReader, ReadFactsOptions } from './read.ts'
+export { NO_SINCE, selectFacts } from './select.ts'
+export type { SelectOptions, SelectedFact } from './select.ts'
+export { FactReadError, compareVersions, releaseLine } from './version.ts'
+export type { ReadErrorCode } from './version.ts'
 export { diffFacts, diffIndexFiles, diffIndexes } from './diff.ts'
 export type { IndexDiff } from './diff.ts'
 export { interfaceToJsonSchema, readJsonSchemaFile, readStringTuples, readStringTuplesFromFile } from './convert.ts'
