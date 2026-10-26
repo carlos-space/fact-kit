@@ -29,11 +29,12 @@ fact-kit check [--cwd dir] [--config file] [--facts-dir dir] [--examples-dir dir
                [--index path]... [--allow-domain host]...
 fact-kit build [--cwd dir] [--facts-dir dir] [--out-dir dir] [--write-exports]
 fact-kit diff <old> <new> [--json]
+fact-kit diff --impact <id> [--cwd dir] [--json]
 ```
 
 `check` validates every fact against the meta-schema, rejects duplicate ids, local absolute paths and
 domains that are not in the allowed list, and checks that examples only reference existing fact ids.
-Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`, `indexFiles`, `allowedDomains`).
+Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`, `indexFiles`, `allowedDomains`, and for the aggregate package below, `aggregate` and `docsDirs`).
 
 A fact whose content changes over versions, or differs by platform, lists rows in `variants`
 (`{ since, content, pending?, stability?, platforms?, os? }`). `since` is a version, `'next'`, or one version per
@@ -47,6 +48,35 @@ the top-level `content` has to be a guess. The rules are in [`conformance/README
 package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.1"`, and a fact with `variants`
 gets the latest published row as its top-level `content`, which is what a reader of format 1.0 uses. `build` validates format and ids only; it does not scan
 for local paths or domains, so run `check` before publishing.
+
+### Two-layer packages
+
+A repository can keep its facts in private component packages (named `@component/<directory>`, `"private": true`)
+and publish one aggregate package that holds all their indexes. The aggregate lists the components in
+`devDependencies` (`"workspace:*"`) and in `fact-kit.config.json`:
+
+```json
+{ "aggregate": { ".": "@component/fact-kit", "git": "@component/git" } }
+```
+
+`fact-kit build` in the aggregate package copies the built indexes of the components (build them first; with pnpm,
+`pnpm -r build` orders them) into `dist/` and clears `dist/` before it writes. A component with one entry goes to
+`dist/<sub-path>/`, the root component (`.`) to `dist/`. A component with several entries goes to
+`dist/<sub-path>/<entry>/`, or `dist/<entry>/` for the root, and the build fails when that name is also another
+sub-path. `schemas/` is copied along, and each index gets `./<dir>/index.json` and `./<dir>/schemas/*` in `exports`.
+In the copied index, `package` is the aggregate name, `entry` is the path of the index in the aggregate (`.` for the
+root), `component` is the component package, and `derivedFrom` and `movedTo` that name a component package become the published spec.
+`readFacts('<aggregate>')`, `readFacts('<aggregate>/<sub-path>')` and `readFacts('<aggregate>/<sub-path>/<entry>')`
+read them.
+
+### Impact of a change
+
+`fact-kit diff --impact <id>` runs in an aggregate package. It reads the built indexes of the components, follows
+`derivedFrom` downstream and prints `{ id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }` with `--json`.
+`docs` come from `docsDirs` (relative to the config file): markdown lines with `fact:<id>` or `fact:<spec>:<id>`, and
+in TypeScript the string argument of `get`, `value` and `has` calls and imports of a fact object. An import counts when its relative module, loaded the way `build` loads fact sources,
+exports a fact object with the id, whatever name it is imported under; a module that fails to load is skipped. Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
+loaded only then.
 
 ## Reading
 

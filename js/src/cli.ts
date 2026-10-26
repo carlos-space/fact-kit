@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { buildFacts } from './build.ts'
 import { diffIndexFiles } from './diff.ts'
+import { impactOf } from './impact.ts'
 import { LoadError } from './load.ts'
 import { checkProject } from './project.ts'
 import type { CheckProjectOptions } from './project.ts'
@@ -15,8 +16,10 @@ const HELP = `fact-kit <command> [options]
 
 Commands
   check                 Validate facts, examples and what must not ship (local paths, unregistered domains)
-  build                 Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/
+  build                 Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/, or in an
+                        aggregate package ("aggregate" in the config) copy its components' indexes into dist/
   diff <old> <new>      List the fact ids added, removed and changed between two index.json files
+  diff --impact <id>    List the facts computed from a fact, and the docs and code that read it
 
 Options for check
   --cwd <dir>           Package directory (default: current directory)
@@ -34,6 +37,8 @@ Options for build
 
 Options for diff
   --json                Print the result as JSON
+  --impact <id>         Report what a change to this fact reaches, instead of comparing two files
+  --cwd <dir>           With --impact: the aggregate package directory (default: current directory)
 
   -h, --help            Show this help
   -v, --version         Show the version
@@ -113,11 +118,26 @@ async function runBuild(argv: string[], io: CliIo): Promise<number> {
 async function runDiff(argv: string[], io: CliIo): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv,
-    options: { json: { type: 'boolean' } },
+    options: { json: { type: 'boolean' }, impact: { type: 'string' }, cwd: { type: 'string' } },
     allowPositionals: true,
   })
+  if (values.impact !== undefined) {
+    if (positionals.length > 0) {
+      io.err('fact-kit diff: --impact takes a fact id and no files\n')
+      return 2
+    }
+    const impact = await impactOf(values.impact, values.cwd !== undefined ? { cwd: values.cwd } : {})
+    if (values.json) io.out(`${JSON.stringify(impact, null, 2)}\n`)
+    else {
+      io.out(`impact of ${impact.id}\n`)
+      for (const f of impact.facts) io.out(`fact     ${f.id}  (depth ${f.depth}, via ${f.via})\n`)
+      for (const d of impact.docs) io.out(`doc      ${d.file}:${d.line}  ${d.id}\n`)
+      if (impact.facts.length + impact.docs.length === 0) io.out('nothing reads or derives from it\n')
+    }
+    return 0
+  }
   if (positionals.length !== 2) {
-    io.err('fact-kit diff: expected <old> <new>\n')
+    io.err('fact-kit diff: expected <old> <new>, or --impact <id>\n')
     return 2
   }
   const diff = await diffIndexFiles(positionals[0] as string, positionals[1] as string)

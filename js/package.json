@@ -24,6 +24,14 @@
     "ts-json-schema-generator": "^2.9.0",
     "typescript5": "npm:typescript@^5.9.3"
   },
+  "peerDependencies": {
+    "oxc-parser": "^0.155.0"
+  },
+  "peerDependenciesMeta": {
+    "oxc-parser": {
+      "optional": true
+    }
+  },
   "bin": {
     "fact-kit": "./dist/bin.js"
   },
@@ -40,5 +48,8 @@
   "keywords": [
     "facts",
     "json-schema"
-  ]
+  ],
+  "devDependencies": {
+    "oxc-parser": "^0.155.0"
+  }
 }
