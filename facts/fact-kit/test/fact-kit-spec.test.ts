@@ -1,0 +1,356 @@
+// Compares the facts in facts/fact-kit with the fact-kit implementation. The facts are the spec, so a change to
+// one side without the other fails here.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Ajv2020 } from 'ajv/dist/2020.js'
+import { afterAll, describe, expect, it } from 'vitest'
+import { cli, cleanTmp, makeTmp, writeTree } from '../../fact-kit/test/helpers.ts'
+import * as kitModule from '../../fact-kit/src/index.ts'
+import {
+  X_KEYWORDS,
+  buildIndex,
+  exampleGroupSchema as implExampleGroupSchema,
+  factSchema as implFactSchema,
+  flattenSchema,
+  indexSchema as implIndexSchema,
+  readFacts,
+  validateExampleGroup,
+  validateFact,
+} from '../../fact-kit/src/index.ts'
+import { loadEntries } from '../../fact-kit/src/load.ts'
+import type { Fact } from '../../fact-kit/src/index.ts'
+
+const root = fileURLToPath(new URL('..', import.meta.url))
+const kitSrc = join(fileURLToPath(new URL('../../fact-kit', import.meta.url)), 'src')
+
+const entries = await loadEntries(join(root, 'facts'))
+const spec = entries.find((e) => e.entry === 'fact-kit')
+if (!spec) throw new Error('facts/fact-kit is missing')
+const byId = new Map(spec.module.facts.map((f) => [f.id, f]))
+const content = (id: string): any => {
+  const f = byId.get(id)
+  if (!f) throw new Error(`no fact ${id}`)
+  return 'schema' in f.content ? f.content.schema : (f.content as { value: unknown }).value
+}
+const allFacts: Fact[] = entries.flatMap((e) => e.module.facts)
+
+afterAll(() => cleanTmp())
+
+describe('fact-kit.fact and fact-kit.index', () => {
+  const ajv = new Ajv2020({ strict: false })
+  const validate = ajv.compile(content('fact-kit.fact'))
+
+  it('accepts every fact in this package', () => {
+    const bad = allFacts.filter((f) => !(validate(f) as boolean)).map((f) => f.id)
+    expect(bad).toEqual([])
+  })
+
+  it('names the same fields as the implementation meta-schema', () => {
+    const spec = content('fact-kit.fact')
+    expect(Object.keys(spec.properties).sort()).toEqual(Object.keys(implFactSchema.properties).sort())
+    expect([...spec.required].sort()).toEqual([...implFactSchema.required].sort())
+    expect(Object.keys(spec.properties.content.properties).sort()).toEqual(
+      Object.keys(implFactSchema.properties.content.properties).sort(),
+    )
+    expect(Object.keys(spec.properties.when.properties).sort()).toEqual(
+      Object.keys(implFactSchema.properties.when.properties).sort(),
+    )
+    expect(spec.properties.id.pattern).toBe(implFactSchema.properties.id.pattern)
+    expect(spec.properties.tool.pattern).toBe(implFactSchema.properties.tool.pattern)
+  })
+
+  it('agrees with validateFact on good and bad facts', () => {
+    const good: Fact = {
+      id: 'demo.thing',
+      tool: 'demo',
+      topics: ['t'],
+      title: 'Thing',
+      content: { value: [1] },
+      source: { kind: 'published' },
+    }
+    const samples: unknown[] = [
+      good,
+      { ...good, extra: 1 },
+      { ...good, id: 'Demo.thing' },
+      { ...good, title: undefined },
+      { ...good, content: { value: 1, statement: 'x' } },
+      { ...good, source: { kind: 'converted', from: 'a' } },
+      { ...good, source: { kind: 'observed', basis: 'guess' } },
+      { ...good, when: { os: ['beos'] } },
+      { ...good, verify: { probe: { kind: 'manual' }, verifiedOn: '2026-01-01' } },
+      { ...good, title: { fr: 'chose' } },
+    ]
+    for (const sample of samples) {
+      expect(validate(sample), JSON.stringify(sample)).toBe(validateFact(sample).length === 0)
+    }
+  })
+
+  it('describes the built index and the entry module like the implementation does', () => {
+    const index = ajv.compile(content('fact-kit.index'))
+    for (const e of entries) expect(index(buildIndex('platform-facts', e)), e.entry).toBe(true)
+    expect(index({ package: 'p', entry: 'e', facts: [] })).toBe(false)
+    expect(Object.keys(content('fact-kit.index').properties).sort()).toEqual(
+      Object.keys(implIndexSchema.properties).sort(),
+    )
+    expect(Object.keys(content('fact-kit.entry-module').properties).sort()).toEqual([
+      'describes',
+      'facts',
+      'formatVersion',
+    ])
+  })
+})
+
+describe('fact-kit.x-keywords', () => {
+  it('lists the registered keywords with their value shapes', () => {
+    expect(content('fact-kit.x-keywords')).toEqual(X_KEYWORDS)
+  })
+})
+
+describe('fact-kit.cli', () => {
+  const commands = content('fact-kit.cli')
+
+  /** Flags per command, read from the sections of the help text. */
+  async function helpFlags(): Promise<{ text: string; sections: Record<string, string[]> }> {
+    const { stdout } = await cli(['--help'])
+    const sections: Record<string, string[]> = {}
+    let current: string | undefined
+    for (const line of stdout.split('\n')) {
+      const header = /^Options for (\w+)/.exec(line)
+      if (header) current = header[1]
+      else if (/^\S/.test(line) || line.trim() === '') current = line.trim() === '' ? undefined : current
+      else if (current) {
+        const flag = /^\s+(--[a-z-]+)/.exec(line)
+        if (flag) (sections[current] ??= []).push(flag[1] as string)
+      }
+    }
+    return { text: stdout, sections }
+  }
+
+  it('has the commands and flags of the help text', async () => {
+    const { text, sections } = await helpFlags()
+    for (const name of ['check', 'build', 'diff']) {
+      expect(text, name).toMatch(new RegExp(`^  ${name}\\b`, 'm'))
+      const flags = (commands[name].options as { flag: string }[]).map((o) => o.flag).sort()
+      expect(flags, name).toEqual([...(sections[name] ?? [])].sort())
+    }
+    expect(Object.keys(commands).sort()).toEqual(['build', 'check', 'diff', 'global'])
+    for (const o of commands.global.options) {
+      expect(text).toContain(o.flag)
+      expect(text).toContain(o.alias)
+    }
+  })
+
+  it('marks the repeatable flags and the defaults the help text gives', async () => {
+    const { text } = await helpFlags()
+    const repeatable = (commands.check.options as { flag: string; repeatable?: boolean }[]).filter((o) => o.repeatable)
+    expect(repeatable.map((o) => o.flag).sort()).toEqual(['--allow-domain', '--index'])
+    for (const o of repeatable) expect(text).toMatch(new RegExp(`${o.flag} .*`))
+    expect(text).toMatch(/--facts-dir <dir>\s+Fact sources.*\(default: facts\)/)
+    expect(text).toMatch(/--out-dir <dir>\s+Output directory \(default: dist\)/)
+    expect(text).toMatch(/--examples-dir <dir>.*\(default: examples\)/)
+  })
+
+  it('exits with the documented codes', async () => {
+    expect(commands.global.exitCodes).toEqual({
+      '0': expect.any(String),
+      '1': expect.any(String),
+      '2': expect.any(String),
+    })
+    const dir = makeTmp('cli-codes')
+    expect((await cli(['check', '--cwd', dir])).code).toBe(0)
+    expect((await cli([])).code).toBe(2)
+    expect((await cli(['nope'])).code).toBe(2)
+    expect((await cli(['diff', 'only-one'])).code).toBe(2)
+    expect((await cli(['--help'])).code).toBe(0)
+    writeTree(dir, {
+      'facts/bad/index.ts': 'export default { facts: [{}] }\n',
+      'package.json': { name: 'x', type: 'module' },
+    })
+    expect((await cli(['check', '--cwd', dir])).code).toBe(1)
+  })
+
+  it('takes the diff arguments and prints the --json shape', async () => {
+    expect(commands.diff.arguments).toEqual(['<old>', '<new>'])
+    const dir = makeTmp('cli-diff')
+    const index = (ids: string[]) => ({ facts: ids.map((id) => ({ id })) })
+    writeTree(dir, { 'a.json': index(['x.a', 'x.b']), 'b.json': index(['x.b', 'x.c']) })
+    const { stdout } = await cli(['diff', join(dir, 'a.json'), join(dir, 'b.json'), '--json'])
+    expect(Object.keys(JSON.parse(stdout)).sort()).toEqual(['added', 'changed', 'removed'])
+  })
+
+  it('prints the version of package.json', async () => {
+    const pkg = JSON.parse(readFileSync(join(kitSrc, '..', 'package.json'), 'utf8')) as { version: string }
+    expect((await cli(['--version'])).stdout.trim()).toBe(pkg.version)
+    expect(spec.module.describes['fact-kit']).toBe(pkg.version)
+  })
+})
+
+describe('fact-kit.problem-codes and fact-kit.config-file', () => {
+  it('lists the problem codes of the Problem type', () => {
+    const source = readFileSync(join(kitSrc, 'types.ts'), 'utf8')
+    const block = /code:\s*([\s\S]*?)\n\s*message:/.exec(source)?.[1] ?? ''
+    const codes = [...block.matchAll(/'([a-z-]+)'/g)].map((m) => m[1])
+    expect(codes.length).toBeGreaterThan(0)
+    expect(content('fact-kit.problem-codes')).toEqual(codes)
+  })
+
+  it('lists the settings of ProjectConfig', () => {
+    const source = readFileSync(join(kitSrc, 'project.ts'), 'utf8')
+    const block = /export interface ProjectConfig \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? ''
+    const keys = [...block.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1])
+    expect(Object.keys(content('fact-kit.config-file').properties).sort()).toEqual([...keys].sort())
+  })
+})
+
+describe('fact-kit.read-facts', () => {
+  const sample = content('fact-kit.read-facts')
+
+  it('reads a package and returns the documented members', () => {
+    const hub = makeTmp('read-facts')
+    writeTree(hub, {
+      'package.json': { name: 'hub', private: true },
+      'node_modules/@demo/x-facts/package.json': {
+        name: '@demo/x-facts',
+        version: '1.0.0',
+        exports: { './sdk/index.json': './dist/sdk/index.json' },
+      },
+      'node_modules/@demo/x-facts/dist/sdk/index.json': {
+        package: '@demo/x-facts',
+        entry: 'sdk',
+        describes: { demo: '1.0.0' },
+        facts: [
+          {
+            id: 'demo.list',
+            tool: 'demo',
+            topics: [],
+            title: 't',
+            content: { value: [1, 2] },
+            source: { kind: 'published' },
+          },
+          {
+            id: 'demo.said',
+            tool: 'demo',
+            topics: [],
+            title: 't',
+            content: { statement: 's' },
+            source: { kind: 'published' },
+          },
+        ],
+      },
+    })
+    const reader = readFacts('@demo/x-facts/sdk', { root: hub })
+    expect(Object.keys(reader).sort()).toEqual(sample.returns.members.map((m: { name: string }) => m.name).sort())
+    expect(reader.value('demo.list')).toEqual([1, 2])
+    expect(reader.has('demo.nope')).toBe(false)
+    expect(() => reader.get('demo.nope')).toThrow()
+    expect(() => reader.value('demo.said')).toThrow()
+  })
+
+  it('throws in the four documented cases', () => {
+    expect(sample.throws).toHaveLength(4)
+    const hub = makeTmp('read-facts-throws')
+    writeTree(hub, {
+      'package.json': { name: 'hub', private: true },
+      'node_modules/@demo/bad-facts/package.json': {
+        name: '@demo/bad-facts',
+        version: '1.0.0',
+        exports: { './sdk/index.json': './dist/sdk/index.json' },
+      },
+      'node_modules/@demo/bad-facts/dist/sdk/index.json': { nothing: true },
+      'node_modules/@demo/old-facts/package.json': {
+        name: '@demo/old-facts',
+        version: '1.0.0',
+        exports: { './sdk/index.json': './dist/sdk/index.json' },
+      },
+      'node_modules/@demo/old-facts/dist/sdk/index.json': {
+        package: '@demo/old-facts',
+        entry: 'sdk',
+        describes: { demo: '1.0.0' },
+        facts: [],
+      },
+      'node_modules/demo/package.json': { name: 'demo', version: '2.0.0' },
+    })
+    expect(() => readFacts('no-entry', { root: hub })).toThrow(/<package>\/<entry>/)
+    expect(() => readFacts('@demo/missing-facts/sdk', { root: hub })).toThrow(/cannot resolve/)
+    expect(() => readFacts('@demo/bad-facts/sdk', { root: hub })).toThrow(/not a fact index/)
+    expect(() => readFacts('@demo/old-facts/sdk', { root: hub })).toThrow(
+      /describes demo 1\.0\.0, but .* has demo 2\.0\.0/,
+    )
+  })
+
+  it('defaults root to process.cwd(), as the fact says', () => {
+    expect(sample.parameters.find((p: { name: string }) => p.name === 'options.root').default).toBe('process.cwd()')
+    const source = readFileSync(join(kitSrc, 'read.ts'), 'utf8')
+    expect(source).toMatch(/options\.root \?\? process\.cwd\(\)/)
+  })
+})
+
+describe('fact-kit.module-api', () => {
+  const api = content('fact-kit.module-api')
+
+  it('names functions fact-kit exports', () => {
+    const missing = api.exports
+      .map((e: { name: string }) => e.name)
+      .filter((name: string) => typeof (kitModule as Record<string, unknown>)[name] !== 'function')
+    expect(missing).toEqual([])
+  })
+
+  it('lists the fields of SchemaRow', () => {
+    const source = readFileSync(join(kitSrc, 'table.ts'), 'utf8')
+    const block = /export interface SchemaRow \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? ''
+    const keys = [...block.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1] ?? '')
+    expect(keys.length).toBeGreaterThan(0)
+    expect(api.schemaRow.map((r: { name: string }) => r.name).sort()).toEqual([...keys].sort())
+    const [row] = flattenSchema({ type: 'object', properties: { a: { enum: ['x'] } } })
+    expect(row).toBeDefined()
+    expect(Object.keys(row ?? {}).every((k) => keys.includes(k))).toBe(true)
+  })
+})
+
+describe('fact-kit.example-group', () => {
+  const spec = content('fact-kit.example-group')
+  const scenario = (s: any) => s.properties.scenarios.items
+  const code = (s: any) => scenario(s).properties.code.items
+
+  it('names the same fields as the implementation schema', () => {
+    for (const pick of [(s: any) => s, scenario, code]) {
+      expect(Object.keys(pick(spec).properties).sort()).toEqual(
+        Object.keys(pick(implExampleGroupSchema).properties).sort(),
+      )
+      expect([...pick(spec).required].sort()).toEqual([...pick(implExampleGroupSchema).required].sort())
+    }
+    expect(spec.properties.id.pattern).toBe(implExampleGroupSchema.properties.id.pattern)
+  })
+
+  it('agrees with validateExampleGroup on good and bad groups', () => {
+    const validate = new Ajv2020({ strict: false }).compile(spec)
+    const good = {
+      id: 'demo',
+      name: 'Demo',
+      situation: 's',
+      claim: 'c',
+      scenarios: [
+        {
+          title: 't',
+          situation: 's',
+          code: [{ caption: 'a.ts', lang: 'ts', source: '' }],
+          outcome: [],
+          points: [],
+          facts: ['demo.x'],
+        },
+      ],
+    }
+    const samples: unknown[] = [
+      good,
+      { ...good, extra: 1 },
+      { ...good, id: 'Demo' },
+      { ...good, scenarios: [] },
+      { ...good, scenarios: [{ ...good.scenarios[0], facts: [] }] },
+      { ...good, scenarios: [{ ...good.scenarios[0], code: [{ caption: 'a.ts', lang: 'ts' }] }] },
+    ]
+    for (const sample of samples) {
+      expect(validate(sample) as boolean, JSON.stringify(sample)).toBe(validateExampleGroup(sample).length === 0)
+    }
+  })
+})
