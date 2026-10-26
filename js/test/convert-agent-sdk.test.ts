@@ -43,6 +43,7 @@ describe('c001 converting the claude-agent-sdk types on TypeScript 7.1', () => {
     expect(Object.keys(fixture.types)).toHaveLength(104)
   })
 
+  // 104 conversions, each with its own program: about 4s locally and up to 12s on CI runners
   test('104 types differ from the 0.6.0 output only in the prefixItems of tuples', async () => {
     const dir = makeTmp('agent-sdk')
     const changed: Record<string, string[]> = {}
@@ -71,7 +72,7 @@ describe('c001 converting the claude-agent-sdk types on TypeScript 7.1', () => {
         '$.properties.proposals.anyOf[0].prefixItems: added',
       ],
     })
-  })
+  }, 60_000)
 })
 
 describe('c001 union members keep the order of the source', () => {
