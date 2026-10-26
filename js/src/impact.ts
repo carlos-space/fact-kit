@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { planAggregate } from './aggregate.ts'
 import { readConfig } from './project.ts'
 import { readPackageName } from './load.ts'
+import { loadOxc } from './oxc.ts'
+import type { OxcModule } from './oxc.ts'
 
 export interface Impact {
   /** The fact asked about, as given. */
@@ -41,20 +43,6 @@ async function* walkFiles(dir: string): AsyncGenerator<string> {
     if (item.isDirectory()) {
       if (!item.name.startsWith('.') && !SKIPPED_DIRS.has(item.name)) yield* walkFiles(path)
     } else yield path
-  }
-}
-
-interface OxcModule {
-  parseSync(file: string, source: string): { program: unknown; errors: { message: string }[] }
-}
-
-async function loadOxc(): Promise<OxcModule> {
-  try {
-    return (await import('oxc-parser')) as unknown as OxcModule
-  } catch (error) {
-    throw new Error(
-      `reading TypeScript files needs the optional package oxc-parser, which could not be loaded. Install it: pnpm add -D oxc-parser (${(error as Error).message})`,
-    )
   }
 }
 

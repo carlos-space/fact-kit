@@ -8,6 +8,7 @@ import type { LoadedEntry } from './load.ts'
 import { readConfig } from './project.ts'
 import { topLevelContent } from './select.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
+import { staleDerivedProblems } from './upstream.ts'
 
 export interface BuildOptions {
   /** Package directory, holding package.json. Defaults to `process.cwd()`. */
@@ -18,6 +19,11 @@ export interface BuildOptions {
   outDir?: string
   /** Add the `exports` entries that are missing from package.json. Otherwise missing entries are only reported. */
   writeExports?: boolean
+  /**
+   * Build facts derived from a newer version of their upstream package than the last build recorded.
+   * Without it the build fails and says what version changed.
+   */
+  acceptUpstream?: boolean
 }
 
 export interface BuildResult {
@@ -106,13 +112,26 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
   if (aggregate) return buildAggregate(cwd, aggregate, outDir, options.writeExports)
 
   const packageName = await readPackageName(cwd)
-  const loaded = await loadEntries(join(cwd, factsDir))
+  const loaded = await loadEntries(join(cwd, factsDir), { cwd, packageName })
   const indexes: IndexInput[] = loaded.map((e) => ({
     origin: `${factsDir}/${e.entry}/index.ts`,
     index: buildIndex(packageName, e),
     schemas: e.schemas,
   }))
-  result.problems = checkFacts({ indexes, scan: false }).problems
+  result.problems = [
+    ...loaded.flatMap((e) => e.problems.map((p) => ({ ...p }))),
+    ...checkFacts({ indexes, scan: false, strict: false }).problems,
+  ]
+  if (!options.acceptUpstream) {
+    for (const [i, e] of loaded.entries()) {
+      const previous = await readFile(join(cwd, outDir, e.entry, 'index.json'), 'utf8')
+        .then((text) => JSON.parse(text) as unknown)
+        .catch(() => undefined)
+      if (previous !== undefined) {
+        result.problems.push(...staleDerivedProblems(previous, indexes[i]?.index, `${outDir}/${e.entry}/index.json`))
+      }
+    }
+  }
   if (result.problems.length > 0) return result
 
   for (const [i, e] of loaded.entries()) {

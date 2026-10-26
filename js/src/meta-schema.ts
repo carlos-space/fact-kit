@@ -113,7 +113,7 @@ export const factSchema = {
     source: {
       type: 'object',
       required: ['kind'],
-      properties: { kind: { enum: ['published', 'converted', 'observed'] } },
+      properties: { kind: { enum: ['published', 'converted', 'observed', 'derived'] } },
       allOf: [
         {
           if: { properties: { kind: { const: 'published' } } },
@@ -125,6 +125,14 @@ export const factSchema = {
             required: ['from', 'converter', 'upstream'],
             additionalProperties: false,
             properties: { kind: true, from: nonEmptyString, converter: nonEmptyString, upstream: nonEmptyString },
+          },
+        },
+        {
+          if: { properties: { kind: { const: 'derived' } } },
+          then: {
+            required: ['from', 'version'],
+            additionalProperties: false,
+            properties: { kind: true, from: nonEmptyString, version: nonEmptyString },
           },
         },
         {

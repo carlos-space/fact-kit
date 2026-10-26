@@ -3,8 +3,8 @@ import { parseArgs } from 'node:util'
 import { buildFacts } from './build.ts'
 import { diffIndexFiles } from './diff.ts'
 import { impactOf } from './impact.ts'
-import { LoadError } from './load.ts'
-import { checkProject } from './project.ts'
+import { InputError, LoadError } from './load.ts'
+import { checkProject, parseTrain } from './project.ts'
 import type { CheckProjectOptions } from './project.ts'
 
 export interface CliIo {
@@ -28,12 +28,18 @@ Options for check
   --examples-dir <dir>  Example files, relative to --cwd (default: examples)
   --index <path>        A built index.json (or its directory) to check too; repeatable
   --allow-domain <host> Host URLs may point at, subdomains included; repeatable
+  --train <c>=<v>       A component being released at version <v>: its "since" may be as new as <v>,
+                        and no row but a pending one may still say "next". Repeatable
+  --json                Print { problems: [{ code, message, location }] } on stdout
+
+  Exit code: 0 no problem, 1 problems found, 2 bad settings or input
 
 Options for build
   --cwd <dir>           Package directory (default: current directory)
   --facts-dir <dir>     Fact sources (default: facts)
   --out-dir <dir>       Output directory (default: dist)
   --write-exports       Add the missing "exports" entries to package.json
+  --accept-upstream     Build facts derived from a newer upstream version than the last build recorded
 
 Options for diff
   --json                Print the result as JSON
@@ -59,9 +65,12 @@ async function runCheck(argv: string[], io: CliIo): Promise<number> {
       'examples-dir': { type: 'string' },
       index: { type: 'string', multiple: true },
       'allow-domain': { type: 'string', multiple: true },
+      train: { type: 'string', multiple: true },
+      json: { type: 'boolean' },
     },
   })
   const options: CheckProjectOptions = {
+    ...(values.train ? { train: parseTrain(values.train) } : {}),
     ...(values.cwd !== undefined ? { cwd: values.cwd } : {}),
     ...(values.config !== undefined ? { configFile: values.config } : {}),
     ...(values['facts-dir'] !== undefined ? { factsDir: values['facts-dir'] } : {}),
@@ -71,6 +80,12 @@ async function runCheck(argv: string[], io: CliIo): Promise<number> {
   }
   const { problems, warnings, counts } = await checkProject(options)
   for (const w of warnings) io.err(`warning ${w.code}: ${w.message}${w.location ? `\n  at ${w.location}` : ''}\n`)
+  if (values.json) {
+    io.out(
+      `${JSON.stringify({ problems: problems.map((p) => ({ code: p.code, message: p.message, location: p.location ?? null })) }, null, 2)}\n`,
+    )
+    return problems.length > 0 ? 1 : 0
+  }
   if (problems.length > 0) {
     for (const p of problems) io.err(`${p.code}: ${p.message}${p.location ? `\n  at ${p.location}` : ''}\n`)
     io.err(`fact-kit check: ${problems.length} problem${problems.length === 1 ? '' : 's'}\n`)
@@ -90,6 +105,7 @@ async function runBuild(argv: string[], io: CliIo): Promise<number> {
       'facts-dir': { type: 'string' },
       'out-dir': { type: 'string' },
       'write-exports': { type: 'boolean' },
+      'accept-upstream': { type: 'boolean' },
     },
   })
   const result = await buildFacts({
@@ -97,6 +113,7 @@ async function runBuild(argv: string[], io: CliIo): Promise<number> {
     ...(values['facts-dir'] !== undefined ? { factsDir: values['facts-dir'] } : {}),
     ...(values['out-dir'] !== undefined ? { outDir: values['out-dir'] } : {}),
     ...(values['write-exports'] ? { writeExports: true } : {}),
+    ...(values['accept-upstream'] ? { acceptUpstream: true } : {}),
   })
   if (result.problems.length > 0) {
     for (const p of result.problems) io.err(`${p.code}: ${p.message}${p.location ? `\n  at ${p.location}` : ''}\n`)
@@ -176,6 +193,12 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         return 2
     }
   } catch (error) {
+    // Bad options and settings: the command could not run, which is not the same as finding problems.
+    const code = (error as NodeJS.ErrnoException).code
+    if (error instanceof InputError || (typeof code === 'string' && code.startsWith('ERR_PARSE_ARGS'))) {
+      io.err(`fact-kit ${command}: ${(error as Error).message}\n`)
+      return 2
+    }
     if (error instanceof LoadError) io.err(`fact-kit ${command}: ${error.message}\n  at ${error.file}\n`)
     else io.err(`fact-kit ${command}: ${(error as Error).message}\n`)
     return 1

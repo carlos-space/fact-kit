@@ -1,14 +1,19 @@
 import { access, readdir, readFile } from 'node:fs/promises'
-import { join, relative, sep } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { FactsModule } from './types.ts'
+import { resolveEntries } from './author.ts'
+import type { SourceEntry } from './author.ts'
+import type { FactsModule, FactsSource, Problem } from './types.ts'
 
 export interface LoadedEntry {
   /** Sub-path of the entry, e.g. `cli` or `hooks/events`. */
   entry: string
   /** Absolute directory of the entry. */
   dir: string
+  /** The facts as the build writes them: `history`, `relates`, `factLink` and `derive` already expanded. */
   module: FactsModule
+  /** Problems found while expanding the sources, such as `relates-foreign` and `derive`. `check` reports them. */
+  problems: Problem[]
   /** JSON Schema files under `<entry>/schemas/`, keyed by path relative to that directory. */
   schemas: { file: string; schema: unknown }[]
 }
@@ -16,10 +21,21 @@ export interface LoadedEntry {
 /** Raised when a source file cannot be loaded. The CLI reports it as a `load` problem. */
 export class LoadError extends Error {
   readonly file: string
-  constructor(file: string, message: string) {
+  /** The problem code the CLI reports it as. */
+  readonly code: 'load' | 'history'
+  constructor(file: string, message: string, code: 'load' | 'history' = 'load') {
     super(message)
     this.name = 'LoadError'
     this.file = file
+    this.code = code
+  }
+}
+
+/** Raised when `check` can not run: bad settings or an input it was told to read is unreadable. The CLI exits with 2. */
+export class InputError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InputError'
   }
 }
 
@@ -86,33 +102,67 @@ export async function readSchemas(dir: string): Promise<LoadedEntry['schemas']> 
   return out
 }
 
+export interface LoadEntriesOptions {
+  /** Package directory, where `derive` finds the installed upstream packages. Defaults to the parent of `factsDir`. */
+  cwd?: string
+  /** Name of the package, for the locations `relates` writes across entries. Defaults to the name in `cwd`'s package.json. */
+  packageName?: string
+}
+
 /**
  * Loads every entry under `factsDir`. An entry is a directory holding `index.ts` that default-exports
  * `{ describes, facts }`. The TypeScript is run by Node's built-in type stripping, so it must use erasable
  * syntax only and relative imports must carry the `.ts` extension. A missing `factsDir` yields no entries.
+ * `history`, `relates`, `factLink` and `derive` are expanded once every entry is loaded, because a fact may
+ * relate to a fact of another entry.
  */
-export async function loadEntries(factsDir: string): Promise<LoadedEntry[]> {
-  const entries: LoadedEntry[] = []
+export async function loadEntries(factsDir: string, options: LoadEntriesOptions = {}): Promise<LoadedEntry[]> {
+  const raw: (SourceEntry & { dir: string })[] = []
   for (const dir of await findEntryDirs(factsDir)) {
     const file = join(dir, 'index.ts')
     let mod: Record<string, unknown>
     try {
       mod = (await import(pathToFileURL(file).href)) as Record<string, unknown>
     } catch (error) {
+      // `history` and `keyed` name the key that does not fit, which is the whole message.
+      if ((error as Error | undefined)?.name === 'HistoryError')
+        throw new LoadError(file, (error as Error).message, 'history')
       throw new LoadError(file, `cannot run the module: ${(error as Error).message}`)
     }
-    const value = (mod.default ?? mod) as Partial<FactsModule> | undefined
+    const value = (mod.default ?? mod) as Partial<FactsSource> | undefined
     if (!value || typeof value !== 'object' || !Array.isArray(value.facts)) {
       throw new LoadError(file, 'must default-export an object with a `facts` array (and `describes`)')
     }
-    entries.push({
+    raw.push({
       entry: relative(factsDir, dir).split(sep).join('/'),
       dir,
-      module: { describes: {}, ...value } as FactsModule,
-      schemas: await readSchemas(dir),
+      origin: relative(options.cwd ?? dirname(factsDir), file)
+        .split(sep)
+        .join('/'),
+      source: { describes: {}, ...value } as FactsSource,
+    })
+  }
+  const cwd = options.cwd ?? dirname(factsDir)
+  const resolved = resolveEntries(raw, { cwd, packageName: options.packageName ?? (await tryPackageName(cwd)) })
+  const entries: LoadedEntry[] = []
+  for (const [i, e] of raw.entries()) {
+    entries.push({
+      entry: e.entry,
+      dir: e.dir,
+      module: (resolved[i] as (typeof resolved)[number]).module,
+      problems: (resolved[i] as (typeof resolved)[number]).problems,
+      schemas: await readSchemas(e.dir),
     })
   }
   return entries
+}
+
+async function tryPackageName(cwd: string): Promise<string> {
+  try {
+    return await readPackageName(cwd)
+  } catch {
+    return ''
+  }
 }
 
 /** Reads `name` from the package.json in `cwd`. */

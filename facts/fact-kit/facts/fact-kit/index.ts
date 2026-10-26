@@ -54,7 +54,7 @@ const defs = {
   },
   Source: {
     description:
-      'Where the fact comes from. `published` is written by the tool itself, `converted` is generated from an upstream file, `observed` is read from documentation or measured.',
+      'Where the fact comes from. `published` is written by the tool itself, `converted` is generated from an upstream file, `observed` is read from documentation or measured, `derived` is computed from a fact of another fact package.',
     oneOf: [
       { type: 'object', required: ['kind'], additionalProperties: false, properties: { kind: { const: 'published' } } },
       {
@@ -66,6 +66,23 @@ const defs = {
           from: { ...nonEmpty, description: 'The upstream file the fact was converted from.' },
           converter: { ...nonEmpty, description: 'The script that did the conversion.' },
           upstream: { ...nonEmpty, description: 'The upstream version or commit the conversion read.' },
+        },
+      },
+      {
+        type: 'object',
+        required: ['kind', 'from', 'version'],
+        additionalProperties: false,
+        properties: {
+          kind: { const: 'derived' },
+          from: {
+            ...nonEmpty,
+            description: 'The spec of the upstream index: `<package>` or `<package>/<path>`.',
+          },
+          version: {
+            ...nonEmpty,
+            description:
+              'The version of the upstream fact package that was installed when the fact was built. The fact it was computed from is in `derivedFrom`.',
+          },
         },
       },
       {
@@ -154,7 +171,8 @@ const factSchema = {
     },
     derivedFrom: {
       ...list,
-      description: 'Locations of the facts this one is computed from: `<id>`, or `<spec>:<id>` for another package.',
+      description:
+        'Locations of the facts this one is computed from: `<id>` in the same entry, `<spec>:<id>` in another entry or package. The build writes them from `relates`, `factLink` and `derive`.',
     },
     when: {
       type: 'object',
@@ -234,7 +252,12 @@ const entryModuleSchema = {
   properties: {
     describes: { type: 'object', additionalProperties: nonEmpty },
     formatVersion: nonEmpty,
-    facts: { type: 'array', items: { $ref: 'urn:fact-kit:fact' } },
+    facts: {
+      description:
+        'Facts as they appear in the index, with three differences that the build resolves. `variants` may be the result of `history(...)`, and `content` may then be left out. `relates` lists other fact objects of this package, which become `derivedFrom`. An item may be `derive(upstreamSpec, id, map?)`, a fact computed from an installed upstream package.',
+      type: 'array',
+      items: { $ref: 'urn:fact-kit:fact' },
+    },
   },
 }
 
@@ -264,10 +287,26 @@ const configSchema = {
       description:
         'Aggregate package only: sub-path (`.` for the root) -> the component package whose built indexes `build` copies there. See `fact-kit.aggregate-layout`.',
     },
+    repoRoot: {
+      type: 'string',
+      default: 'the nearest parent that holds .git',
+      description:
+        'Root of the repository, relative to the package. `check` reads every package.json under it and reports a package that is not a facts package but lists a `-facts` package in `dependencies`.',
+    },
+    testDirs: {
+      ...list,
+      description:
+        'Directories of tests, relative to the package. A `pending` label must be passed as `include` by a test there.',
+    },
     docsDirs: {
       ...list,
       description:
-        'Directories, relative to the config file, that `diff --impact` searches for `fact:<id>` in markdown and for `get`, `value` and `has` calls in TypeScript.',
+        'Directories, relative to the package. `check` reports a `fact:<id>` or `fact:<spec>:<id>` in the markdown there that names no fact. `diff --impact` searches them for references to a fact: markdown, and `get`, `value` and `has` calls in TypeScript.',
+    },
+    implDirs: {
+      ...list,
+      description:
+        'Directories of the implementation, relative to the package. Code there must not import a `-facts` package.',
     },
   },
 }
@@ -299,7 +338,7 @@ const commands = {
     exitCodes: {
       '0': 'No problem found.',
       '1': 'A problem was found, or the command failed.',
-      '2': 'Wrong usage: no command, an unknown command, or the wrong number of arguments.',
+      '2': 'Wrong usage or input: no command, an unknown command or option, the wrong number of arguments, a `--train` that is not `<component>=<version>`, or a config or index file that can not be read.',
     },
   },
   check: {
@@ -318,6 +357,19 @@ const commands = {
         ...dirOption('--allow-domain', '<host>', 'none', 'Host URLs may point at, subdomains included.'),
         repeatable: true,
       },
+      {
+        ...dirOption(
+          '--train',
+          '<component>=<version>',
+          'none',
+          'A component being released at that version: its `since` may be as new as the version, and no row but a pending one may still say `next`.',
+        ),
+        repeatable: true,
+      },
+      {
+        flag: '--json',
+        summary: 'Print `{ problems: [{ code, message, location }] }` on stdout instead of the text on stderr.',
+      },
     ],
   },
   build: {
@@ -329,6 +381,11 @@ const commands = {
       dirOption('--facts-dir', '<dir>', 'facts', 'Fact sources.'),
       dirOption('--out-dir', '<dir>', 'dist', 'Output directory.'),
       { flag: '--write-exports', summary: 'Add the missing "exports" entries to package.json.' },
+      {
+        flag: '--accept-upstream',
+        summary:
+          'Build facts derived from a newer upstream version than the last build recorded. Without it the build fails and names both versions.',
+      },
     ],
   },
   diff: {
@@ -468,6 +525,30 @@ const moduleApi = {
       summary: 'Identity helper that types the default export of `facts/<entry>/index.ts`.',
     },
     {
+      name: 'history',
+      signature: 'history(...rows: HistoryRow[]) => FactVariant[]',
+      summary:
+        "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`.",
+    },
+    {
+      name: 'keyed',
+      signature: 'keyed<T>(items: T[], keys?: string[]) => T[]',
+      summary:
+        'Declares the fields that identify an item of an array, so `history` can `add`, `remove` and `replace` items by key. Several fields make a key written as an array in that order. Without `keys` the items are scalars and identify themselves. An array that is not keyed can only be replaced whole.',
+    },
+    {
+      name: 'factLink',
+      signature: 'factLink(fact: Fact) => string',
+      summary:
+        'The location of another fact of this package, to write inside a sentence of `content`: `<id>` in the same entry, `<spec>:<id>` in another. The build adds the fact to `derivedFrom`. `relates: [fact]` adds it without text. A fact object that is not one of this package fails `check` with `relates-foreign`.',
+    },
+    {
+      name: 'derive',
+      signature: 'derive(upstreamSpec: string, id: string, map?: (upstream: Fact) => Partial<Fact>) => DerivedFact',
+      summary:
+        "A fact computed from a fact of another package, listed in `facts`. The build reads the installed index of `upstreamSpec`, copies the fact `id`, lets `map` change the copy, and sets `source` to `{ kind: 'derived', from: upstreamSpec, version }` with the upstream version installed, and `derivedFrom` to `<upstreamSpec>:<id>`. Building again with another upstream version installed fails with `derive-version` until `--accept-upstream`.",
+    },
+    {
       name: 'defineExamples',
       signature: 'defineExamples(examples: ExampleGroup | ExampleGroup[]) => typeof examples',
       summary: 'Identity helper that types an example file. Each group follows `fact-kit.example-group`.',
@@ -571,6 +652,43 @@ const converters = {
   ],
 }
 
+const historyRowSchema = {
+  $schema: 'https://json-schema.org/draft/2020-12/schema',
+  title: 'Row of history(...)',
+  description:
+    'The first row gives the content with one of `value`, `schema` and `statement`. Each later row rewrites the content whole with one of those, or changes the content of the row before it with `remove`, `replace`, `add` and `set`, applied in that order. A row with none of them keeps the content and changes only the conditions.',
+  type: 'object',
+  required: ['since'],
+  additionalProperties: false,
+  properties: {
+    since: defs.Since,
+    value: { description: 'The content, or a full rewrite of it.' },
+    schema: defs.JsonSchema,
+    statement: defs.Text,
+    remove: {
+      description:
+        'JSON Pointer to a keyed array -> the keys of the items to drop. One key field is written as its value, several as an array in the declared order.',
+      type: 'object',
+      additionalProperties: { type: 'array' },
+    },
+    replace: {
+      description:
+        'JSON Pointer -> the new value. For a keyed array and a list of items, the items are swapped in by key. Otherwise the value there is replaced, and it must exist.',
+      type: 'object',
+    },
+    add: {
+      description: 'JSON Pointer to a keyed array -> the items to append. An item whose key is already there fails.',
+      type: 'object',
+      additionalProperties: { type: 'array' },
+    },
+    set: { description: 'JSON Pointer -> the value to put there. The last member may be new.', type: 'object' },
+    pending: nonEmpty,
+    stability: { enum: ['experimental'] },
+    platforms: list,
+    os: { type: 'array', items: { enum: ['macos', 'linux', 'windows'] } },
+  },
+}
+
 const exampleGroupSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   $id: 'urn:fact-kit:example-group',
@@ -631,6 +749,132 @@ const problemCodes = [
   'ambiguous-rows',
   'top-level-content',
   'load',
+  'history',
+  'relates-foreign',
+  'derive',
+  'derive-version',
+  'same-line',
+  'relation-cycle',
+  'lib-rows',
+  'since-ahead',
+  'train-next',
+  'pending-untested',
+  'doc-unknown-id',
+  'impl-imports-facts',
+  'impl-depends-on-facts',
+]
+
+/** What each problem code stands for, and what the rule reads. `check` runs all of them, `build` the first group. */
+const checkRules = [
+  {
+    code: 'format',
+    rule: 'A fact, index, schema file or example does not fit its meta-schema.',
+    reads: 'sources and built indexes',
+  },
+  { code: 'duplicate-id', rule: 'Two facts have one id.', reads: 'sources and built indexes' },
+  { code: 'id-prefix', rule: 'A fact id does not start with its tool and a dot.', reads: 'sources and built indexes' },
+  { code: 'local-path', rule: 'A fact holds a local absolute path.', reads: 'sources and built indexes' },
+  {
+    code: 'unregistered-domain',
+    rule: 'A fact holds a URL whose host is not in `allowedDomains`.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'unknown-fact-id',
+    rule: '`replacement`, `derivedFrom` or an example names a fact that does not exist.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'missing-schema-file',
+    rule: 'A `$ref` points at a file under `schemas/` that is not there.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'describes',
+    rule: '`describes` names more than one component, or the entries of one package disagree (different components, or `{}` mixed with one).',
+    reads: 'sources',
+  },
+  {
+    code: 'since-format',
+    rule: 'A `since` is not a version, `next`, or an array of versions that may end in `next`.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'same-line',
+    rule: 'A `since` array has two versions on one release line.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'ambiguous-rows',
+    rule: 'Two rows apply to the same readers with the same bound, so a reader can not choose.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'relation-cycle',
+    rule: 'Facts are derived from each other in a loop through `derivedFrom`.',
+    reads: 'sources and built indexes',
+  },
+  {
+    code: 'relates-foreign',
+    rule: '`relates` or `factLink` holds a fact object that is not a fact of this package, such as one imported from another package.',
+    reads: 'sources',
+  },
+  {
+    code: 'history',
+    rule: 'A `history` row does not fit: a key that matches no item, a key that is already there, an array that is not keyed, a bad pointer.',
+    reads: 'sources',
+  },
+  {
+    code: 'derive',
+    rule: '`derive` finds no installed upstream package, no such fact in it, or `map` returns something that is not an object.',
+    reads: 'the installed upstream package',
+  },
+  {
+    code: 'derive-version',
+    rule: 'A derived fact records another upstream version than the one installed. `build` also compares with the index of its last build.',
+    reads: 'the installed upstream package, the last build',
+  },
+  {
+    code: 'lib-rows',
+    rule: 'A row with `since` in `facts/_lib`, which holds only functions and constants.',
+    reads: 'source code, parsed with oxc',
+  },
+  {
+    code: 'since-ahead',
+    rule: 'A `since` is newer than `describes`, or than the `--train` version of its component when one is given.',
+    reads: 'sources, `--train`',
+  },
+  {
+    code: 'train-next',
+    rule: 'A component named by `--train` still has a row that says `next` and is not pending.',
+    reads: 'sources, `--train`',
+  },
+  {
+    code: 'pending-untested',
+    rule: 'A `pending` label is not passed as `include` by any test in `testDirs`.',
+    reads: '`testDirs`, parsed with oxc',
+  },
+  {
+    code: 'doc-unknown-id',
+    rule: 'A `fact:<id>` or `fact:<spec>:<id>` in `docsDirs` names a fact that does not exist.',
+    reads: '`docsDirs`',
+  },
+  {
+    code: 'impl-imports-facts',
+    rule: 'Code in `implDirs` imports a `-facts` package.',
+    reads: '`implDirs`, parsed with oxc',
+  },
+  {
+    code: 'impl-depends-on-facts',
+    rule: 'A package that is not a facts package lists a `-facts` package in `dependencies`.',
+    reads: 'every package.json under `repoRoot`',
+  },
+  {
+    code: 'top-level-content',
+    rule: 'A warning. No row applies to a reader that names no platform, so the top-level content is a guess.',
+    reads: 'sources and built indexes',
+  },
+  { code: 'load', rule: 'A source module, example or index file can not be run or parsed.', reads: 'sources' },
 ]
 
 const fact = (f: Omit<Fact, 'tool' | 'source'>): Fact => ({ ...f, tool: 'fact-kit', source: published })
@@ -642,6 +886,21 @@ const facts: Fact[] = [
     title: { en: 'Fields of a fact' },
     description: { en: 'The shape of one fact in an `index.json`.' },
     content: { schema: factSchema },
+  }),
+  fact({
+    id: 'fact-kit.check-rules',
+    topics: ['check'],
+    title: { en: 'What each problem code of check stands for' },
+    description: {
+      en: 'One entry per code of `fact-kit.problem-codes`, with the rule and the input it reads. `check` exits with 0 when it finds no problem, 1 when it finds one, and 2 when it can not run because of bad settings or input.',
+    },
+    content: { value: checkRules },
+  }),
+  fact({
+    id: 'fact-kit.history-row',
+    topics: ['authoring'],
+    title: { en: 'Fields of a row of history(...)' },
+    content: { schema: historyRowSchema },
   }),
   fact({
     id: 'fact-kit.index',

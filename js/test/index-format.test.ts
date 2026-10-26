@@ -212,7 +212,7 @@ describe('check: rows', () => {
     expect(bad.problems.map((p) => [p.code, p.message])).toEqual([
       ['since-format', 'demo.a: since "soon" is neither a version nor "next"'],
       ['since-format', 'demo.a: since "next" may only be the last item of an array'],
-      ['since-format', 'demo.a: since two versions on release line 0.49'],
+      ['same-line', 'demo.a: since two versions on release line 0.49'],
     ])
     const empty = await check(row('[]'))
     expect([...new Set(empty.problems.map((p) => p.code))].sort()).toEqual(['format', 'since-format'])
@@ -249,7 +249,8 @@ describe('check: rows', () => {
     expect((await check([platformRow, osRow, both].join(','))).problems).toEqual([])
     // Two pending labels are alternatives, not a tie.
     const pending = [row("'next'", ", pending: 'x'"), row("'next'", ", pending: 'y'")].join(',')
-    expect((await check(pending)).problems).toEqual([])
+    // (No test includes the labels here, so `pending-untested` is reported. The rows are not a tie.)
+    expect((await check(pending)).problems.map((p) => p.code)).toEqual(['pending-untested', 'pending-untested'])
   })
 
   test('warns, without failing, when no row applies to a reader that names no platform', async () => {

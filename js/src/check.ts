@@ -2,7 +2,7 @@ import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
 import { ambiguousRows, topLevelContent } from './select.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
-import { sinceProblem } from './version.ts'
+import { compareVersions, parseVersion, sinceIssue } from './version.ts'
 import { validateExampleGroup, validateIndex, validateSchemaDocument } from './validate.ts'
 import type { ValidationIssue } from './validate.ts'
 
@@ -34,6 +34,15 @@ export interface CheckOptions {
   allowedDomains?: readonly string[]
   /** Set to false to skip the path and domain scan, as `build` does. Defaults to true. */
   scan?: boolean
+  /**
+   * Set to false to skip the rules about a release (`since-ahead`, `train-next`, `pending-untested`), as `build`
+   * does. On a release branch `since` is ahead of `describes`, so building must not depend on them.
+   */
+  strict?: boolean
+  /** Component -> version of the train being released. `since` up to that version is allowed, and `next` is not. */
+  train?: Readonly<Record<string, string>>
+  /** The labels some test includes. With it, a `pending` label that is not in the set is reported. */
+  pendingTested?: ReadonlySet<string>
 }
 
 export interface CheckResult {
@@ -117,10 +126,14 @@ function checkRows(fact: Fact, location: string, problems: Problem[], warnings: 
   let valid = true
   const sinceOf = (since: unknown, pointer: string) => {
     if (since === undefined) return
-    const why = sinceProblem(since as never)
-    if (why) {
+    const issue = sinceIssue(since as never)
+    if (issue) {
       valid = false
-      problems.push({ code: 'since-format', message: `${fact.id}: since ${why}`, location: `${location}${pointer}` })
+      problems.push({
+        code: issue.code,
+        message: `${fact.id}: since ${issue.message}`,
+        location: `${location}${pointer}`,
+      })
     }
   }
   sinceOf(fact.when?.since, '/when/since')
@@ -142,6 +155,122 @@ function checkRows(fact: Fact, location: string, problems: Problem[], warnings: 
       location: `${location}/content`,
     })
   }
+}
+
+// --- rules about a release ----------------------------------------------------------------------------
+/** The component a package's facts describe: the one key of `describes`, else the package name without scope and `-facts`. */
+export function componentOf(index: Partial<FactIndex> | null | undefined): string | undefined {
+  const keys = Object.keys(index?.describes ?? {})
+  if (keys.length === 1) return keys[0]
+  if (keys.length > 1 || typeof index?.package !== 'string') return undefined
+  return index.package.replace(/^@[^/]+\//, '').replace(/-facts$/, '')
+}
+
+/** Every `since` of a fact with where it is and whether its row is `pending`. */
+function sinceOfRows(fact: Partial<Fact>): { since: unknown; pointer: string; pending: boolean }[] {
+  const out: { since: unknown; pointer: string; pending: boolean }[] = []
+  if (fact.when?.since !== undefined) out.push({ since: fact.when.since, pointer: '/when/since', pending: false })
+  for (const [k, v] of (Array.isArray(fact.variants) ? fact.variants : []).entries()) {
+    const row = v as { since?: unknown; pending?: unknown } | null
+    if (row && row.since !== undefined) {
+      out.push({ since: row.since, pointer: `/variants/${k}/since`, pending: row.pending !== undefined })
+    }
+  }
+  return out
+}
+
+function versionsOf(since: unknown): string[] {
+  const list = Array.isArray(since) ? since : [since]
+  return list.filter((v): v is string => typeof v === 'string' && v !== 'next' && parseVersion(v) !== undefined)
+}
+
+const endsWithNext = (since: unknown): boolean => since === 'next' || (Array.isArray(since) && since.at(-1) === 'next')
+
+function releaseRules(
+  index: Partial<FactIndex> | null | undefined,
+  file: string,
+  options: CheckOptions,
+  problems: Problem[],
+): void {
+  const facts = Array.isArray(index?.facts) ? index.facts : []
+  const component = componentOf(index)
+  const described = Object.entries(index?.describes ?? {})
+  const describedVersion = described.length === 1 ? described[0]?.[1] : undefined
+  const trainVersion = component !== undefined ? options.train?.[component] : undefined
+  // On the train, `since` may be as new as the version being released.
+  let limit = typeof describedVersion === 'string' && parseVersion(describedVersion) ? describedVersion : undefined
+  if (
+    trainVersion !== undefined &&
+    parseVersion(trainVersion) &&
+    (!limit || compareVersions(trainVersion, limit) > 0)
+  ) {
+    limit = trainVersion
+  }
+  for (const [i, raw] of facts.entries()) {
+    const fact = raw as Partial<Fact> | null
+    if (!fact || typeof fact.id !== 'string') continue
+    for (const row of sinceOfRows(fact)) {
+      const location = at(file, `/facts/${i}${row.pointer}`)
+      if (limit !== undefined) {
+        for (const version of versionsOf(row.since)) {
+          if (compareVersions(version, limit) > 0) {
+            problems.push({
+              code: 'since-ahead',
+              message: `${fact.id}: since ${version} is newer than ${component} ${limit}${limit === trainVersion ? ' (the train)' : ' (describes)'}. Pin to a released version or use "next"`,
+              location,
+            })
+          }
+        }
+      }
+      if (trainVersion !== undefined && !row.pending && endsWithNext(row.since)) {
+        problems.push({
+          code: 'train-next',
+          message: `${fact.id}: ${component} is released as ${trainVersion}, but this row still starts at "next". Run pin first`,
+          location,
+        })
+      }
+    }
+    if (options.pendingTested) {
+      for (const [k, v] of (Array.isArray(fact.variants) ? fact.variants : []).entries()) {
+        const label = (v as { pending?: unknown } | null)?.pending
+        if (typeof label === 'string' && !options.pendingTested.has(label)) {
+          problems.push({
+            code: 'pending-untested',
+            message: `${fact.id}: no test includes the pending label "${label}", so nothing checks the row. Pass it as include in a test under testDirs`,
+            location: at(file, `/facts/${i}/variants/${k}/pending`),
+          })
+        }
+      }
+    }
+  }
+}
+
+/** Cycles in the graph of `derivedFrom`, each reported once. `edges` maps a fact id to the ids it is derived from. */
+function findCycles(edges: ReadonlyMap<string, readonly string[]>): string[][] {
+  const state = new Map<string, 'open' | 'done'>()
+  const cycles: string[][] = []
+  const seen = new Set<string>()
+  const path: string[] = []
+  const visit = (id: string): void => {
+    state.set(id, 'open')
+    path.push(id)
+    for (const next of edges.get(id) ?? []) {
+      if (state.get(next) === 'open') {
+        const cycle = path.slice(path.indexOf(next))
+        const key = [...cycle].sort().join('\0')
+        if (!seen.has(key)) {
+          seen.add(key)
+          cycles.push([...cycle, next])
+        }
+      } else if (!state.has(next)) {
+        visit(next)
+      }
+    }
+    path.pop()
+    state.set(id, 'done')
+  }
+  for (const id of edges.keys()) if (!state.has(id)) visit(id)
+  return cycles
 }
 
 // --- the check --------------------------------------------------------------------------------------
@@ -180,8 +309,11 @@ export function checkFacts(options: CheckOptions): CheckResult {
   const allowed = options.allowedDomains ?? []
   const doScan = options.scan !== false
   const idOrigin = new Map<string, string>()
-  const references: { id: string; field: string; target: string; location: string }[] = []
+  const references: { id: string; field: string; target: string; spec?: string; location: string }[] = []
   let component: { name: string | null; file: string } | undefined
+  const strict = options.strict !== false
+  const specs = new Set<string>()
+  const edges = new Map<string, string[]>()
   let factCount = 0
   let schemaCount = 0
 
@@ -197,6 +329,8 @@ export function checkFacts(options: CheckOptions): CheckResult {
     }
 
     const facts = (input.index as Partial<FactIndex> | null)?.facts
+    const head = input.index as Partial<FactIndex> | null
+    if (typeof head?.package === 'string' && typeof head.entry === 'string') specs.add(`${head.package}/${head.entry}`)
     if (Array.isArray(facts)) {
       for (const [i, raw] of facts.entries()) {
         const fact = raw as Partial<Fact>
@@ -227,16 +361,24 @@ export function checkFacts(options: CheckOptions): CheckResult {
             : `/facts/${i}/when/replacement`
           references.push({ id: fact.id, field: 'replacement', target, location: at(file, pointer) })
         }
-        // A location with a colon points into another package or entry, which this check does not read.
-        for (const [k, target] of (Array.isArray(fact.derivedFrom) ? fact.derivedFrom : []).entries()) {
-          if (typeof target !== 'string' || target.includes(':')) continue
+        // A location with a colon points into another package or entry. It is checked when that entry is one of
+        // the indexes here, and left alone otherwise.
+        const derivedFrom = Array.isArray(fact.derivedFrom) ? fact.derivedFrom : []
+        const dependsOn: string[] = []
+        for (const [k, target] of derivedFrom.entries()) {
+          if (typeof target !== 'string') continue
+          const colon = target.lastIndexOf(':')
+          const spec = colon === -1 ? undefined : target.slice(0, colon)
           references.push({
             id: fact.id,
             field: 'derivedFrom',
-            target,
+            target: colon === -1 ? target : target.slice(colon + 1),
+            ...(spec !== undefined ? { spec } : {}),
             location: at(file, `/facts/${i}/derivedFrom/${k}`),
           })
+          dependsOn.push(target)
         }
+        edges.set(fact.id, dependsOn)
         checkRows(fact as Fact, at(file, `/facts/${i}`), problems, warnings)
         // Inline schemas may $ref a file under schemas/.
         const shipped = new Set((input.schemas ?? []).map((s) => s.file))
@@ -255,6 +397,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
         }
       }
     }
+    if (input.source && strict) releaseRules(input.index as Partial<FactIndex> | null, file, options, problems)
     if (input.source) {
       const describes = (input.index as Partial<FactIndex> | null)?.describes
       const keys = describes && typeof describes === 'object' ? Object.keys(describes) : []
@@ -290,13 +433,36 @@ export function checkFacts(options: CheckOptions): CheckResult {
   }
 
   for (const r of references) {
+    // A location in an entry that was not loaded here can not be checked.
+    if (r.spec !== undefined && !specs.has(r.spec)) continue
     if (!idOrigin.has(r.target)) {
       problems.push({
         code: 'unknown-fact-id',
-        message: `${r.id}: ${r.field} "${r.target}" is not a known fact id`,
+        message: `${r.id}: ${r.field} "${r.spec !== undefined ? `${r.spec}:` : ''}${r.target}" is not a known fact id`,
         location: r.location,
       })
     }
+  }
+
+  // A fact derived from itself, through any number of others.
+  const graph = new Map<string, string[]>()
+  for (const [id, targets] of edges) {
+    graph.set(
+      id,
+      targets.flatMap((t) => {
+        const colon = t.lastIndexOf(':')
+        if (colon === -1) return [t]
+        return specs.has(t.slice(0, colon)) ? [t.slice(colon + 1)] : []
+      }),
+    )
+  }
+  for (const cycle of findCycles(graph)) {
+    const first = cycle[0] as string
+    problems.push({
+      code: 'relation-cycle',
+      message: `facts derived from each other in a loop: ${cycle.join(' -> ')}`,
+      location: `${idOrigin.get(first) ?? first}/derivedFrom`,
+    })
   }
 
   let exampleCount = 0

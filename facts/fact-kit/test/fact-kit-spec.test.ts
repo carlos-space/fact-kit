@@ -14,6 +14,7 @@ import {
   exampleGroupSchema as implExampleGroupSchema,
   factSchema as implFactSchema,
   flattenSchema,
+  history,
   indexSchema as implIndexSchema,
   readFacts,
   validateExampleGroup,
@@ -81,6 +82,9 @@ describe('fact-kit.fact and fact-kit.index', () => {
       { ...good, when: { os: ['beos'] } },
       { ...good, verify: { probe: { kind: 'manual' }, verifiedOn: '2026-01-01' } },
       { ...good, title: { fr: 'chose' } },
+      { ...good, source: { kind: 'derived', from: '@up/x-facts/cli', version: '1.0.0' } },
+      { ...good, source: { kind: 'derived', from: '@up/x-facts/cli' } },
+      { ...good, source: { kind: 'derived', from: 'a', version: '1', extra: true } },
     ]
     for (const sample of samples) {
       expect(validate(sample), JSON.stringify(sample)).toBe(validateFact(sample).length === 0)
@@ -107,6 +111,8 @@ describe('fact-kit.x-keywords', () => {
     expect(content('fact-kit.x-keywords')).toEqual(X_KEYWORDS)
   })
 })
+
+const commands2 = content('fact-kit.cli')
 
 describe('fact-kit.cli', () => {
   const commands = content('fact-kit.cli')
@@ -145,7 +151,7 @@ describe('fact-kit.cli', () => {
   it('marks the repeatable flags and the defaults the help text gives', async () => {
     const { text } = await helpFlags()
     const repeatable = (commands.check.options as { flag: string; repeatable?: boolean }[]).filter((o) => o.repeatable)
-    expect(repeatable.map((o) => o.flag).sort()).toEqual(['--allow-domain', '--index'])
+    expect(repeatable.map((o) => o.flag).sort()).toEqual(['--allow-domain', '--index', '--train'])
     for (const o of repeatable) expect(text).toMatch(new RegExp(`${o.flag} .*`))
     expect(text).toMatch(/--facts-dir <dir>\s+Fact sources.*\(default: facts\)/)
     expect(text).toMatch(/--out-dir <dir>\s+Output directory \(default: dist\)/)
@@ -201,6 +207,51 @@ describe('fact-kit.problem-codes and fact-kit.config-file', () => {
     const block = /export interface ProjectConfig \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? ''
     const keys = [...block.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1])
     expect(Object.keys(content('fact-kit.config-file').properties).sort()).toEqual([...keys].sort())
+  })
+})
+
+describe('fact-kit.check-rules', () => {
+  it('has one entry for each problem code, in no particular order', () => {
+    const rules = content('fact-kit.check-rules') as { code: string; rule: string; reads: string }[]
+    expect(rules.map((r) => r.code).sort()).toEqual([...content('fact-kit.problem-codes')].sort())
+    for (const r of rules) expect(r.rule.length, r.code).toBeGreaterThan(10)
+  })
+
+  it('exits with 2 for a --train that is not <component>=<version>, as the cli fact says', async () => {
+    expect(commands2.global.exitCodes['2']).toContain('--train')
+    const dir = makeTmp('rules-exit')
+    expect((await cli(['check', '--cwd', dir, '--train', 'demo'])).code).toBe(2)
+    expect((await cli(['check', '--cwd', dir, '--train', 'demo=1.0.0', '--json'])).stdout).toBe(
+      '{\n  "problems": []\n}\n',
+    )
+  })
+})
+
+describe('fact-kit.history-row', () => {
+  const row = content('fact-kit.history-row')
+  const validate = new Ajv2020({ strict: false }).compile(row)
+
+  it('names the fields of HistoryRow', () => {
+    const source = readFileSync(join(kitSrc, 'history.ts'), 'utf8')
+    const block = /export interface HistoryRow \{([\s\S]*?)\n\}/.exec(source)?.[1] ?? ''
+    const keys = [...block.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1] ?? '')
+    expect(keys.length).toBeGreaterThan(0)
+    expect(Object.keys(row.properties).sort()).toEqual([...keys].sort())
+  })
+
+  it('agrees with history() on rows that are and are not rows', () => {
+    const good = [
+      { since: '1.0.0', value: { a: 1 } },
+      { since: '1.1.0', add: { '/a': [1] }, remove: { '/a': [2] }, replace: { '/b': 1 }, set: { '/c': 1 } },
+      { since: ['1.0.1', 'next'], pending: 'x', stability: 'experimental', platforms: ['codex'], os: ['macos'] },
+    ]
+    for (const r of good) expect(validate(r), JSON.stringify(r)).toBe(true)
+    const bad = [{ value: 1 }, { since: '1', nope: 1 }, { since: '1', add: [1] }, { since: '1', os: ['beos'] }]
+    for (const r of bad) {
+      expect(validate(r), JSON.stringify(r)).toBe(false)
+      expect(() => history(r as never, ...[])).toThrow()
+    }
+    expect(() => history(...(good.slice(0, 1) as never[]))).not.toThrow()
   })
 })
 

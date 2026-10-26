@@ -18,6 +18,8 @@ export type FactContent =
 export type FactSource =
   | { kind: 'published' }
   | { kind: 'converted'; from: string; converter: string; upstream: string }
+  /** Derived from a fact of another package: `from` is its spec, `version` the version of that package installed at build. */
+  | { kind: 'derived'; from: string; version: string }
   | {
       kind: 'observed'
       basis: 'doc' | 'measured' | 'spike'
@@ -81,7 +83,35 @@ export interface Fact {
   verify?: { probe: FactProbe; verifiedOn: string; screenedThrough?: string }
 }
 
-/** What a `facts/<entry>/index.ts` module default-exports. */
+/**
+ * A fact as an author writes it in `facts/<entry>/index.ts`. `variants` is usually the result of `history(...)`,
+ * `relates` takes other fact objects of the same package, and `content` may be left out when there are `variants`.
+ * The build turns it into a {@link Fact}.
+ */
+export interface FactDecl extends Omit<Fact, 'content'> {
+  content?: FactContent
+  /** Other facts of this package this one is computed from. The build lists them in `derivedFrom`. */
+  relates?: readonly FactLike[]
+}
+
+/** What `derive(...)` returns: a fact computed from a fact of another package, resolved at build. */
+export interface DerivedFact {
+  readonly spec: string
+  readonly id: string
+  readonly map?: (upstream: Fact) => Partial<FactDecl>
+}
+
+/** Anything that can stand for a fact in `relates` and `factLink`. */
+export type FactLike = Fact | FactDecl | DerivedFact
+
+/** What a `facts/<entry>/index.ts` module default-exports, as written. */
+export interface FactsSource {
+  describes: Record<string, string>
+  formatVersion?: string
+  facts: (FactDecl | DerivedFact)[]
+}
+
+/** The facts of one entry after the build has expanded `history`, `relates`, `factLink` and `derive`. */
 export interface FactsModule {
   /** The one component this entry describes and the latest published version it covers, e.g. `{ mainflow: '1.2.0' }`. */
   describes: Record<string, string>
@@ -112,6 +142,19 @@ export interface Problem {
     | 'ambiguous-rows'
     | 'top-level-content'
     | 'load'
+    | 'history'
+    | 'relates-foreign'
+    | 'derive'
+    | 'derive-version'
+    | 'same-line'
+    | 'relation-cycle'
+    | 'lib-rows'
+    | 'since-ahead'
+    | 'train-next'
+    | 'pending-untested'
+    | 'doc-unknown-id'
+    | 'impl-imports-facts'
+    | 'impl-depends-on-facts'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string
