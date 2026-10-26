@@ -122,7 +122,7 @@ const factSchema = {
     },
     variants: {
       description:
-        'Rows of a fact whose content changes by version or differs by platform. `content` then holds the latest published row, for readers of index format 1.0. Without `variants` the whole fact is one row that starts at `when.since`.',
+        'Rows of a fact whose content changes by version or differs by platform. `content` then holds the latest published row, for readers of index format 1.0. Without `variants` the whole fact is one row that starts at `when.since` and has the conditions `when.platforms` and `when.os`.',
       type: 'array',
       minItems: 1,
       items: {
