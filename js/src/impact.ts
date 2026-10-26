@@ -71,7 +71,7 @@ function stringValue(node: any): string | undefined {
 /** The string arguments of `get`, `value` and `has` calls, and the names imported, with their offsets. */
 function scanProgram(program: unknown): {
   calls: { id: string; offset: number }[]
-  imports: { name: string; offset: number }[]
+  imports: { name: string; source: string; offset: number }[]
 } {
   const calls: { id: string; offset: number }[] = []
   const imports: { name: string; source: string; offset: number }[] = []
