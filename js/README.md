@@ -34,6 +34,8 @@ fact-kit check [--cwd dir] [--config file] [--facts-dir dir] [--examples-dir dir
 fact-kit build [--cwd dir] [--facts-dir dir] [--out-dir dir] [--write-exports] [--accept-upstream]
 fact-kit diff <old> <new> [--json]
 fact-kit diff --impact <id> [--cwd dir] [--json]
+fact-kit pin --version <v> [--cwd dir] [--config file] [--facts-dir dir]
+fact-kit merge-since [--cwd dir]
 ```
 
 `check` validates every fact against the meta-schema, rejects duplicate ids, local absolute paths and
@@ -54,6 +56,34 @@ the top-level `content` has to be a guess. The rules are in [`conformance/README
 package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.1"`, and a fact with `variants`
 gets the latest published row as its top-level `content`, which is what a reader of format 1.0 uses. `build` validates format and ids only; it does not scan
 for local paths or domains, so run `check` before publishing.
+
+### Pinning `next` and merging `since`
+
+Both commands read the TypeScript sources with `oxc-parser` (an optional peer dependency; without it they print
+what to install and exit with 2) and change only the text of a `since` literal, so nothing else in a file moves.
+
+`fact-kit pin --version <v>` runs in a component package. In the rows under the facts directory it turns a `since`
+that is `'next'`, or an array that ends in `'next'`, into `<v>`. A row with a `pending` label stays, and so do
+`describes` and `<facts-dir>/_lib`. `<v>` is a semver 2.0.0 version, and a pre-release such as `0.49.0-alpha.1` is
+written whole. It takes `--version` once: none, two, or a value that is not semver exits with 2 and changes nothing.
+A second run changes nothing, because a pinned `since` is no longer `next`. A row that spreads another object
+(`{ ...shared, since: 'next' }`) may get its `pending` from it, so `pin` leaves it and warns on stderr. Only objects
+that are not fact content count as rows, so an object inside `content`, `value`, `schema`, `statement`, `add`,
+`replace`, `remove` or `set` is data and is not changed.
+
+`fact-kit merge-since` runs after `git merge` (while the merge is open, or once it is committed), in a directory of
+the repository. Only files under that directory are read.
+
+1. In each file that `git diff --name-only --diff-filter=U` lists, a conflict block whose two sides differ only in
+   the `since` values is settled: the union of the versions, the smaller one when two are on one release line,
+   ordered by release line with `next` last. Normal, `diff3` and `zdiff3` markers are read, and the base side is not
+   used. A `since` written over several lines is not recognized, and neither is any other difference.
+2. A row that only the merged-in side has (the same fact has no row with that `since` in `HEAD`), whose `since` is one
+   patch version `X.Y.Z` (`Z` above 0, no pre-release) and that has no `pending`, becomes `['X.Y.Z', 'next']`. A row
+   `HEAD` already had, such as a `'0.7.1'` that `pin` wrote on main, stays.
+
+It writes what it settled, stages nothing, and prints each conflict left as `<file>:<line> <reason>`. Exit code: 0 all
+settled, 1 conflicts left, 2 no merge to read, or bad input. A second run changes nothing.
 
 ### Two-layer packages
 

@@ -6,13 +6,13 @@ import type { Problem } from './types.ts'
 
 /** Rules that read files around the facts: the helper directory, tests, docs and the implementation. */
 
-type Node = { type: string; start: number; [key: string]: unknown }
+export type Node = { type: string; start: number; end: number; [key: string]: unknown }
 
 const SKIPPED = new Set(['node_modules', '.git', 'dist', 'tmp'])
-const CODE = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'])
+export const CODE = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'])
 
 /** Files under `dir` with one of the extensions. A missing directory has none. */
-async function walk(dir: string, accept: ReadonlySet<string> | ((name: string) => boolean)): Promise<string[]> {
+export async function walk(dir: string, accept: ReadonlySet<string> | ((name: string) => boolean)): Promise<string[]> {
   const wanted = typeof accept === 'function' ? accept : (name: string) => accept.has(extname(name))
   const out: string[] = []
   const visit = async (current: string): Promise<void> => {
@@ -35,7 +35,7 @@ async function walk(dir: string, accept: ReadonlySet<string> | ((name: string) =
   return out
 }
 
-function visitNodes(node: unknown, fn: (node: Node) => void): void {
+export function visitNodes(node: unknown, fn: (node: Node) => void): void {
   if (Array.isArray(node)) {
     for (const item of node) visitNodes(item, fn)
   } else if (typeof node === 'object' && node !== null) {
@@ -47,7 +47,7 @@ function visitNodes(node: unknown, fn: (node: Node) => void): void {
   }
 }
 
-const lineOf = (source: string, offset: number): number => source.slice(0, offset).split('\n').length
+export const lineOf = (source: string, offset: number): number => source.slice(0, offset).split('\n').length
 
 async function parsed(file: string): Promise<{ program: unknown; source: string }> {
   const oxc = await loadOxc()
@@ -56,7 +56,7 @@ async function parsed(file: string): Promise<{ program: unknown; source: string 
 }
 
 /** The name an object key or a literal stands for. */
-function nameOf(node: unknown): string | undefined {
+export function nameOf(node: unknown): string | undefined {
   const n = node as { type?: string; name?: string; value?: unknown } | null
   if (n?.type === 'Identifier') return n.name
   if (n?.type === 'Literal' && typeof n.value === 'string') return n.value
