@@ -193,6 +193,36 @@ describe('c004 check: the rules of m149/d011', () => {
     expect(ok.code).toBe(0)
   })
 
+  test('impl-reads-facts-dist: code in implDirs names a path in facts/dist', async () => {
+    const files = {
+      'facts/a/index.ts': entry([fact('one')]),
+      'fact-kit.config.json': { implDirs: ['src'] },
+      'src/cli.ts': [
+        "import data from '../facts/dist/a/index.json'",
+        "const text = readFileSync('../facts/dist/a/index.json', 'utf8')",
+        "const url = new URL('../../facts/dist/a/index.json', import.meta.url)",
+        'const tpl = `${root}/facts/dist/a`',
+        'export { data, text, url, tpl }',
+        '',
+      ].join('\n'),
+    }
+    const r = await check(files)
+    expect([r.code, codes(r)]).toEqual([1, Array(4).fill('impl-reads-facts-dist')])
+    expect(r.problems.map((p) => p.location)).toEqual(['src/cli.ts:1', 'src/cli.ts:2', 'src/cli.ts:3', 'src/cli.ts:4'])
+    expect(r.problems[0]?.message).toContain('only tests and docs read them')
+    // Tests are not in implDirs, and a string that only contains the letters is not a path part.
+    const ok = await check({
+      ...files,
+      'test/read.test.ts': "import data from '../facts/dist/a/index.json'\nexport { data }\n",
+      'src/cli.ts':
+        "export const a = 'my-facts/distance'\nexport const b = 'facts/dist-old'\nexport const c = 'facts/distance'\n",
+    })
+    expect([ok.code, ok.problems]).toEqual([0, []])
+    // Import of a -facts package and a facts/dist path on one line are both reported.
+    const both = await check({ ...files, 'src/cli.ts': "import x from 'demo-facts/facts/dist/a'\nexport { x }\n" })
+    expect(codes(both).sort()).toEqual(['impl-imports-facts', 'impl-reads-facts-dist'])
+  })
+
   test('impl-depends-on-facts: a package that is not a facts package lists a -facts package in dependencies', async () => {
     const files = {
       'facts/a/index.ts': entry([fact('one')]),

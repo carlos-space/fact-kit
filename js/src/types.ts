@@ -154,6 +154,7 @@ export interface Problem {
     | 'pending-untested'
     | 'doc-unknown-id'
     | 'impl-imports-facts'
+    | 'impl-reads-facts-dist'
     | 'impl-depends-on-facts'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */

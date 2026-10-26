@@ -761,6 +761,7 @@ const problemCodes = [
   'pending-untested',
   'doc-unknown-id',
   'impl-imports-facts',
+  'impl-reads-facts-dist',
   'impl-depends-on-facts',
 ]
 
@@ -862,6 +863,11 @@ const checkRules = [
   {
     code: 'impl-imports-facts',
     rule: 'Code in `implDirs` imports a `-facts` package.',
+    reads: '`implDirs`, parsed with oxc',
+  },
+  {
+    code: 'impl-reads-facts-dist',
+    rule: "A string in `implDirs` code, or a fixed part of a template, holds `facts/dist` as a path part (bounded by the start, the end, `/` or `\\`). It covers an import, `require`, `readFileSync` and `new URL`. It matches the literal text, so a path built as `join('facts', 'dist')` is not found, and implementations in other languages are out of scope.",
     reads: '`implDirs`, parsed with oxc',
   },
   {

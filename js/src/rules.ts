@@ -143,6 +143,9 @@ export async function docRefProblems(dirs: readonly string[], base: string, know
   return problems
 }
 
+/** `facts/dist` as a path part: bounded by the start, the end, `/` or `\\`. */
+const FACTS_DIST = /(?:^|[/\\])facts[/\\]dist(?:$|[/\\])/
+
 const isFactsPackage = (name: unknown): boolean => typeof name === 'string' && name.endsWith('-facts')
 
 function packageOfSpecifier(specifier: string): string | undefined {
@@ -185,6 +188,20 @@ export async function implProblems(root: string, base: string, implDirs: readonl
     for (const file of await walk(join(base, dir), CODE)) {
       const { program, source } = await parsed(file)
       visitNodes(program, (n) => {
+        // Any string, or fixed part of a template, that names the facts build output as a path.
+        const texts: string[] = []
+        if (n.type === 'Literal' && typeof n.value === 'string') texts.push(n.value)
+        else if (n.type === 'TemplateElement') {
+          const cooked = (n.value as { cooked?: string } | undefined)?.cooked
+          if (typeof cooked === 'string') texts.push(cooked)
+        }
+        if (texts.some((t) => FACTS_DIST.test(t))) {
+          problems.push({
+            code: 'impl-reads-facts-dist',
+            message: `the implementation names a path in facts/dist. The facts are the spec, so only tests and docs read them`,
+            location: where(base, file, source, n.start),
+          })
+        }
         let specifier: unknown
         if (
           n.type === 'ImportDeclaration' ||
