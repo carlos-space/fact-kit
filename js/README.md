@@ -74,8 +74,8 @@ read them.
 `fact-kit diff --impact <id>` runs in an aggregate package. It reads the built indexes of the components, follows
 `derivedFrom` downstream and prints `{ id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }` with `--json`.
 `docs` come from `docsDirs` (relative to the config file): markdown lines with `fact:<id>` or `fact:<spec>:<id>`, and
-in TypeScript the string argument of `get`, `value` and `has` calls and imports named like the fact object
-(`git.cmd.commit` is `gitCmdCommit`). Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
+in TypeScript the string argument of `get`, `value` and `has` calls and imports of a fact object. An import counts when its relative module, loaded the way `build` loads fact sources,
+exports a fact object with the id, whatever name it is imported under; a module that fails to load is skipped. Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
 loaded only then.
 
 ## Reading

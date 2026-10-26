@@ -1,5 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { planAggregate } from './aggregate.ts'
 import { readConfig } from './project.ts'
 import { readPackageName } from './load.ts'
@@ -43,11 +44,6 @@ async function* walkFiles(dir: string): AsyncGenerator<string> {
   }
 }
 
-/** `git.cmd.commit` -> `gitCmdCommit`, the name a fact object is imported under. */
-function camelCase(id: string): string {
-  return id.replace(/[^A-Za-z0-9]+(.)?/g, (_, c: string | undefined) => (c ? c.toUpperCase() : ''))
-}
-
 interface OxcModule {
   parseSync(file: string, source: string): { program: unknown; errors: { message: string }[] }
 }
@@ -78,7 +74,7 @@ function scanProgram(program: unknown): {
   imports: { name: string; offset: number }[]
 } {
   const calls: { id: string; offset: number }[] = []
-  const imports: { name: string; offset: number }[] = []
+  const imports: { name: string; source: string; offset: number }[] = []
   const stack: unknown[] = [program]
   while (stack.length > 0) {
     const node = stack.pop() as any
@@ -98,9 +94,13 @@ function scanProgram(program: unknown): {
       const id = READ_METHODS.has(name) ? stringValue(node.arguments?.[0]) : undefined
       if (id !== undefined) calls.push({ id, offset: node.arguments[0].start })
     } else if (node.type === 'ImportDeclaration') {
-      for (const s of node.specifiers ?? []) {
-        const name = s.type === 'ImportSpecifier' ? (s.imported?.name ?? s.imported?.value) : s.local?.name
-        if (typeof name === 'string') imports.push({ name, offset: s.start })
+      const source = stringValue(node.source)
+      if (source !== undefined && node.importKind !== 'type') {
+        for (const s of node.specifiers ?? []) {
+          if (s.type === 'ImportNamespaceSpecifier' || s.importKind === 'type') continue
+          const name = s.type === 'ImportSpecifier' ? (s.imported?.name ?? s.imported?.value) : 'default'
+          if (typeof name === 'string') imports.push({ name, source, offset: s.start })
+        }
       }
     }
     for (const key of Object.keys(node)) {
@@ -111,6 +111,26 @@ function scanProgram(program: unknown): {
   }
   return { calls, imports }
 }
+
+/**
+ * The value a named (or default) import of a relative module stands for, loaded the way `build` loads fact
+ * sources. Undefined when the module cannot be resolved or run, or does not export the name.
+ */
+async function importedValue(file: string, source: string, name: string): Promise<unknown> {
+  if (!source.startsWith('.') && !source.startsWith('/')) return undefined
+  try {
+    const mod = (await import(pathToFileURL(resolve(dirname(file), source)).href)) as Record<string, unknown>
+    return mod[name]
+  } catch {
+    return undefined
+  }
+}
+
+const isFactObject = (value: unknown): value is { id: string; title?: unknown } =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { id?: unknown }).id === 'string' &&
+  typeof (value as { content?: unknown }).content === 'object'
 
 const lineOf = (source: string, offset: number): number => {
   let line = 1
@@ -199,9 +219,9 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
         }
       } else if (TYPESCRIPT.test(file) && !file.endsWith('.d.ts')) {
         const source = await readFile(file, 'utf8')
-        // Skip the parser for a file that cannot name any of the facts.
+        // Skip the parser for a file that neither imports anything nor names any of the facts.
         const wanted = [...seen].map((k) => keys.get(k)?.id ?? k)
-        if (!wanted.some((w) => source.includes(w) || source.includes(camelCase(w)))) continue
+        if (!source.includes('import') && !wanted.some((w) => source.includes(w))) continue
         oxc ??= await loadOxc()
         const parsed = oxc.parseSync(file, source)
         const { calls, imports } = scanProgram(parsed.program)
@@ -209,12 +229,21 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
           const found = lookup(c.id)
           if (found !== undefined) docs.push({ file: shown, line: lineOf(source, c.offset), id: found })
         }
+        // An import counts when the module exports a fact object, whatever name it is imported under.
         for (const imp of imports) {
-          for (const k of seen) {
-            const factId = keys.get(k)?.id ?? k
-            if (imp.name === camelCase(factId))
-              docs.push({ file: shown, line: lineOf(source, imp.offset), id: show(k) })
+          const value = await importedValue(file, imp.source, imp.name)
+          if (!isFactObject(value)) continue
+          let hits = [...seen].filter((k) => keys.get(k)?.id === value.id)
+          if (hits.length > 1) {
+            const same = hits.filter((k) => {
+              const owner = plan.placed.find((p) => p.spec === keys.get(k)?.spec)
+              return (
+                JSON.stringify(owner?.index.facts.find((f) => f.id === value.id)?.title) === JSON.stringify(value.title)
+              )
+            })
+            if (same.length > 0) hits = same
           }
+          for (const k of hits) docs.push({ file: shown, line: lineOf(source, imp.offset), id: show(k) })
         }
       }
     }

@@ -44,7 +44,13 @@ async function sample() {
       'export const e = kit.get(name)',
       '',
     ].join('\n'),
-    'agg/src/fact-object.ts': "import { demoLeaf } from './facts.ts'\nexport const x = demoLeaf\n",
+    // The import name has nothing to do with the id.
+    'agg/src/facts.ts': "export const custom = { id: 'demo.leaf', tool: 'demo', content: { value: 1 } }\n",
+    'agg/src/fact-object.ts': "import { custom as anything } from './facts.ts'\nexport const x = anything\n",
+    // The name is the camelCase of an id, but the module exports another fact, and a missing module is skipped.
+    'agg/src/decoy.ts':
+      "import { demoBase } from './decoy-facts.ts'\nimport { demoDerived } from './missing.ts'\nexport const y = [demoBase, demoDerived]\n",
+    'agg/src/decoy-facts.ts': "export const demoBase = { id: 'demo.elsewhere', tool: 'demo', content: { value: 1 } }\n",
   })
   for (const dir of ['up', 'down']) {
     expect((await buildFacts({ cwd: join(repo, dir) })).problems).toEqual([])
@@ -74,6 +80,16 @@ describe('c001 diff --impact', () => {
       { file: 'src/reader.ts', line: 4, id: 'demo-facts/down:demo.leaf' },
       { file: 'src/reader.ts', line: 5, id: 'demo-facts/down:demo.derived' },
     ])
+  })
+
+  test('lists an import of the fact object under any name', async () => {
+    const impact = await impactOf('demo.base', { cwd: await sample() })
+    expect(impact.docs).toContainEqual({ file: 'src/fact-object.ts', line: 1, id: 'demo-facts/down:demo.leaf' })
+  })
+
+  test('does not list an import named like a fact id when the module exports another value', async () => {
+    const impact = await impactOf('demo.base', { cwd: await sample() })
+    expect(impact.docs.filter((d) => d.file === 'src/decoy.ts')).toEqual([])
   })
 
   test('the CLI prints the --json shape, and text without it', async () => {
