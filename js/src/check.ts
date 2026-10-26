@@ -181,7 +181,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
   const doScan = options.scan !== false
   const idOrigin = new Map<string, string>()
   const references: { id: string; field: string; target: string; location: string }[] = []
-  let component: { name: string; file: string } | undefined
+  let component: { name: string | null; file: string } | undefined
   let factCount = 0
   let schemaCount = 0
 
@@ -259,20 +259,23 @@ export function checkFacts(options: CheckOptions): CheckResult {
       const describes = (input.index as Partial<FactIndex> | null)?.describes
       const keys = describes && typeof describes === 'object' ? Object.keys(describes) : []
       if (describes && typeof describes === 'object') {
-        if (keys.length !== 1) {
+        // `{}` says the described thing has no version. Every entry of a package must agree.
+        const name = keys[0] ?? null
+        const show = (n: string | null) => (n === null ? 'nothing ({})' : `"${n}"`)
+        if (keys.length > 1) {
           problems.push({
             code: 'describes',
-            message: `describes must name exactly one component, and this one names ${keys.length}${keys.length ? ` (${keys.join(', ')})` : ''}`,
+            message: `describes must name at most one component, and this one names ${keys.length} (${keys.join(', ')})`,
             location: at(file, '/describes'),
           })
-        } else if (component && component.name !== keys[0]) {
+        } else if (component && component.name !== name) {
           problems.push({
             code: 'describes',
-            message: `describes "${keys[0]}", but ${component.file} of the same package describes "${component.name}"`,
+            message: `describes ${show(name)}, but ${component.file} of the same package describes ${show(component.name)}`,
             location: at(file, '/describes'),
           })
         } else if (!component) {
-          component = { name: keys[0] as string, file }
+          component = { name, file }
         }
       }
     }

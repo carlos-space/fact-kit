@@ -14,8 +14,8 @@ pnpm add -D fact-kit
 ## Authoring
 
 A package holds one directory per entry: `facts/<entry>/index.ts`, which default-exports
-`{ describes, facts }`. `describes` names exactly one component, such as `{ mainflow: '1.2.0' }`, and `check`
-rejects an entry that names none or several, and entries of one package that name different components. Optional `facts/<entry>/schemas/*.schema.json` hold field shapes that facts `$ref`.
+`{ describes, facts }`. `describes` names at most one component, such as `{ mainflow: '1.2.0' }`, or is `{}` when the described thing has no version. `check`
+rejects an entry that names several, and entries of one package that disagree: different components, or `{}` mixed with a component. Optional `facts/<entry>/schemas/*.schema.json` hold field shapes that facts `$ref`.
 Directories starting with `_` are helpers, not entries.
 
 The TypeScript runs with Node's built-in type stripping (Node 24 or later). Use erasable syntax only

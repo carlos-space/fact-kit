@@ -208,7 +208,7 @@ const indexSchema = {
     formatVersion: nonEmpty,
     describes: {
       description:
-        'The one component this entry describes and the latest published version it covers, e.g. `{ "claude-code": "2.1.308" }`. `check` rejects an entry with no key or several.',
+        'The component this entry describes and the latest published version it covers, e.g. `{ "claude-code": "2.1.308" }`. `{}` means the described thing has no version. `check` rejects an entry with several keys, and entries of one package that disagree (different components, or `{}` mixed with a component).',
       type: 'object',
       additionalProperties: nonEmpty,
     },

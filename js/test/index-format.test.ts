@@ -108,7 +108,7 @@ describe('c004 derivedFrom, replacement and movedTo', () => {
   })
 })
 
-describe('c004 check: describes names exactly one component', () => {
+describe('c004 check: describes names at most one component', () => {
   const run = async (files: Record<string, string>) => {
     const dir = makeTmp('describes')
     writeTree(dir, { 'package.json': pkg, ...files })
@@ -120,17 +120,29 @@ describe('c004 check: describes names exactly one component', () => {
     expect(r.code).toBe(0)
   })
 
-  test('no key fails and says why', async () => {
+  test('no key passes, it says the described thing has no version', async () => {
     const r = await run({ 'facts/cli/index.ts': entry('{}', [fact('demo.a')]) })
+    expect(r.code).toBe(0)
+    const all = await run({
+      'facts/cli/index.ts': entry('{}', [fact('demo.a')]),
+      'facts/hooks/index.ts': entry('{}', [fact('demo.b')]),
+    })
+    expect(all.code).toBe(0)
+  })
+
+  test('an entry with {} and an entry with a component fail', async () => {
+    const r = await run({
+      'facts/cli/index.ts': entry('{}', [fact('demo.a')]),
+      'facts/hooks/index.ts': entry("{ demo: '1.0.0' }", [fact('demo.b')]),
+    })
     expect(r.code).toBe(1)
-    expect(r.stderr).toContain('describes: describes must name exactly one component, and this one names 0')
-    expect(r.stderr).toContain('facts/cli/index.ts#/describes')
+    expect(r.stderr).toContain('describes "demo", but facts/cli/index.ts of the same package describes nothing ({})')
   })
 
   test('two keys fail and name them', async () => {
     const r = await run({ 'facts/cli/index.ts': entry("{ demo: '1.2.0', other: '2.0.0' }", [fact('demo.a')]) })
     expect(r.code).toBe(1)
-    expect(r.stderr).toContain('names 2 (demo, other)')
+    expect(r.stderr).toContain('at most one component, and this one names 2 (demo, other)')
   })
 
   test('two entries of one package that describe different components fail', async () => {
