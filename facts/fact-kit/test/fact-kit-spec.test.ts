@@ -310,6 +310,25 @@ describe('fact-kit.module-api', () => {
   })
 })
 
+describe('fact-kit.converters', () => {
+  const converters = content('fact-kit.converters')
+
+  it('names functions fact-kit exports', () => {
+    const missing = converters.exports
+      .map((e: { name: string }) => e.name)
+      .filter((name: string) => typeof (kitModule as Record<string, unknown>)[name] !== 'function')
+    expect(missing).toEqual([])
+  })
+
+  it('states the optional peer dependency that package.json declares', () => {
+    const pkg = JSON.parse(readFileSync(join(kitSrc, '..', 'package.json'), 'utf8'))
+    const { peerDependency, range, optional } = converters.requires
+    expect(pkg.peerDependencies[peerDependency]).toBe(range)
+    expect(pkg.peerDependenciesMeta[peerDependency].optional).toBe(optional)
+    expect(pkg.dependencies?.[peerDependency]).toBeUndefined()
+  })
+})
+
 describe('fact-kit.example-group', () => {
   const spec = content('fact-kit.example-group')
   const scenario = (s: any) => s.properties.scenarios.items
