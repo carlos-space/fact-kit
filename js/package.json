@@ -6,8 +6,8 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/carlos-space/facts",
-    "directory": "packages/fact-kit"
+    "url": "https://github.com/carlos-space/fact-kit",
+    "directory": "js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

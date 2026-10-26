@@ -5,8 +5,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { afterAll, describe, expect, it } from 'vitest'
-import { cli, cleanTmp, makeTmp, writeTree } from '../../fact-kit/test/helpers.ts'
-import * as kitModule from '../../fact-kit/src/index.ts'
+import { cli, cleanTmp, makeTmp, writeTree } from '../../../js/test/helpers.ts'
+import * as kitModule from '../../../js/src/index.ts'
 import {
   X_KEYWORDS,
   buildIndex,
@@ -17,12 +17,12 @@ import {
   readFacts,
   validateExampleGroup,
   validateFact,
-} from '../../fact-kit/src/index.ts'
-import { loadEntries } from '../../fact-kit/src/load.ts'
-import type { Fact } from '../../fact-kit/src/index.ts'
+} from '../../../js/src/index.ts'
+import { loadEntries } from '../../../js/src/load.ts'
+import type { Fact } from '../../../js/src/index.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const kitSrc = join(fileURLToPath(new URL('../../fact-kit', import.meta.url)), 'src')
+const kitSrc = join(fileURLToPath(new URL('../../../js', import.meta.url)), 'src')
 
 const entries = await loadEntries(join(root, 'facts'))
 const spec = entries.find((e) => e.entry === 'fact-kit')
