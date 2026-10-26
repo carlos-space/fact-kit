@@ -1,7 +1,7 @@
 // Facts about fact-kit itself. They are the spec, and fact-kit's code does not import them. The tests in
 // test/fact-kit-spec.test.ts compare each one with the implementation, so a change on either side fails there.
-import type { Fact, FactsModule } from '../../../fact-kit/src/index.ts'
-import kit from '../../../fact-kit/package.json' with { type: 'json' }
+import type { Fact, FactsModule } from '../../../../js/src/index.ts'
+import kit from '../../../../js/package.json' with { type: 'json' }
 
 const published = { kind: 'published' } as const
 const nonEmpty = { type: 'string', minLength: 1 }

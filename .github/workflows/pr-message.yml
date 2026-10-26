@@ -1,0 +1,59 @@
+name: pr-message
+
+# Squash-merge makes the PR title the commit subject and the PR body the commit body
+# (squash_merge_commit_title: PR_TITLE, squash_merge_commit_message: PR_BODY), so both get the rules of a
+# commit on main. main only takes pull requests and there is no local hook, so these two scripts are the
+# only place the rules run.
+#
+# A separate workflow because it also runs on "edited": fixing the title or body re-runs only this
+# cheap check. Putting "edited" on ci.yml would either rebuild for a text change or record skipped
+# check/build/test checks, and gh pr checks keeps only the newest check per name, workflow and event,
+# so a skipped one would hide an earlier failure from the merge gate.
+# The job id stays pr-title and has no name:, so the check context is still the required "pr-title".
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: pr-message-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # release-please opens its PRs with GITHUB_TOKEN; GitHub does not run workflows for them, so they
+  # would sit as "Action required". Their title and body are generated, so skip them explicitly.
+  pr-title:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # the body check diffs against origin/<base>, so it needs the base branch history
+          fetch-depth: 0
+          persist-credentials: false
+      - name: PR title follows Conventional Commits (squash-merge makes it the releasable unit)
+        run: bash scripts/ci/check-pr-title.sh "$PR_TITLE"
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+      # The body is read live, not from the event payload, so a manual re-run checks the current body.
+      # Release-line PRs (release/*, including --to-main) carry whole release lines, so only the
+      # attribution rule applies to them.
+      - name: PR body has no AI attribution, and a cross-unit change declares Coupled-Change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          only=()
+          if [[ "$HEAD_REF" == release/* ]]; then only=(--only attribution); fi
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json body --jq .body \
+            | bash scripts/ci/check-commit-body.sh "${only[@]}" --message - --diff "origin/$BASE_REF...HEAD"

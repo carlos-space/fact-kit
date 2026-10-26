@@ -1,0 +1,121 @@
+name: ci
+
+# A pull request gets the checks that block the merge; a push to main or to a release branch runs the same
+# set, and a release branch additionally runs the assembled-system check, which GA gates on. The
+# release-branch run is what the ci gate of advance-release.sh and finalize-release.sh waits for. Three
+# jobs (check, build, test) so each shows as its own check.
+#
+# Whether a run checks anything is decided by content, in the scope job (scripts/ci/ci-scope.sh), not by
+# path filters here: every push gets a run, so "the latest ci run" is always the run of the tip, which is
+# what the release gates read. A run whose source is unchanged since the branch's last green run skips its
+# jobs and still concludes success.
+on:
+  pull_request:
+  # 手動派送一律全部執行，用來在不推 commit 的情況下重跑一次
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'release/**'
+      # the branch that carries a train back to main already has a pull request
+      - '!release/**--to-main'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # release-please opens its PRs with GITHUB_TOKEN. GitHub deliberately does not run workflows for
+  # those PRs (recursion guard), so they sit as "Action required" forever. Their content is generated
+  # (version bumps + changelog) and CI already ran on the base branch, so skip them explicitly.
+  #
+  # The PR title and body check lives in pr-message.yml, which also runs when the PR is edited. It is
+  # not here because an edited run of this workflow would either rebuild for a text change or record
+  # skipped check/build/test checks; gh pr checks keeps only the newest check per name, workflow and
+  # event, so a skipped one would hide an earlier failure from the merge gate.
+  #
+  # The path rules live in one place: scripts/ci/ci-scope.conf. The script runs only git and gh, so it
+  # does not use setup-workspace.
+  scope:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # gh run list: the branch's last successful ci run
+      pull-requests: read # commits/<sha>/pulls: the pull request a push came from
+    outputs:
+      run: ${{ steps.s.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: s
+        run: bash scripts/ci/ci-scope.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.ref_name }}
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REPO: ${{ github.repository }}
+
+  check:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm check
+
+  build:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+
+  test:
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm test
+
+  # Assembled-system check against packed tarballs. Only on a release branch: this is the stabilisation
+  # window, and finalize-release.sh --phase ga refuses to proceed until this run is green.
+  assembled:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/release/')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - name: Pack, install into an empty directory, smoke test
+        run: bash scripts/ci/assembled-check.sh

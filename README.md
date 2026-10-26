@@ -1,0 +1,77 @@
+# fact-kit
+
+撰寫、檢查、建置與讀取 facts 的工具。一筆 fact 是由工具決定、使用者必須照著做或一定會遇到的事，例如指令、設定欄位、hook 事件與行為。fact 以 JSON 與 JSON Schema 發布，讀取時不需要 fact-kit。
+
+## 內容
+
+| 路徑                          | 內容                                                                                  | 發布到哪    |
+| :---------------------------- | :------------------------------------------------------------------------------------ | :---------- |
+| `js/`                         | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具 | npm（公開） |
+| `facts/fact-kit/`             | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                        | 不發布      |
+| `py/`、`rs/`、`go/`、`swift/` | 其他語言的實作，之後加入                                                              | 之後決定    |
+| `conformance/`                | 跨語言共用的測試資料，之後加入                                                        | 不發布      |
+
+## 開發
+
+需要 Node.js 24 以上與 pnpm。
+
+```bash
+pnpm install
+pnpm check
+pnpm build
+pnpm test
+```
+
+`pnpm check` 依序跑型別檢查、prettier 與 `facts/fact-kit` 的 `fact-kit check`。`facts/fact-kit/fact-kit.config.json` 的 `allowedDomains` 列出 facts 可以引用的網域。
+
+main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Commits，PR 內文就是 main 上的 commit 內文。本機不裝 git hook，規則都由 PR 的 workflow 檢查。內文不能帶 AI 平台署名。
+
+## 發版
+
+發版單元是 `release-please-config.json` 的 `packages` 鍵，目前只有 `js`（component 是 `fact-kit`）。之後加 `py/`、`rs/`、`go/` 或 `facts/*` 時，在這份設定與 `.release-please-manifest.json` 加一筆，腳本和 workflow 不必改。
+
+整個倉庫同一時間最多一條發布分支 `release/vX.Y`（train），用 `--units` 選要入版的單元（用 component 名稱）。入版的單元各自有版號和 tag `<component>/vX.Y.Z`，例如 `fact-kit/v0.7.0`。每次發布另外指派一個產品版號，產品 tag 是 `product/vX.Y.Z`，版號記在 root `package.json` 的 `version`。main 只收 PR，上面不會出現 release-please 開的 commit。版號檔、CHANGELOG、manifest 與產品版號在 GA 之後，隨 `release/vX.Y--to-main` 這個 squash 合回 PR 進 main。
+
+`--line X.Y` 是產品線，用來命名分支，不決定單元版號。單元版號由 release-please 依 commit 算出，這條線上只放 `fix:` commit 時單元只升 patch，放 `feat:` 會升 minor。產品版號由 `--product-version` 指定，每次發布必填。這條線已經有產品 tag `product/vX.Y.Z` 時，切分支必須帶 `--from <最新的產品 tag>`。
+
+預發布版的 npm dist-tag 等於階段名（`alpha`、`beta`、`rc`），只有 GA 進 `latest`，所以 `npm install` 不會裝到預發布版。腳本需要 bash 4 以上（macOS 用 `brew install bash`）、`gh`、`jq`，並且在乾淨的工作區執行。所有腳本都可以加 `--dry-run` 先看會做什麼，不寫遠端也不推送。
+
+以下以產品線 0.1、產品版號 0.1.0 為例。
+
+1. 切分支，預設從 alpha 開始。`--units` 是入版的單元，用逗號分隔，沒有 commit 的單元不會發版。腳本會把相依的單元一併納入。推送後 release-please 在分支上開 Release PR。
+
+   ```bash
+   bash scripts/release/cut-release.sh --line 0.1 --units fact-kit [--stage alpha|beta|rc|ga] [--from product/v0.1.0]
+   ```
+
+2. 合併分支上的 Release PR。release-please 為每個入版的單元建立 tag，例如 `fact-kit/v0.7.0-alpha.1`，`publish.yml` 以 dist-tag `alpha` 發布到 npm。分支上再有 `fix:` commit 時，每次都再開一次 Release PR，序號加一。
+
+3. 推進階段。順序是 alpha、beta、rc，可以跳過，不能往回。省略 `--to` 時推進到下一階段。每個階段的序號從 `.1` 開始，再重複第 2 步。
+
+   ```bash
+   bash scripts/release/advance-release.sh --line 0.1 [--to beta|rc]
+   ```
+
+4. GA。`--to ga` 必須帶 `--product-version`。腳本等分支最新 commit 的 ci 通過，寫入各單元的正式版號並離開預發布模式。合併分支上的 Release PR 後，tag 變成 `fact-kit/v0.7.0`，以 dist-tag `latest` 發布。
+
+   ```bash
+   bash scripts/release/advance-release.sh --line 0.1 --to ga --product-version 0.1.0
+   ```
+
+5. 合回 main。腳本刪掉標記檔，把產品版號寫進發布分支的 root `package.json`，在 main 之上建立 `release/v0.1--to-main` 並開 PR，PR 內文附 Snapshot。等這個 PR 的 ci 通過。
+
+   ```bash
+   bash scripts/release/finalize-release.sh --line 0.1 --phase merge-back --product-version 0.1.0
+   ```
+
+6. 收尾。腳本以 squash 合併上一步的 PR，在發布分支的最後一個 commit 打產品 tag `product/v0.1.0`，刪掉發布分支與 release-please 暫時分支，並核對 main。產品 tag 會觸發 `release-line-finalize.yml`，核對各單元 tag 並建立附 Snapshot 的 GitHub Release。
+
+   ```bash
+   bash scripts/release/finalize-release.sh --line 0.1 --phase close --product-version 0.1.0
+   ```
+
+任何一步中途失敗，修好後重跑同一個指令。已經發到 npm 的版本會被略過。發布分支上的 hotfix 從 `hotfix/<issue>-<kebab>` 切出，PR 合回發布分支。已發布的產品線要修補時，用 `cut-release.sh --line 0.1 --units <單元> --from product/v0.1.0` 自產品 tag 重建。
+
+## 授權
+
+MIT。
