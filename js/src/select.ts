@@ -63,7 +63,14 @@ function rowsOf(fact: Fact): Row[] {
         ...(v.os !== undefined ? { os: v.os } : {}),
       }))
   }
-  return [{ since: fact.when?.since, content: fact.content }]
+  return [
+    {
+      since: fact.when?.since,
+      content: fact.content,
+      ...(fact.when?.platforms !== undefined ? { platforms: fact.when.platforms } : {}),
+      ...(fact.when?.os !== undefined ? { os: fact.when.os } : {}),
+    },
+  ]
 }
 
 function boundOf(since: Since | undefined, reader: Reader, id: string): Bound | undefined {

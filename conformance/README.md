@@ -75,7 +75,7 @@ fact 與選列有關的欄位：
 
 ## 選列規則
 
-一筆 fact 有一個或多個「列」。有 `variants` 時每個 variant 是一列。沒有時整筆 fact 是一列，`since` 取 `when.since`，沒有 `when.since` 時這列一律適用，界線是最小值。`when.platforms` 與 `when.os` 不參與選列。
+一筆 fact 有一個或多個「列」。有 `variants` 時每個 variant 是一列。沒有時整筆 fact 是一列，`since` 取 `when.since`，沒有 `when.since` 時這列一律適用，界線是最小值，條件取 `when.platforms` 與 `when.os`，和 variant 列用同一套規則。
 
 對一個讀者，一列要同時符合以下條件才適用：
 

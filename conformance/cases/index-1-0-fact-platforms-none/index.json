@@ -1,0 +1,55 @@
+{
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "facts": [
+    {
+      "id": "demo.any",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.any",
+      "content": {
+        "value": "any"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "when": {
+        "since": "0.40.0"
+      }
+    },
+    {
+      "id": "demo.claude",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.claude",
+      "content": {
+        "value": "c"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "when": {
+        "since": "0.40.0",
+        "platforms": ["claude-code"]
+      }
+    },
+    {
+      "id": "demo.mac",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.mac",
+      "content": {
+        "value": "m"
+      },
+      "source": {
+        "kind": "published"
+      },
+      "when": {
+        "os": ["macos"]
+      }
+    }
+  ]
+}
