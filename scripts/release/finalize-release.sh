@@ -95,7 +95,11 @@ case "$phase" in
     #   - 產品版號寫進根目錄 package.json，產品 tag 的樹因此帶著自己的版號，合回差異也一併帶到 main。
     # 這個 commit 只含 chore、不帶 Release-As，release-please 會判為「No user facing commits」而
     # 跳過，不會多開一次 Release PR（實測 2026-09-10，見 ADR-004 第 33 項）。
-    if compgen -G "*/*/.release-marker" >/dev/null 2>&1; then run git rm -q --ignore-unmatch */*/.release-marker; fi
+    #   標記檔寫在單元路徑下（release-stages.sh），單元可能在任一層（js/、services/api/），所以用 git 的
+    #   `**/` pathspec 找，不用固定層數的 shell glob。
+    declare -a markers=()
+    while IFS= read -r m; do [[ -n "$m" ]] && markers+=("$m"); done < <(git ls-files -- ':(glob)**/.release-marker')
+    (( ${#markers[@]} == 0 )) || run git rm -q -- "${markers[@]}"
     log "產品 marker → ${product}（發布分支的 root package.json）"
     if (( DRY_RUN )); then info "[dry-run] jq .version=$product package.json"; else
       tmp="$(mktemp)"; jq --arg v "$product" '.version = $v' package.json > "$tmp" && mv "$tmp" package.json
