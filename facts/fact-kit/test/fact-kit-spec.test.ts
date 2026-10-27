@@ -416,8 +416,8 @@ describe('fact-kit.module-api', () => {
     const old = namesAt('0.7.0')
     expect(old.filter((name) => added.includes(name))).toEqual([])
     expect(head.filter((name: string) => !added.includes(name))).toEqual(old)
-    // A reader that names no version gets the latest published rows, which are those of 0.7.0.
-    expect(namesAt()).toEqual(old)
+    // A reader that names no version gets the latest published rows, which are those of 0.8.0.
+    expect(namesAt()).toEqual(head)
   })
 
   it('names each export once and writes the new history signature', () => {
@@ -426,12 +426,16 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one next row for each fact that changed', () => {
+  it('keeps one 0.8.0 row for each fact that changed, and no next row', () => {
     for (const fact of specIndex.facts) {
-      const rows = (fact.variants ?? []).filter((v) => v.since === 'next')
+      const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
+      expect(
+        (fact.variants ?? []).filter((v) => v.since === 'next'),
+        fact.id,
+      ).toEqual([])
     }
-    const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === 'next')).map((f) => f.id)
+    const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
       'fact-kit.aggregate-layout',
       'fact-kit.check-rules',
