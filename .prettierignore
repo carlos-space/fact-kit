@@ -4,5 +4,6 @@ tmp
 pnpm-lock.yaml
 # Written by release-please
 CHANGELOG.md
+.release-please-manifest.json
 # Generated test data, compared byte for byte with converter output
 js/test/fixtures
