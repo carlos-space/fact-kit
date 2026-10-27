@@ -4,17 +4,23 @@
 
 ## 內容
 
-| 路徑                                                  | 內容                                                                                                                         | 發布到哪                     |
-| :---------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- | :--------------------------- |
-| `js/`                                                 | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                        | npm（公開）                  |
-| `facts/fact-kit/`                                     | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                                                               | 不發布                       |
-| `facts/py/`、`facts/rs/`、`facts/go/`、`facts/swift/` | 其他語言讀取套件的公開 API，還沒發布前都帶 pending 標籤 `readers`，要用 `version: 'head'` 加 `include: ['readers']` 才讀得到 | 不發布                       |
-| `py/`                                                 | Python 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `py/README.md`                                                       | PyPI                         |
-| `rs/`                                                 | Rust 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `rs/README.md`                                                         | crates.io                    |
-| `go/`                                                 | Go 讀取套件，模組路徑 `github.com/carlos-space/fact-kit/go`，說明在 `go/README.md`                                           | Go module（tag `go/vX.Y.Z`） |
-| `Package.swift`、`Sources/`、`Tests/`                 | Swift 讀取套件 `FactKit`，放在倉庫根是因為 SwiftPM 只讀倉庫根的 `Package.swift`，說明在 `swift/README.md`                    | SwiftPM（純 semver tag）     |
-| `conformance/`                                        | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                                                       | 不發布                       |
-| `consumer/`                                           | 各語言的消費端 harness（`py/`、`rs/`、`go/`、`swift/`），說明在 `consumer/README.md`                                         | 不發布                       |
+每種語言的套件各佔倉庫根的一個目錄，不收進 `packages/`，因為有兩個平台限制把位置定死了。SwiftPM 用倉庫網址加 tag 解析依賴，只讀倉庫根的 `Package.swift`，所以 Swift 套件的 `Package.swift`、`Sources/`、`Tests/` 只能放在根。Go 的模組路徑與 tag 前綴都等於目錄 `go/`，搬目錄等於換一個新模組，已發布的版本會留在舊路徑。根目錄的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`、`vitest.config.ts` 是 pnpm workspace 的根設定，管 `js/` 與 `facts/` 這兩個 npm 套件。
+
+| 路徑                                                                                 | 內容                                                                                                                     | 發布到哪                         |
+| :----------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- | :------------------------------- |
+| `js/`                                                                                | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                    | npm（公開）                      |
+| `facts/`                                                                             | 匯總套件 `fact-kit-facts`，根路徑是 fact-kit 的 facts，子路徑 `./py`、`./rs`、`./go`、`./swift` 是各語言讀取套件的 facts | npm（公開）                      |
+| `facts/fact-kit/`                                                                    | fact-kit 自己的 facts 源碼，是它的規格，測試拿它和 `js/` 的實作比對                                                      | 由 `facts/` 匯總發布             |
+| `facts/py/`、`facts/rs/`、`facts/go/`、`facts/swift/`                                | 其他語言讀取套件的公開 API 的 facts 源碼，四種語言的讀取測試拿它比對自己的實作                                           | 由 `facts/` 匯總發布             |
+| `py/`                                                                                | Python 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `py/README.md`                                                   | PyPI                             |
+| `rs/`                                                                                | Rust 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `rs/README.md`                                                     | crates.io                        |
+| `go/`                                                                                | Go 讀取套件，模組路徑 `github.com/carlos-space/fact-kit/go`，說明在 `go/README.md`                                       | Go module（tag `go/vX.Y.Z`）     |
+| `Package.swift`、`Package.resolved`、`Sources/`、`Tests/`                            | Swift 讀取套件 `FactKit`，說明在 `swift/README.md`（`swift/` 只放這份說明）                                              | SwiftPM（不帶前綴的 semver tag） |
+| `conformance/`                                                                       | 跨語言共用的 index 格式規格與測試資料，五種語言的一致性測試都跑它                                                        | 不發布                           |
+| `consumer/`                                                                          | 各語言的消費端 harness（`py/`、`rs/`、`go/`、`swift/`），安裝驗證用它從 registry 裝套件，說明在 `consumer/README.md`     | 不發布                           |
+| `scripts/`                                                                           | 發布腳本（`scripts/release/`）、CI 腳本（`scripts/ci/`）與它們共用的函式（`scripts/lib/`）                               | 不發布                           |
+| `.github/workflows/`                                                                 | CI、一致性測試、release-please、發布與安裝驗證的 workflow                                                                | 不發布                           |
+| `release-please-config.json`、`.release-please-manifest.json`、`release-policy.json` | 版號設定、各單元目前的版號，以及各單元經過的發布階段                                                                     | 不發布                           |
 
 ## 開發
 
