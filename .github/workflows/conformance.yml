@@ -108,3 +108,17 @@ jobs:
       - run: pnpm build
       - run: xcodebuild -version && swift --version | head -1
       - run: swift test
+
+  # SwiftPM builds on Linux as well, and the ubuntu runner image ships a Swift toolchain.
+  swift-linux:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - run: swift --version | head -1
+      - run: swift test
