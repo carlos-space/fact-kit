@@ -28,7 +28,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 
 ## 發版
 
-發版單元是 `release-please-config.json` 的 `packages` 鍵，目前只有 `js`（component 是 `fact-kit`）。之後加 `py/`、`rs/`、`go/` 或 `facts/*` 時，在這份設定與 `.release-please-manifest.json` 加一筆，腳本和 workflow 不必改。
+發版單元是 `release-please-config.json` 的 `packages` 鍵，目前有 `js`（component 是 `fact-kit`）與 `facts`（匯總套件，component 是 `fact-kit-facts`）。`facts/` 底下的 component 套件是 private，不是發版單元。之後加 `py/`、`rs/` 或 `go/` 時，在這份設定與 `.release-please-manifest.json` 加一筆，腳本和 workflow 不必改。
 
 整個倉庫同一時間最多一條發布分支 `release/vX.Y`（train），用 `--units` 選要入版的單元（用 component 名稱）。入版的單元各自有版號和 tag `<component>/vX.Y.Z`，例如 `fact-kit/v0.7.0`。每次發布另外指派一個產品版號，產品 tag 是 `product/vX.Y.Z`，版號記在 root `package.json` 的 `version`。main 只收 PR，上面不會出現 release-please 開的 commit。版號檔、CHANGELOG、manifest 與產品版號在 GA 之後，隨 `release/vX.Y--to-main` 這個 squash 合回 PR 進 main。
 
