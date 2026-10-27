@@ -13,9 +13,10 @@ let package = Package(
   targets: [
     .target(
       name: "FactKit",
-      dependencies: [.product(name: "SemanticVersion", package: "SemanticVersion")]
+      dependencies: [.product(name: "SemanticVersion", package: "SemanticVersion")],
+      path: "swift/Sources/FactKit"
     ),
-    .testTarget(name: "FactKitTests", dependencies: ["FactKit"]),
+    .testTarget(name: "FactKitTests", dependencies: ["FactKit"], path: "swift/Tests/FactKitTests"),
   ],
   swiftLanguageModes: [.v6]
 )
