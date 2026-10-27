@@ -3,6 +3,8 @@
 # into an empty place and run a smoke test against what was installed, not against the sources. Unit
 # tests prove the sources; this proves the published shape (files whitelist, exports, bin) still works.
 #   npm units     pnpm pack, then npm install of the tarballs into an empty directory
+#   fact-kit      consumer/js/run.sh --local <tgz>: a new npm project installs the tarball
+#   fact-kit-facts  read through the installed fact-kit with readFacts
 #   py            uv build, then consumer/py/run.sh --local <wheel>: a new virtual environment holds the wheel
 #   rs            cargo package (which builds the packaged crate), then consumer/rs/run.sh --local <.crate>
 #   go            the module directory copied out, then consumer/go/run.sh --local <copy>
@@ -42,10 +44,7 @@ for p in "${paths[@]}"; do
   comp="$(jq -r --arg p "$p" '.packages[$p].component // empty' "$root/release-please-config.json")"
   case "${comp:-$p}" in
     fact-kit)
-      node --input-type=module -e "
-        import { defineFacts, checkFacts } from 'fact-kit'
-        if (typeof defineFacts !== 'function' || typeof checkFacts !== 'function') throw new Error('fact-kit exports are missing')"
-      ./node_modules/.bin/fact-kit --help | grep -q '^Commands' ;;
+      bash "$root/consumer/js/run.sh" --local "$work"/packed/fact-kit-[0-9]*.tgz ;;
     fact-kit-facts)
       # Read through fact-kit, as a consumer does. A train without fact-kit reads with the published one.
       [[ -d node_modules/fact-kit ]] || npm install --no-audit --no-fund --silent fact-kit
