@@ -433,13 +433,31 @@ describe('fact-kit.module-api', () => {
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === 'next')).map((f) => f.id)
     expect(changed.sort()).toEqual([
+      'fact-kit.aggregate-layout',
       'fact-kit.check-rules',
+      'fact-kit.cli',
+      'fact-kit.config-file',
+      'fact-kit.example-group',
       'fact-kit.history-row',
       'fact-kit.module-api',
       'fact-kit.problem-codes',
       'fact-kit.x-keywords',
     ])
     for (const id of changed) expect(specIndex.facts.find((f) => f.id === id)?.variants?.[0]?.since).toBe('0.7.0')
+  })
+
+  it('writes the outcome references into defineExamples and exampleFactRefs, and the signature of 0.7.0 for an older reader', () => {
+    const find = (exports: { name: string }[], name: string) => exports.find((e) => e.name === name) as any
+    expect(find(api.exports, 'exampleFactRefs').signature).toContain("in: 'facts' | 'outcome'")
+    expect(find(api.exports, 'defineExamples').summary).toContain('statementFrom')
+    const old = selectFacts(specIndex, { version: '0.7.0' }).find((f) => f.id === 'fact-kit.module-api')
+    const oldExports = (old?.content as { value: { exports: { name: string; signature: string }[] } }).value.exports
+    expect(find(oldExports, 'exampleFactRefs').signature).toBe(
+      'exampleFactRefs(group: ExampleGroup) => { id: string; location: string }[]',
+    )
+    // The functions of the head list are exported, and the example helpers are among them.
+    for (const name of ['defineExamples', 'exampleFactRefs'])
+      expect(typeof (kitModule as any)[name], name).toBe('function')
   })
 
   it('lists the fields of SchemaRow', () => {
@@ -513,10 +531,26 @@ describe('fact-kit.example-group', () => {
       { ...good, scenarios: [] },
       { ...good, scenarios: [{ ...good.scenarios[0], facts: [] }] },
       { ...good, scenarios: [{ ...good.scenarios[0], code: [{ caption: 'a.ts', lang: 'ts' }] }] },
+      ...[
+        ['text', { fact: 'demo.x', field: 'a.b', text: { en: 'x', 'zh-TW': 'y' } }],
+        ['fact only', { fact: 'demo.x' }],
+        ['no fact', { field: 'a' }],
+        ['empty fact', { fact: '' }],
+        ['extra key', { fact: 'demo.x', extra: 1 }],
+        ['text as number', { fact: 'demo.x', text: 1 }],
+        ['number', 1],
+      ].map(([, item]) => ({ ...good, scenarios: [{ ...good.scenarios[0], outcome: ['plain', item] }] })),
     ]
     for (const sample of samples) {
       expect(validate(sample) as boolean, JSON.stringify(sample)).toBe(validateExampleGroup(sample).length === 0)
     }
+  })
+
+  it('lets a reader of 0.7.0 see only string outcomes', () => {
+    const old = selectFacts(specIndex, { version: '0.7.0' }).find((f) => f.id === 'fact-kit.example-group')
+    const outcome = (old?.content as any).schema.properties.scenarios.items.properties.outcome
+    expect(outcome.items).toEqual({ type: 'string', minLength: 1 })
+    expect(scenario(spec).properties.outcome.items.oneOf).toHaveLength(2)
   })
 })
 
@@ -527,7 +561,21 @@ describe('fact-kit.aggregate-layout', () => {
       ({ component, subpath, dir }) as unknown as Parameters<typeof aggregateExports>[0][number]
     const exports = aggregateExports([place('@component/a', '.', ''), place('@component/b', 'sub', 'sub')], 'dist')
     expect(Object.keys(exports)).toEqual(['./index.json', './schemas/*', './sub/index.json', './sub/schemas/*'])
-    expect(layout.exports).toEqual(['./<dir>/index.json', './<dir>/schemas/*'])
+    expect(layout.exports.slice(0, 2)).toEqual(['./<dir>/index.json', './<dir>/schemas/*'])
+    expect(layout.exports[2]).toContain('examples.json')
+    const withExamples = aggregateExports(
+      [place('@component/a', '.', ''), place('@component/b', 'sub', 'sub')],
+      'dist',
+      [{ dir: '' }, { dir: 'sub' }],
+    )
+    expect(Object.keys(withExamples).filter((k) => k.endsWith('examples.json'))).toEqual([
+      './examples.json',
+      './sub/examples.json',
+    ])
+    expect(layout.examples.file).toBe('examples.json')
+    const old = selectFacts(specIndex, { version: '0.7.0' }).find((f) => f.id === 'fact-kit.aggregate-layout')
+    expect((old?.content as any).value.exports).toEqual(['./<dir>/index.json', './<dir>/schemas/*'])
+    expect((old?.content as any).value.examples).toBeUndefined()
     expect(layout.placement.map((p: { dir: string }) => p.dir)).toEqual([
       '.',
       '<entry>',

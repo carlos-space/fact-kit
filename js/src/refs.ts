@@ -71,6 +71,22 @@ const kindOf = (content: FactContent): 'schema' | 'value' | 'statement' | undefi
   (['schema', 'value', 'statement'] as const).find((k) => isRecord(content) && Object.hasOwn(content, k))
 
 /**
+ * Why `field` (dotted) is not in the content of a row, or undefined when it is. Used for an example that names a
+ * field of a fact. A statement has no fields.
+ */
+export function contentFieldProblem(content: FactContent, field: string): string | undefined {
+  const kind = kindOf(content)
+  const body = content as Record<string, unknown>
+  return kind === 'statement'
+    ? 'it is a statement, which has no fields'
+    : kind === 'schema'
+      ? schemaFieldProblem(body.schema, field)
+      : kind === 'value'
+        ? valueFieldProblem(body.value, field)
+        : 'it has no content to read'
+}
+
+/**
  * Tests every `ref` against the facts it points at, at every version boundary of the two facts. Where a reader
  * gets a row of the fact that writes the `ref`, it must also get a row of the target that has the field, and for a
  * `$ref` the schema in `$defs` must be the schema that reader gets from the target. Each problem is reported once,

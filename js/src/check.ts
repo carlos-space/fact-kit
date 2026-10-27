@@ -1,7 +1,7 @@
 import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
-import { ambiguousRows, topLevelContent } from './select.ts'
-import { refProblems } from './refs.ts'
+import { ambiguousRows, factRows, topLevelContent } from './select.ts'
+import { contentFieldProblem, refProblems } from './refs.ts'
 import { subschemas } from './schema-walk.ts'
 import { subsetProblems } from './subset.ts'
 import type { RefDecl } from './author.ts'
@@ -340,6 +340,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
   const allowed = options.allowedDomains ?? []
   const doScan = options.scan !== false
   const idOrigin = new Map<string, string>()
+  const factById = new Map<string, Fact>()
   const references: { id: string; field: string; target: string; spec?: string; location: string }[] = []
   let component: { name: string | null; file: string } | undefined
   const strict = options.strict !== false
@@ -376,6 +377,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
           })
         } else {
           idOrigin.set(fact.id, at(file, `/facts/${i}`))
+          factById.set(fact.id, fact as Fact)
         }
         if (typeof fact.tool === 'string' && !fact.id.startsWith(`${fact.tool}.`)) {
           problems.push({
@@ -522,9 +524,20 @@ export function checkFacts(options: CheckOptions): CheckResult {
         if (!idOrigin.has(ref.id)) {
           problems.push({
             code: 'unknown-fact-id',
-            message: `example references fact id "${ref.id}", which does not exist`,
+            message: `example ${ref.in === 'outcome' ? 'outcome ' : ''}references fact id "${ref.id}", which does not exist`,
             location: at(ex.origin, ref.location),
           })
+        } else if (ref.field !== undefined) {
+          // The field has to be in at least one row, because an example does not say which version it shows.
+          const target = factById.get(ref.id) as Fact
+          const whys = factRows(target).map((row) => contentFieldProblem(row.content, ref.field as string))
+          if (whys.length > 0 && whys.every((why) => why !== undefined)) {
+            problems.push({
+              code: 'ref',
+              message: `example outcome names the field "${ref.field}" of ${ref.id}, and no row of the fact has it: ${whys[0]}`,
+              location: at(ex.origin, ref.location),
+            })
+          }
         }
       }
     }

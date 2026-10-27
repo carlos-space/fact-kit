@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { aggregateExports, planAggregate, writeAggregate } from './aggregate.ts'
 import { checkFacts } from './check.ts'
 import type { IndexInput } from './check.ts'
-import { loadEntries, readPackageName } from './load.ts'
+import { loadEntries, loadExampleGroups, readIndexInput, readPackageName } from './load.ts'
 import type { LoadedEntry } from './load.ts'
 import { readConfig } from './project.ts'
 import { topLevelContent } from './select.ts'
@@ -71,8 +71,13 @@ export function buildIndex(packageName: string, loaded: LoadedEntry): FactIndex 
 }
 
 /** The `exports` map package.json should have for the given entries. */
-export function expectedExports(entries: readonly LoadedEntry[], outDir: string): Record<string, string> {
+export function expectedExports(
+  entries: readonly LoadedEntry[],
+  outDir: string,
+  withExamples = false,
+): Record<string, string> {
   const out: Record<string, string> = {}
+  if (withExamples) out['./examples.json'] = `./${outDir}/examples.json`
   for (const e of entries) {
     out[`./${e.entry}/index.json`] = `./${outDir}/${e.entry}/index.json`
     if (e.schemas.length > 0) out[`./${e.entry}/schemas/*`] = `./${outDir}/${e.entry}/schemas/*`
@@ -109,7 +114,7 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
   const outDir = options.outDir ?? 'dist'
   const result: BuildResult = { problems: [], entries: [], files: [], missingExports: [], exportsUpdated: false }
 
-  const { aggregate } = await readConfig(cwd)
+  const { aggregate, examplesDir = 'examples', indexFiles = [] } = await readConfig(cwd)
   if (aggregate) return buildAggregate(cwd, aggregate, outDir, options.writeExports)
 
   const packageName = await readPackageName(cwd)
@@ -121,9 +126,19 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     subsets: e.subsets,
     refs: e.refs,
   }))
+  // Examples belong to the package, so they are built when it has facts. Their snippets are never run.
+  const exampleSet =
+    loaded.length > 0
+      ? await loadExampleGroups(join(cwd, examplesDir), examplesDir, loaded.ids)
+      : { examples: [], problems: [] }
+  const withIndexFiles =
+    exampleSet.examples.length > 0
+      ? [...indexes, ...(await Promise.all(indexFiles.map((path) => readIndexInput(cwd, path))))]
+      : indexes
   result.problems = [
     ...loaded.flatMap((e) => e.problems.map((p) => ({ ...p }))),
-    ...checkFacts({ indexes, scan: false, strict: false }).problems,
+    ...exampleSet.problems,
+    ...checkFacts({ indexes: withIndexFiles, examples: exampleSet.examples, scan: false, strict: false }).problems,
   ]
   const sources = derivedSources(indexes.map((i) => i.index))
   const lock = await readLock(cwd)
@@ -146,6 +161,16 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     result.entries.push(e.entry)
   }
 
+  const examplesFile = join(cwd, outDir, 'examples.json')
+  if (exampleSet.examples.length > 0) {
+    await mkdir(join(cwd, outDir), { recursive: true })
+    const text = { package: packageName, examples: exampleSet.examples.map((e) => e.group) }
+    await writeFile(examplesFile, `${JSON.stringify(text, null, 2)}\n`)
+    result.files.push(`${outDir}/examples.json`)
+  } else {
+    await rm(examplesFile, { force: true })
+  }
+
   // The lock records the upstream versions this build used, and goes into version control.
   if (sources.size > 0) {
     const text = lockText(sources)
@@ -155,7 +180,7 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     }
   }
 
-  await syncExports(cwd, expectedExports(loaded, outDir), options.writeExports, result)
+  await syncExports(cwd, expectedExports(loaded, outDir, exampleSet.examples.length > 0), options.writeExports, result)
   return result
 }
 
@@ -196,6 +221,6 @@ async function buildAggregate(
   if (result.problems.length > 0) return result
   result.files = written.files
   result.entries = plan.placed.map((p) => p.dir || '.')
-  await syncExports(cwd, aggregateExports(plan.placed, outDir), writeExports, result)
+  await syncExports(cwd, aggregateExports(plan.placed, outDir, plan.examples), writeExports, result)
   return result
 }

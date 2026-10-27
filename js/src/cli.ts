@@ -21,7 +21,7 @@ Commands
   build                 Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/, or in an
                         aggregate package ("aggregate" in the config) copy its components' indexes into dist/
   diff <old> <new>      List the fact ids added, removed and changed between two index.json files
-  diff --impact <id>    List the facts computed from a fact, and the docs and code that read it
+  diff --impact <id>    List the facts computed from a fact, and the docs, code and examples that read it
   pin --version <v>     Turn every "next" in the "since" of the rows (not the pending ones) into <v>
   merge-since           After "git merge", settle the conflicts that differ only in "since" and rewrite
                         the rows the merged-in side added
@@ -165,7 +165,10 @@ async function runDiff(argv: string[], io: CliIo): Promise<number> {
       io.out(`impact of ${impact.id}\n`)
       for (const f of impact.facts) io.out(`fact     ${f.id}  (depth ${f.depth}, via ${f.via})\n`)
       for (const d of impact.docs) io.out(`doc      ${d.file}:${d.line}  ${d.id}\n`)
-      if (impact.facts.length + impact.docs.length === 0) io.out('nothing reads or derives from it\n')
+      for (const e of impact.examples) io.out(`example  ${e.spec} ${e.group} / ${e.scenario}  ${e.id}  (in ${e.in})\n`)
+      if (impact.facts.length + impact.docs.length + impact.examples.length === 0) {
+        io.out('nothing reads or derives from it\n')
+      }
     }
     return 0
   }
