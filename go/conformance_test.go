@@ -18,7 +18,9 @@ import (
 	factkit "github.com/carlos-space/fact-kit/go"
 )
 
-// conformanceDir finds conformance/ from FACT_KIT_CONFORMANCE, else by walking up from this file.
+// conformanceDir finds conformance/ from FACT_KIT_CONFORMANCE, else by walking up from this file. The module zip
+// carries this file but not conformance/, so `go test all` in a module that depends on this one skips instead of
+// failing. CI sets FACT_KIT_CONFORMANCE, so a missing directory there fails rather than skips.
 func conformanceDir(t testing.TB) string {
 	t.Helper()
 	if dir := os.Getenv("FACT_KIT_CONFORMANCE"); dir != "" {
@@ -31,7 +33,7 @@ func conformanceDir(t testing.TB) string {
 			return candidate
 		}
 		if filepath.Dir(dir) == dir {
-			t.Fatal("conformance/ not found: set FACT_KIT_CONFORMANCE or run the test inside the repository")
+			t.Skip("conformance/ not found: set FACT_KIT_CONFORMANCE or run the test inside the repository")
 		}
 	}
 }

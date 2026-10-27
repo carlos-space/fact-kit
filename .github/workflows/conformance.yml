@@ -94,9 +94,12 @@ jobs:
           go-version: ${{ matrix.go }}
           cache-dependency-path: go/go.sum
       # -count=1: the test cache does not see conformance/, which is outside the module, so a new sample
-      # would otherwise be skipped by a cached result.
+      # would otherwise be skipped by a cached result. FACT_KIT_CONFORMANCE makes a missing conformance/ fail;
+      # without it the test skips (conformance_test.go).
       - run: go test -count=1 -v ./...
         working-directory: go
+        env:
+          FACT_KIT_CONFORMANCE: ${{ github.workspace }}/conformance
 
   swift:
     if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
