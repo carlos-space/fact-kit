@@ -44,5 +44,5 @@ cd "$work/app"
 swift build 2>&1 | tail -3
 echo "source: swift package show-dependencies"
 swift package show-dependencies --format json | jq -r '.dependencies[] | "  \(.identity) \(.version) \(.url) at \(.path)"'
-[[ ! -f Package.resolved ]] || { echo "source: Package.resolved"; jq -r '.pins[]? | "  \(.identity) \(.state.version // .state.branch) \(.state.revision)"' Package.resolved; }
+[[ ! -f Package.resolved ]] || { echo "source: Package.resolved"; jq -r '.pins[]? | "  \(.identity) \(.location) \(.state.version // .state.branch) \(.state.revision)"' Package.resolved; }
 swift run --skip-build consumer

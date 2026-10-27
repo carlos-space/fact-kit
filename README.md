@@ -54,7 +54,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 2. `.release-please-manifest.json`：加同一個路徑，版號寫 `0.0.0`。
 3. `release-policy.json`：以 component 為鍵加一筆，寫 `kind` 與 `stages`。
 4. 單元自己的版本檔：Python 是 `pyproject.toml`，Rust 是 `Cargo.toml` 與 `Cargo.lock`，版號要等於 manifest。
-5. 單元發布到新種類的註冊中心時：`scripts/lib/release-stages.sh` 的 `unit_registry`、`scripts/release/publish-units.sh` 加一段，`.github/workflows/publish.yml` 加一個 job，`scripts/ci/assembled-check.sh` 加一個 case，並在 `consumer/` 加該語言的 harness 與 `.github/workflows/verify-install.yml` 的 job。已有的種類只要前四步。
+5. 單元發布到新種類的註冊中心時：`scripts/lib/release-stages.sh` 的 `unit_registry`、`scripts/release/publish-units.sh` 加一段，`.github/workflows/publish.yml` 加一個 job，`scripts/ci/assembled-check.sh` 加一個 case 並在 `.github/workflows/ci.yml` 的 `assembled` job 裝上該語言的工具鏈，並在 `consumer/` 加該語言的 harness 與 `.github/workflows/verify-install.yml` 的 job。已有的種類只要前四步。
 6. `scripts/release/release-config.test.ts` 的 `expected` 加一筆。
 7. 在倉庫根新增頂層目錄時：把它加進 swift 單元的 `exclude-paths`（`release-please-config.json`），否則只改那個目錄的 commit 也會讓 Swift 升版。`release-config.test.ts` 會檢查這件事。
 8. 要納入 CI 的新目錄：`scripts/ci/ci-scope.conf`。

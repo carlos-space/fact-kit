@@ -31,5 +31,5 @@ fi
 export GOFLAGS=-mod=mod
 go mod tidy
 echo "source: go list -m $module"
-go list -m -json "$module" | jq -r '"  path \(.Path)\n  version \(.Version)\n  dir \(.Dir)" + (if .Replace then "\n  replace \(.Replace.Path) \(.Replace.Version // "")" else "" end)'
+go list -m -json "$module" | jq -r '"  path \(.Path)\n  version \(.Version)\n  dir \(.Dir)" + (if .Origin then "\n  origin \(.Origin.URL // "") \(.Origin.Ref // "") \(.Origin.Hash // "")" else "" end) + (if .Replace then "\n  replace \(.Replace.Path) \(.Replace.Version // "")" else "" end)'
 go run .
