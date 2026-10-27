@@ -24,7 +24,7 @@ const listOf = (content: FactContent | undefined): readonly unknown[] | undefine
 }
 
 /** Orders the labels of readers: versions from the oldest, then `latest`, then `head`. */
-function byLabel(a: string, b: string): number {
+export function byLabel(a: string, b: string): number {
   const rank = (label: string) => (label === 'head' ? 2 : label === 'latest' ? 1 : 0)
   if (rank(a) !== rank(b)) return rank(a) - rank(b)
   const va = parseVersion(a)
@@ -32,7 +32,7 @@ function byLabel(a: string, b: string): number {
   return va && vb ? compareSemver(va, vb) : a < b ? -1 : a > b ? 1 : 0
 }
 
-function conditions(p: PairedRows): string {
+export function conditions(p: PairedRows): string {
   const parts = [
     p.platform !== undefined ? (p.platform === 'other' ? 'a platform no row names' : `platform ${p.platform}`) : '',
     p.os !== undefined ? (p.os === 'other' ? 'an os no row names' : `os ${p.os}`) : '',

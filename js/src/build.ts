@@ -119,6 +119,7 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
     index: buildIndex(packageName, e),
     schemas: e.schemas,
     subsets: e.subsets,
+    refs: e.refs,
   }))
   result.problems = [
     ...loaded.flatMap((e) => e.problems.map((p) => ({ ...p }))),

@@ -99,3 +99,46 @@ export function collecting<T>(fn: () => T): { value: T; facts: object[] } {
 export function recordRead(fact: object): void {
   scopes.at(-1)?.add(fact)
 }
+
+// --- field references ----------------------------------------------------------------------------------------
+const REFS = Symbol.for('fact-kit.refs')
+
+/** What a `ref` placeholder stands for. */
+export interface RefTarget {
+  fact: object
+  /** A dotted path, or undefined for the whole fact. */
+  field: string | undefined
+}
+
+interface RefRegistry {
+  byToken: Map<string, RefTarget>
+  byFact: WeakMap<object, Map<string, string>>
+}
+
+function refs(): RefRegistry {
+  const store = globalThis as unknown as Record<symbol, RefRegistry | undefined>
+  return (store[REFS] ??= { byToken: new Map(), byFact: new WeakMap() })
+}
+
+/** The placeholder for one fact object and field. The same pair always gets the same placeholder. */
+export function refToken(fact: object, field: string | undefined): string {
+  const registry = refs()
+  let tokens = registry.byFact.get(fact)
+  if (!tokens) registry.byFact.set(fact, (tokens = new Map()))
+  const key = field ?? ''
+  let token = tokens.get(key)
+  if (token === undefined) {
+    token = `⟦fact-ref:${registry.byToken.size}⟧`
+    registry.byToken.set(token, { fact, field })
+    tokens.set(key, token)
+  }
+  return token
+}
+
+/** The fact object and field a placeholder stands for, if it is one. */
+export const refTarget = (token: string): RefTarget | undefined => refs().byToken.get(token)
+
+/** Matches the placeholders of `ref` inside a longer string. */
+export const REF_TOKEN = /⟦fact-ref:(\d+)⟧/g
+/** Matches a string that is nothing but one placeholder. */
+export const WHOLE_REF = /^⟦fact-ref:\d+⟧$/

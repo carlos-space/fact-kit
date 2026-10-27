@@ -1,5 +1,6 @@
 import { keyed } from './history.ts'
-import { BUILDER, BuilderError, isObject, registerBuilderCheck, setMark } from './markers.ts'
+import type { FactRef } from './builders.ts'
+import { BUILDER, BuilderError, REF_TOKEN, isObject, refTarget, registerBuilderCheck, setMark } from './markers.ts'
 import type { Fact } from './types.ts'
 
 // --- shapes ------------------------------------------------------------------------------------------------
@@ -8,8 +9,8 @@ export interface Transition<S extends string = string> {
   to: S
   /** One event, or several between the same two states (the key is `from` plus `to`). */
   event?: string | string[]
-  /** Applies to every event of the transition. */
-  guard?: string
+  /** Applies to every event of the transition. A `ref(fact)` is the location of that fact once built. */
+  guard?: string | FactRef
 }
 
 export interface StateMachine<S extends string = string> {
@@ -104,7 +105,8 @@ function stateMachineProblem(root: unknown): string | undefined {
       return `transition ${key}: "event" must be a string or a list of strings, got ${show(event)}`
     }
     if (t.guard !== undefined && !isName(t.guard)) {
-      return `transition ${key}: "guard" must be a string, got ${show(t.guard)}`
+      // A `ref(fact)` is a string until the build, so it passes here.
+      return `transition ${key}: "guard" must be a string or a ref(fact), got ${show(t.guard)}`
     }
   }
   return undefined
@@ -232,7 +234,13 @@ function valueOf(source: unknown, fn: string): unknown {
 
 /** Text for a label: mermaid reads `#` followed by a number or name and `;` as markup, so they become entities. */
 function label(text: string): string {
-  return text.replace(/[#";|]/g, (c) => (c === '"' ? '#quot;' : `#${c.charCodeAt(0)};`)).replace(/\s*\n\s*/g, ' ')
+  // A `ref` that was not built yet is drawn as the fact it points at.
+  const named = text.replace(REF_TOKEN, (token) => {
+    const t = refTarget(token)
+    const id = (t?.fact as { id?: unknown } | undefined)?.id
+    return t && typeof id === 'string' ? `${id}${t.field !== undefined ? `#${t.field}` : ''}` : token
+  })
+  return named.replace(/[#";|]/g, (c) => (c === '"' ? '#quot;' : `#${c.charCodeAt(0)};`)).replace(/\s*\n\s*/g, ' ')
 }
 
 function ready(name: string, source: unknown, problem: (root: unknown) => string | undefined): any {

@@ -158,6 +158,8 @@ export interface Problem {
     | 'impl-depends-on-facts'
     | 'builder'
     | 'subset-of'
+    | 'ref'
+    | 'schema-property'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string
