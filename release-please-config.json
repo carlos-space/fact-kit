@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "$comment": "Two components today: the JS package in js/ (fact-kit) and the aggregate facts package in facts/ (fact-kit-facts). Units are the keys of packages, so py/, rs/ and go/ join by adding an entry here and need no script change. A release/vX.Y branch carries the whole repository, cut-release.sh --units picks the units that board it, and scoped to the train this config holds only those. separate-pull-requests is false so the train gets a single Release PR with one changelog per unit; each unit keeps its own version and tag. Nothing is released from main.",
+  "$comment": "Two components today: the JS package in js/ (fact-kit) and the aggregate facts package in facts/ (fact-kit-facts). Units are the keys of packages, so py/, rs/ and go/ join by adding an entry here and need no script change. A release/vX.Y branch carries the whole repository, cut-release.sh --units picks the units that board it, and scoped to the train this config holds only those. separate-pull-requests is false so the train gets a single Release PR with one changelog per unit; each unit keeps its own version and tag. Nothing is released from main. bootstrap-sha is the import commit from carlos-space/facts: the history before it is not this repository's releases, and its Release-As: 0.7.0 would also pin fact-kit-facts. It only applies while a unit has no release, and goes once the first train has shipped.",
+  "bootstrap-sha": "d48fd467c84150a7ad4b88252a0b7b048db31b14",
   "include-component-in-tag": true,
   "include-v-in-tag": true,
   "tag-separator": "/",
