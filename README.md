@@ -4,7 +4,7 @@
 
 ## 內容
 
-每種語言的套件各佔倉庫根的一個目錄，不收進 `packages/`，因為有兩個平台限制把位置定死了。SwiftPM 用倉庫網址加 tag 解析依賴，只讀倉庫根的 `Package.swift`，所以 Swift 套件的 `Package.swift`、`Sources/`、`Tests/` 只能放在根。Go 的模組路徑與 tag 前綴都等於目錄 `go/`，搬目錄等於換一個新模組，已發布的版本會留在舊路徑。根目錄的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`、`vitest.config.ts` 是 pnpm workspace 的根設定，管 `js/` 與 `facts/` 這兩個 npm 套件。
+每種語言的套件各佔倉庫根的一個目錄，不收進 `packages/`，因為有兩個平台限制把位置定死了。SwiftPM 用倉庫網址加 tag 解析依賴，只讀倉庫根的 `Package.swift`，所以只有 `Package.swift` 與 `Package.resolved` 必須在根，原始碼用 target 的 `path:` 放進 `swift/`。Go 的模組路徑與 tag 前綴都等於目錄 `go/`，搬目錄等於換一個新模組，已發布的版本會留在舊路徑。根目錄的 `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`、`vitest.config.ts` 是 pnpm workspace 的根設定，管 `js/` 與 `facts/` 這兩個 npm 套件。
 
 | 路徑                                                                                 | 內容                                                                                                                     | 發布到哪                         |
 | :----------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------- | :------------------------------- |
@@ -15,7 +15,7 @@
 | `py/`                                                                                | Python 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `py/README.md`                                                   | PyPI                             |
 | `rs/`                                                                                | Rust 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `rs/README.md`                                                     | crates.io                        |
 | `go/`                                                                                | Go 讀取套件，模組路徑 `github.com/carlos-space/fact-kit/go`，說明在 `go/README.md`                                       | Go module（tag `go/vX.Y.Z`）     |
-| `Package.swift`、`Package.resolved`、`Sources/`、`Tests/`                            | Swift 讀取套件 `FactKit`，說明在 `swift/README.md`（`swift/` 只放這份說明）                                              | SwiftPM（不帶前綴的 semver tag） |
+| `Package.swift`、`Package.resolved` 在根，`swift/` 放 `Sources/`、`Tests/` 與說明    | Swift 讀取套件 `FactKit`，說明在 `swift/README.md`                                                                       | SwiftPM（不帶前綴的 semver tag） |
 | `conformance/`                                                                       | 跨語言共用的 index 格式規格與測試資料，五種語言的一致性測試都跑它                                                        | 不發布                           |
 | `consumer/`                                                                          | 各語言的消費端 harness（`py/`、`rs/`、`go/`、`swift/`），安裝驗證用它從 registry 裝套件，說明在 `consumer/README.md`     | 不發布                           |
 | `scripts/`                                                                           | 發布腳本（`scripts/release/`）、CI 腳本（`scripts/ci/`）與它們共用的函式（`scripts/lib/`）                               | 不發布                           |

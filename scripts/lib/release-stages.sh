@@ -69,10 +69,10 @@ unit_registry() {
 
 # unit_content_paths <dir> → the paths that make up the unit, one per line: the directory itself, except for
 # the Swift unit. It sits at the repository root, where "the directory" would be the whole repository, so its
-# own files are named: the manifest, the lock file and the two source directories SwiftPM reads.
+# own files are named: the manifest, the lock file and the two source directories under swift/ that the targets name with path:.
 unit_content_paths() {
   if [[ "$(unit_registry "$1" 2>/dev/null || true)" == swift ]]; then
-    printf '%s\n' "$1/Package.swift" "$1/Package.resolved" "$1/Sources" "$1/Tests"
+    printf '%s\n' "$1/Package.swift" "$1/Package.resolved" "$1/swift/Sources" "$1/swift/Tests"
   else printf '%s\n' "$1"; fi
 }
 
