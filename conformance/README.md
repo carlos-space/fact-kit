@@ -146,7 +146,30 @@ fact 與選列有關的欄位：
 
 - 只寫套件名時讀 `<套件>/index.json`，要有 `"./index.json"` 的 export。
 - 有路徑時讀 `<套件>/<路徑>/index.json`，要有 `"./<路徑>/index.json"` 的 export。路徑可以有多段，套件名可以帶 scope。
-- 套件的解析方式和 Node 相同，從 `root` 往上找最近的 `node_modules/<套件>`。
+- 套件的解析方式和 Node 的 `require.resolve` 相同，以 `root` 為起點。以下是各語言必須一致的規則，樣本在 `resolve/` 底下。
+
+解析順序：
+
+1. **self-reference**：從 `root` 往上找最近的 `package.json`。它的 `name` 等於被讀的套件名，而且有 `exports` 時，用它解析，不再找 `node_modules`。只看最近的一個 `package.json`，更上層的不看。名稱不符或沒有 `exports` 時，繼續下一步。
+2. **往上層找**：從 `root` 往上，找第一個有 `node_modules/<套件>` 的目錄。近的優先。找到最近的套件後就用它，它沒有 export 那個檔案時回 `not-found`，不會再往更遠的層找。
+3. **跟著符號連結**：`node_modules/<套件>` 可以是符號連結，指到 `root` 之外的目錄，像 pnpm 那樣。解析以連結指向的真實目錄為準。
+4. **沒有 `exports` 欄位**：套件的 `package.json` 沒有 `exports` 時，退回檔案路徑解析，直接找 `<套件目錄>/<路徑>/index.json`（只寫套件名時是 `<套件目錄>/index.json`）。檔案不存在時回 `not-found`。
+
+`exports` 的條件與目標：
+
+- 條件集合是 `node-addons`、`node`、`require`、`module-sync`、`default`。其他條件，例如 `import`、`browser`，一律不符合。
+- 條件物件照 key 的寫法順序，由上往下，第一個符合集合的條件勝出，後面的不看。`default` 排在前面時，它先勝出。
+- 條件的值可以是另一個條件物件，照同樣的規則往內找。內層一個都不符合時，回到外層繼續看下一個 key。
+- 目標是陣列時，由前往後取第一個能解析出結果的項目。無效目標與沒有符合條件的項目都略過。
+- 目標是 `null` 時回 `not-found`。
+- 目標是字串時，必須以 `./` 開頭，路徑段裡不能有 `..` 或 `node_modules`。不合格的目標回 `not-found`。陣列裡的無效目標例外，照上一條略過。
+- 所有解析失敗一律回 `not-found`，不分原因。
+
+## 平手規則
+
+選列規則的第 3 條，兩列在同一個讀者下界線與條件都相同時，取 canonical 字串較小的那一列，字串用 UTF-16 code unit 順序比較。canonical 字串是把那一列的 JSON 的 key 排序後，不留空白的輸出。例如 `{"content":{"value":"a"},"since":"0.49.0"}` 比 `{"content":{"value":"b"},"since":"0.49.0"}` 小。
+
+這條只保證值是 ASCII 字串與整數時，各語言的結果一致。其他型別的 canonical 寫法（浮點數、非 ASCII 字元的跳脫）各語言可能不同，共用樣本不涵蓋。整數按文字比較，所以 `10` 的 canonical 字串小於 `9`。樣本在 `cases/tie-*`。
 
 ## 加一種語言
 

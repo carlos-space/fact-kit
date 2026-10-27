@@ -1,0 +1,12 @@
+{
+  "facts": [
+    {
+      "id": "demo.limit",
+      "content": {
+        "note": "a",
+        "value": "x"
+      },
+      "since": "0.49.0"
+    }
+  ]
+}
