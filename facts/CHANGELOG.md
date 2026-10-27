@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.1.0...fact-kit-facts/v0.2.0) (2026-10-27)
+
+
+### Added
+
+* **author:** 新增 factsOf 等撰寫輔助與 subsetOf 子集合約束 ([#23](https://github.com/carlos-space/fact-kit/issues/23)) ([a0c9029](https://github.com/carlos-space/fact-kit/commit/a0c902983395746458904e6fd8f0a9912d4c5729))
+* **ddd:** 新增 DDD 建構函式與物件屬性增刪 ([#29](https://github.com/carlos-space/fact-kit/issues/29)) ([dd184ef](https://github.com/carlos-space/fact-kit/commit/dd184eff1b4d48d1fb2f805bf4e10a78f6fbe877))
+* **examples:** 範例併進 examples entry，outcome 可引用 fact ([#30](https://github.com/carlos-space/fact-kit/issues/30)) ([35c1eb4](https://github.com/carlos-space/fact-kit/commit/35c1eb4da41fb94d84d45de3a96cab5138189a62))
+* **fact-kit-facts:** 新增 py、rs、go、swift 讀取套件的 facts ([#21](https://github.com/carlos-space/fact-kit/issues/21)) ([ecccbf8](https://github.com/carlos-space/fact-kit/commit/ecccbf8a0d8945d7ecc19562ba14cf4617ecf236))
+* **flows:** 新增 stateMachine、relations、sequence 與 mermaid 渲染 ([#26](https://github.com/carlos-space/fact-kit/issues/26)) ([1b07364](https://github.com/carlos-space/fact-kit/commit/1b0736427225d8a2a2c1484300145256e2ac6b9a))
+* **ref:** 新增 ref 欄位引用與 x-identity ([#27](https://github.com/carlos-space/fact-kit/issues/27)) ([0116183](https://github.com/carlos-space/fact-kit/commit/0116183595f0c69ef63ee40f6149209ecbb6f1d2))
+* **ref:** 被引用的 fact 有多個版本列時自動對齊版本列 ([#28](https://github.com/carlos-space/fact-kit/issues/28)) ([4d173d9](https://github.com/carlos-space/fact-kit/commit/4d173d9be6119b79ac38dd6b096381de96f40964))
+* 新增 Python、Rust、Go、Swift 讀取套件，五種語言跑同一組共用樣本 ([#22](https://github.com/carlos-space/fact-kit/issues/22)) ([a5fc8d6](https://github.com/carlos-space/fact-kit/commit/a5fc8d6e6f854bfd23a733d41f8c1fe7764d7542))
+
 ## [0.1.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.1.0-alpha.1...fact-kit-facts/v0.1.0) (2026-10-27)
 
 

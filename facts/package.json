@@ -1,6 +1,6 @@
 {
   "name": "fact-kit-facts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Facts about fact-kit: the spec of its index format, commands and API",
   "license": "MIT",
   "type": "module",
