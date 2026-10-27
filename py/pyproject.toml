@@ -4,6 +4,8 @@ version = "0.0.0"
 description = "Reads the fact packages built by fact-kit"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["fact-kit", "facts", "semver"]
 requires-python = ">=3.11"
 dependencies = [
     "orjson>=3.10",
@@ -16,6 +18,7 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/carlos-space/fact-kit"
+Issues = "https://github.com/carlos-space/fact-kit/issues"
 
 [dependency-groups]
 dev = ["pytest>=8"]

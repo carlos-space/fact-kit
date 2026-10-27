@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "$comment": "Two components today: the JS package in js/ (fact-kit) and the aggregate facts package in facts/ (fact-kit-facts). Units are the keys of packages, so py/, rs/ and go/ join by adding an entry here and need no script change. A release/vX.Y branch carries the whole repository, cut-release.sh --units picks the units that board it, and scoped to the train this config holds only those. separate-pull-requests is false so the train gets a single Release PR with one changelog per unit; each unit keeps its own version and tag. Nothing is released from main.",
+  "$comment": "Six units. js/ (fact-kit) and facts/ (fact-kit-facts) publish to npm; py/ (PyPI), rs/ (crates.io) and go/ (Go module) are the readers in other languages; the Swift reader is registered at the repository root (path \".\") because SwiftPM only reads Package.swift there. Units are the keys of packages. A new unit needs an entry here, an entry in .release-please-manifest.json (0.0.0 until it first releases, so initial-version applies), an entry in release-policy.json and, when it publishes, a case in scripts/lib/release-stages.sh (unit_registry) and scripts/release/publish-units.sh; README.md lists the steps. The Swift unit has no component in its tag and no v (a bare X.Y.Z), because SwiftPM resolves versions from bare semver tags only and a v-prefixed root tag would be taken as a version. Its exclude-paths name every top-level directory that is not Swift, so a commit that touches only those does not release it (release-please matches directories only, not files); a new top-level directory must be added to that list, and release-config.test.ts fails until it is. A release/vX.Y branch carries the whole repository, cut-release.sh --units picks the units that board it, and scoped to the train this config holds only those. separate-pull-requests is false so the train gets a single Release PR with one changelog per unit; each unit keeps its own version and tag. Nothing is released from main.",
   "include-component-in-tag": true,
   "include-v-in-tag": true,
   "tag-separator": "/",
@@ -22,6 +22,25 @@
     "facts": {
       "component": "fact-kit-facts",
       "release-type": "node"
+    },
+    "py": {
+      "component": "py",
+      "release-type": "python"
+    },
+    "rs": {
+      "component": "rs",
+      "release-type": "rust"
+    },
+    "go": {
+      "component": "go",
+      "release-type": "go"
+    },
+    ".": {
+      "component": "swift",
+      "release-type": "simple",
+      "include-component-in-tag": false,
+      "include-v-in-tag": false,
+      "exclude-paths": [".github", "conformance", "consumer", "facts", "go", "js", "py", "rs", "scripts"]
     }
   }
 }
