@@ -359,7 +359,20 @@ describe('fact-kit.module-api', () => {
   })
 
   // What the unreleased code adds to the exports. Each stays out of the list a reader of 0.7.0 gets.
-  const added = ['factsOf', 'observedDoc', 'observedSpike', 'contentOf', 'statementFrom', 'subsetOf']
+  const added = [
+    'factsOf',
+    'observedDoc',
+    'observedSpike',
+    'contentOf',
+    'statementFrom',
+    'subsetOf',
+    'stateMachine',
+    'relations',
+    'sequence',
+    'stateMachineToMermaid',
+    'relationsToMermaid',
+    'sequenceToMermaid',
+  ]
   const namesAt = (version?: string): string[] => {
     const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(
       (fact) => fact.id === 'fact-kit.module-api',

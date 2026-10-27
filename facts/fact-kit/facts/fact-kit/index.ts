@@ -970,6 +970,42 @@ const newApi = [
     summary:
       "A list that must stay inside the list of `parent`, a fact object. When the parent is a typed list (`mf.value('x', ['A', 'B'])`) the type checker rejects an item it does not have. A parent that comes from a conversion has no type, so `check` and `build` test the list again at every version boundary of the two facts and report `subset-of` with the version. The parent goes into `derivedFrom`. Throws `BuilderError` when `parent` is not a fact object.",
   },
+  {
+    name: 'stateMachine',
+    signature: 'stateMachine({ initial, states, transitions }) => StateMachine',
+    summary:
+      "A state machine as a value: `{ initial, states, transitions }`, each transition `{ from, to, event?, guard? }`. `event` is a string, or a list of strings for several events between the same two states, and `guard` is a string that holds for all of them. `states` is keyed by name and `transitions` by `from` and `to`, so a `history` row can `add`, `remove` and `replace` them by key, for example `remove: { '/states': ['blocked'] }` and `remove: { '/transitions': [['active', 'done']] }`. Give it to `mf.value`. Throws `BuilderError` when `initial`, or the `from` or `to` of a transition, is not in `states`, and `history` checks it again after every row, so a row that drops a state a transition still uses fails. `check` reports it as `builder`.",
+  },
+  {
+    name: 'relations',
+    signature: 'relations({ nodes, edges }) => Relations',
+    summary:
+      "Nodes and named relations as a value: `{ nodes, edges }`, each edge `{ from, to, name, cardinality? }` with `cardinality` `'one'` or `'many'`. `nodes` is keyed by name and `edges` by `from`, `to` and `name`, for example `remove: { '/edges': [['a', 'b', 'has']] }`. Give it to `mf.value`. Throws `BuilderError` when the `from` or `to` of an edge is not in `nodes`, and `history` checks it again after every row.",
+  },
+  {
+    name: 'sequence',
+    signature: 'sequence({ participants, steps }) => Sequence',
+    summary:
+      "Messages between participants as a value: `{ participants, steps }`, each step `{ from, to, action }`. `participants` is keyed by name and `steps` by `action`, which no two steps share. A `history` row can `add` steps only at the end. To insert in the middle or to rename an `action`, replace the whole list: `replace: { '/steps': keyed([...], ['action']) }`. Throws `BuilderError` when the `from` or `to` of a step is not in `participants`, and `history` checks it again after every row.",
+  },
+  {
+    name: 'stateMachineToMermaid',
+    signature: 'stateMachineToMermaid(source: StateMachine | Fact) => string',
+    summary:
+      'A `stateDiagram-v2` of a state machine, without a code fence. `source` is the value or a fact whose content is that value. Each state is declared as `state "<name>" as s<i>` in the order of `states`, the initial state is `[*] --> s<i>`, and a transition is `s<i> --> s<j>` followed by `: <events joined by ", "> [<guard>]` when it has either. The ids are generated, so a name with spaces or punctuation is safe, and `#`, `"`, `;` and `|` in a name become mermaid entities.',
+  },
+  {
+    name: 'relationsToMermaid',
+    signature: 'relationsToMermaid(source: Relations | Fact) => string',
+    summary:
+      'A `flowchart LR` of nodes and relations, without a code fence. Each node is declared as `n<i>["<name>"]` and each edge is `n<i> -->|<name>| n<j>`. `cardinality` is not drawn. The ids are generated.',
+  },
+  {
+    name: 'sequenceToMermaid',
+    signature: 'sequenceToMermaid(source: Sequence | Fact) => string',
+    summary:
+      'A `sequenceDiagram` of a sequence, without a code fence. Each participant is declared as `participant p<i> as <name>` and each step is `p<i>->>p<j>: <action>`. The ids are generated.',
+  },
 ]
 
 const facts: FactDecl[] = [
@@ -991,11 +1027,20 @@ const facts: FactDecl[] = [
       { since: since070, value: checkRules },
       {
         since: 'next',
+        replace: {
+          '': [
+            {
+              code: 'history',
+              rule: 'A `history` row does not fit: a key that matches no item, a key that is already there, an array that is not keyed, a bad pointer, or a pointer that goes into an array by index. Name an item by its key, or replace the whole array.',
+              reads: 'sources',
+            },
+          ],
+        },
         add: {
           '': [
             {
               code: 'builder',
-              rule: 'A builder, `mf.*`, `contentOf` or `subsetOf` got input that does not fit, such as a name with a leading dot, rows whose first row is not the kind of the method, or a subset whose parent is not a fact object. `history` also raises it when a row makes what a builder checked invalid. The message names the row and the key. Only `check` prints the code. `build` stops with the message.',
+              rule: 'A builder, `mf.*`, `contentOf` or `subsetOf` got input that does not fit, such as a name with a leading dot, rows whose first row is not the kind of the method, a subset whose parent is not a fact object, or a state machine, relations or sequence with an end that is not declared. `history` also raises it when a row makes what a builder checked invalid. The message names the row and the key. Only `check` prints the code. `build` stops with the message.',
               reads: 'sources',
             },
             {
@@ -1019,6 +1064,10 @@ const facts: FactDecl[] = [
         set: {
           '/description':
             'The first row gives the content with one of `value`, `schema` and `statement`. Each later row rewrites the content whole with one of those, or changes the content of the row before it with `remove`, `replace`, `add` and `set`, applied in that order. A row with none of them keeps the content and changes only the conditions. After each row, the check of the builder that made the content runs again, and a row that breaks it fails with `BuilderError`.',
+          '/properties/replace/description':
+            'JSON Pointer -> the new value. For a keyed array and a list of items, the items are swapped in by key. Otherwise the value there is replaced, and it must exist. A pointer may not go into an array by index, so replace the whole array instead.',
+          '/properties/set/description':
+            'JSON Pointer -> the value to put there. The last member may be new. A pointer may not go into an array by index, so set the whole array instead.',
           '/properties/statement': {
             description:
               'The text, or what `statementFrom` returns. The facts a built statement relates to go into `relates` of the fact.',
