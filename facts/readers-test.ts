@@ -40,11 +40,7 @@ async function installComponent(component: string): Promise<string> {
   return hub
 }
 
-export function readerSpec(
-  component: string,
-  since: string,
-  names: { read: string; select: string },
-): void {
+export function readerSpec(component: string, since: string, names: { read: string; select: string }): void {
   const tool = `fact-kit-${component}`
   const spec = `${aggregate.name}/${component}`
   let hub: string
