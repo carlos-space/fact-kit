@@ -11,9 +11,7 @@ struct ReaderFactsTests {
     let repository = try #require(Conformance.repositoryRoot, "conformance/ not found")
     let reader = try readFacts(
       "fact-kit-facts/swift",
-      root: repository.appendingPathComponent("facts", isDirectory: true),
-      version: "head",
-      include: ["readers"]
+      root: repository.appendingPathComponent("facts", isDirectory: true)
     )
     let value = try reader.value("fact-kit-swift.read-errors")
     let codes = try #require(value.objectValue?["codes"]?.arrayValue)

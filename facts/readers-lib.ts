@@ -1,10 +1,7 @@
 // Shared shape of the facts about the readers in other languages (facts/py, facts/rs, facts/go, facts/swift).
 // Each component describes one language with the same four facts, so a test can compare every language with the
-// JS reader the same way. The readers are not released yet, so every row is pending under one label.
+// JS reader the same way. Each component passes the version of its first release as `since`.
 import type { Fact, FactsModule, ReadErrorCode } from '../js/src/index.ts'
-
-/** The pending label of every reader fact until the first release of the readers. */
-export const READERS = 'readers'
 
 export interface ReaderParam {
   name: string
@@ -55,21 +52,21 @@ export interface ReaderApi {
 
 const published = { kind: 'published' } as const
 
-function pendingFact(f: Omit<Fact, 'source' | 'variants' | 'content'> & { value: unknown }): Fact {
+function readerFact(since: string, f: Omit<Fact, 'source' | 'variants' | 'content'> & { value: unknown }): Fact {
   const { value, ...rest } = f
   return {
     ...rest,
     content: { value },
-    variants: [{ since: 'next', pending: READERS, content: { value } }],
+    variants: [{ since, content: { value } }],
     source: published,
   }
 }
 
-/** The four facts of one language and the entry module that holds them. */
-export function readerFacts(api: ReaderApi): FactsModule {
+/** The four facts of one language and the entry module that holds them, all since the version of its first release. */
+export function readerFacts(api: ReaderApi, since: string): FactsModule {
   const { tool, language } = api
   const facts: Fact[] = [
-    pendingFact({
+    readerFact(since, {
       id: `${tool}.package`,
       tool,
       topics: ['install'],
@@ -77,7 +74,7 @@ export function readerFacts(api: ReaderApi): FactsModule {
       description: { en: 'The registry, the package name, the name code imports, the tag prefix and the toolchain.' },
       value: api.package,
     }),
-    pendingFact({
+    readerFact(since, {
       id: `${tool}.read-facts`,
       tool,
       topics: ['read'],
@@ -87,7 +84,7 @@ export function readerFacts(api: ReaderApi): FactsModule {
       },
       value: api.read,
     }),
-    pendingFact({
+    readerFact(since, {
       id: `${tool}.select-facts`,
       tool,
       topics: ['read', 'select'],
@@ -95,7 +92,7 @@ export function readerFacts(api: ReaderApi): FactsModule {
       description: { en: 'Chooses the rows of a parsed index for one reader, with the rules of `conformance/`.' },
       value: api.select,
     }),
-    pendingFact({
+    readerFact(since, {
       id: `${tool}.read-errors`,
       tool,
       topics: ['read', 'errors'],

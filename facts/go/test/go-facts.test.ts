@@ -1,3 +1,3 @@
 import { readerSpec } from '../../readers-test.ts'
 
-readerSpec('go', { version: 'head', include: ['readers'] }, { read: 'ReadFacts', select: 'SelectFacts' })
+readerSpec('go', '0.3.0-alpha.1', { read: 'ReadFacts', select: 'SelectFacts' })
