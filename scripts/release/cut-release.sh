@@ -139,7 +139,7 @@ fi
 # release-please would take initial-version verbatim (1.0.0 when unset). Start it at this line, in
 # the same format the stage gives every other unit.
 if [[ "$stage" == ga ]]; then initial="${line}.0"; else initial="${line}.0-$(stage_prerelease_type "$stage")"; fi
-declare -a fresh=()
+declare -a fresh=() fresh_release_as=()
 for u in "${units[@]}"; do
   if unit_released "$u"; then
     if [[ "$stage" == ga ]]; then info "${u}：目前 $(manifest_version "$(unit_path "$u")")，正式版號由 release-please 依 commit 計算"
@@ -147,6 +147,13 @@ for u in "${units[@]}"; do
     continue
   fi
   fresh+=("$(unit_path "$u")"); info "${u}：首次發布，起始版號 ${initial}，tag $(unit_tag "$(unit_path "$u")" "$initial")"
+  # release-please's python and rust strategies hard-code their first version as 0.1.0 and never read
+  # initial-version (strategies/python.js and rust.js, initialReleaseVersion). For those a Release-As commit
+  # sets the first version instead; it only steers the next release, and the marker it needs is dropped at
+  # merge-back like the ones advance-release.sh writes.
+  case "$(unit_release_type "$(unit_path "$u")")" in
+    python | rust) fresh_release_as+=("$u"); info "${u}：release-type 不讀 initial-version，切線時另寫 Release-As: ${initial}" ;;
+  esac
 done
 freshj="[]"; (( ${#fresh[@]} )) && { freshj="$(printf '"%s",' "${fresh[@]}")"; freshj="[${freshj%,}]"; }
 
@@ -182,6 +189,10 @@ fi
 run git commit -q -m "chore($branch): open train at $stage with ${units[*]}" -m "$body
 
 Release-Train-Base: $base_sha"
+for u in ${fresh_release_as[@]+"${fresh_release_as[@]}"}; do
+  if (( DRY_RUN )); then info "  [dry-run] ${u}：Release-As ${initial} 的標記 commit"; continue; fi
+  release_as_commit "$branch" "$u" "$(unit_path "$u")" "$initial"
+done
 
 log "推送分支（觸發 release-please → 各單元的 Release PR）"
 external "$(remote_target)" git push -u origin "$branch"
