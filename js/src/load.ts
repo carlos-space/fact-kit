@@ -1,8 +1,8 @@
-import { access, readdir, readFile } from 'node:fs/promises'
-import { dirname, join, relative, sep } from 'node:path'
+import { access, readdir, readFile, stat } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { resolveEntries } from './author.ts'
-import type { RefDecl, SourceEntry, SubsetDecl } from './author.ts'
+import { resolveEntries, resolveExamples } from './author.ts'
+import type { FactIds, RefDecl, SourceEntry, SubsetDecl } from './author.ts'
 import type { FactsModule, FactsSource, Problem } from './types.ts'
 
 export interface LoadedEntry {
@@ -21,6 +21,9 @@ export interface LoadedEntry {
   /** JSON Schema files under `<entry>/schemas/`, keyed by path relative to that directory. */
   schemas: { file: string; schema: unknown }[]
 }
+
+/** What `loadEntries` returns: the entries, and `ids` for every fact object of them. */
+export type LoadedEntries = LoadedEntry[] & { ids: FactIds }
 
 /** Raised when a source file cannot be loaded. The CLI reports it as a `load` problem. */
 export class LoadError extends Error {
@@ -120,7 +123,7 @@ export interface LoadEntriesOptions {
  * `history`, `relates`, `factLink` and `derive` are expanded once every entry is loaded, because a fact may
  * relate to a fact of another entry.
  */
-export async function loadEntries(factsDir: string, options: LoadEntriesOptions = {}): Promise<LoadedEntry[]> {
+export async function loadEntries(factsDir: string, options: LoadEntriesOptions = {}): Promise<LoadedEntries> {
   const raw: (SourceEntry & { dir: string })[] = []
   for (const dir of await findEntryDirs(factsDir)) {
     const file = join(dir, 'index.ts')
@@ -163,7 +166,7 @@ export async function loadEntries(factsDir: string, options: LoadEntriesOptions 
       schemas: await readSchemas(e.dir),
     })
   }
-  return entries
+  return Object.assign(entries, { ids: resolved.ids })
 }
 
 async function tryPackageName(cwd: string): Promise<string> {
@@ -227,4 +230,40 @@ export async function loadExamples(dir: string, label: string): Promise<LoadedEx
     out.push({ origin, groups: Array.isArray(value) ? value : [value] })
   }
   return out
+}
+
+/**
+ * Loads the example groups under `dir` and turns the references in their outcome into fact ids, with the ids the
+ * facts of `ids` have. `build` and `check` both read examples through this, so they see the same groups.
+ */
+export async function loadExampleGroups(
+  dir: string,
+  label: string,
+  ids: FactIds,
+): Promise<{ examples: { origin: string; group: unknown }[]; problems: Problem[] }> {
+  const examples: { origin: string; group: unknown }[] = []
+  const problems: Problem[] = []
+  for (const loaded of await loadExamples(dir, label)) {
+    const resolved = resolveExamples(loaded.groups, ids, loaded.origin)
+    problems.push(...resolved.problems)
+    for (const group of resolved.groups) examples.push({ origin: loaded.origin, group })
+  }
+  return { examples, problems }
+}
+
+/** Reads a built `index.json` (or the directory holding one) and its schema files. Throws {@link InputError} when it can not. */
+export async function readIndexInput(
+  cwd: string,
+  path: string,
+): Promise<{ origin: string; index: unknown; schemas: LoadedEntry['schemas']; indexFile: string }> {
+  const abs = resolve(cwd, path)
+  const isDir = (await stat(abs).catch(() => undefined))?.isDirectory() ?? false
+  const indexFile = isDir ? join(abs, 'index.json') : abs
+  let index: unknown
+  try {
+    index = JSON.parse(await readFile(indexFile, 'utf8'))
+  } catch (error) {
+    throw new InputError(`cannot read index file ${path}: ${(error as Error).message}`)
+  }
+  return { origin: path, index, schemas: await readSchemas(dirname(indexFile)), indexFile }
 }

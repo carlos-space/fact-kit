@@ -23,9 +23,23 @@ export interface PlacedIndex {
   schemas: { file: string; schema: unknown }[]
 }
 
+/** The `examples.json` of a component package, placed in the aggregate package. */
+export interface PlacedExamples {
+  component: string
+  subpath: string
+  /** Where the file goes in the aggregate package, relative to the out dir. Empty for the root. */
+  dir: string
+  /** What `fact-kit diff --impact` shows for the examples: the aggregate name, plus `/<dir>` when `dir` is not empty. */
+  spec: string
+  /** The file as published: `package` is the aggregate name. */
+  file: { package: string; examples: unknown[] }
+}
+
 export interface AggregatePlan {
   aggregate: string
   placed: PlacedIndex[]
+  /** The examples of the components, one file for each component that built any. */
+  examples: PlacedExamples[]
   problems: Problem[]
 }
 
@@ -99,6 +113,7 @@ export async function planAggregate(
 ): Promise<AggregatePlan> {
   const problems: Problem[] = []
   const placed: PlacedIndex[] = []
+  const examples: PlacedExamples[] = []
   const found: { component: string; subpath: string; sourceDir: string; entry: string; index: FactIndex }[] = []
 
   for (const [subpath, component] of Object.entries(aggregate)) {
@@ -123,6 +138,29 @@ export async function planAggregate(
       })
       continue
     }
+    // The examples of a component hang on the sub-path itself, whatever number of entries it has.
+    const exampleFile = join(root, outDir, 'examples.json')
+    const exampleText = await readFile(exampleFile, 'utf8').catch(() => undefined)
+    if (exampleText !== undefined) {
+      let parsed: { examples?: unknown }
+      try {
+        parsed = JSON.parse(exampleText) as { examples?: unknown }
+      } catch (error) {
+        problems.push({
+          code: 'load',
+          message: `aggregate: cannot read ${exampleFile}: ${(error as Error).message}`,
+        })
+        continue
+      }
+      const dir = subpath === '.' ? '' : subpath
+      examples.push({
+        component,
+        subpath,
+        dir,
+        spec: dir ? `${aggregateName}/${dir}` : aggregateName,
+        file: { package: aggregateName, examples: Array.isArray(parsed.examples) ? parsed.examples : [] },
+      })
+    }
     for (const sourceDir of dirs) {
       const index = JSON.parse(await readFile(join(sourceDir, 'index.json'), 'utf8')) as FactIndex
       const entry =
@@ -130,7 +168,7 @@ export async function planAggregate(
       found.push({ component, subpath, sourceDir, entry, index })
     }
   }
-  if (problems.length > 0) return { aggregate: aggregateName, placed, problems }
+  if (problems.length > 0) return { aggregate: aggregateName, placed, examples, problems }
 
   const count = new Map<string, number>()
   for (const f of found) count.set(f.component, (count.get(f.component) ?? 0) + 1)
@@ -165,7 +203,7 @@ export async function planAggregate(
       schemas: await readSchemaFiles(f.sourceDir),
     })
   }
-  if (problems.length > 0) return { aggregate: aggregateName, placed, problems }
+  if (problems.length > 0) return { aggregate: aggregateName, placed, examples, problems }
 
   // A component writes a location in another component with that component's package name (and entry). In the
   // published index it is the aggregate spec, and a location in the same index is a bare id again.
@@ -203,7 +241,7 @@ export async function planAggregate(
       ),
     } as FactIndex
   }
-  return { aggregate: aggregateName, placed, problems }
+  return { aggregate: aggregateName, placed, examples, problems }
 }
 
 /** Copy of `value` with every string passed through `fn`. */
@@ -234,8 +272,15 @@ function rewriteFact(
 }
 
 /** The `exports` map the aggregate package.json needs for these indexes. */
-export function aggregateExports(placed: readonly PlacedIndex[], outDir: string): Record<string, string> {
+export function aggregateExports(
+  placed: readonly PlacedIndex[],
+  outDir: string,
+  examples: readonly Pick<PlacedExamples, 'dir'>[] = [],
+): Record<string, string> {
   const out: Record<string, string> = {}
+  for (const x of examples) {
+    out[x.dir ? `./${x.dir}/examples.json` : './examples.json'] = `./${outDir}/${x.dir ? `${x.dir}/` : ''}examples.json`
+  }
   for (const p of placed) {
     const key = p.dir ? `./${p.dir}` : '.'
     const root = key === '.' ? '' : `${key.slice(2)}/`
@@ -272,6 +317,12 @@ export async function writeAggregate(
       await cp(join(p.sourceDir, 'schemas', s.file), target)
       files.push(`${outDir}/${p.dir ? `${p.dir}/` : ''}schemas/${s.file}`)
     }
+  }
+  for (const x of plan.examples) {
+    const base = join(cwd, outDir, x.dir)
+    await mkdir(base, { recursive: true })
+    await writeFile(join(base, 'examples.json'), `${JSON.stringify(x.file, null, 2)}\n`)
+    files.push(`${outDir}/${x.dir ? `${x.dir}/` : ''}examples.json`)
   }
   return { problems: [], files }
 }

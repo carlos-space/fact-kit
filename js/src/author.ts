@@ -1,4 +1,4 @@
-import { FROM, REF_TOKEN, SUBSET, WHOLE_REF, isObject, markOf, refTarget } from './markers.ts'
+import { FROM, REF_TOKEN, SUBSET, WHOLE_REF, isBuilt, isObject, markOf, partsOf, refTarget } from './markers.ts'
 import { SUB_LIST, SUB_MAP, SUB_ONE, subschemas } from './schema-walk.ts'
 import { alignFact, rewriteRootRefs } from './align.ts'
 import type { AlignSlot } from './align.ts'
@@ -98,12 +98,18 @@ export interface RefDecl {
   location: string
 }
 
+/** Which entry and id each fact object ended up as, for what is written outside the facts (examples). */
+export type FactIds = ReadonlyMap<object, { entry: string; id: string }>
+
 export interface ResolvedEntry {
   module: FactsModule
   problems: Problem[]
   subsets: SubsetDecl[]
   refs: RefDecl[]
 }
+
+/** What `resolveEntries` returns: one per entry, in order, and `ids` for every fact object of them. */
+export type ResolvedEntries = ResolvedEntry[] & { ids: FactIds }
 
 const at = (origin: string, pointer: string) => `${origin}#${pointer}`
 
@@ -220,7 +226,7 @@ interface RefUse {
  * object identity, so renaming or moving a fact does not break the link. A fact object that is not one of this
  * package's facts is reported as `relates-foreign`: one that no entry lists, or one imported from another package.
  */
-export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveContext): ResolvedEntry[] {
+export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveContext): ResolvedEntries {
   const out: ResolvedEntry[] = entries.map((e) => ({
     module: {
       describes: e.source.describes,
@@ -555,5 +561,89 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
   for (const [di, { entryIndex }] of decls.entries()) {
     ;((out[entryIndex] as ResolvedEntry).module.facts as unknown[]).push(resolveDecl(di))
   }
-  return out
+  return Object.assign(out, { ids: registry as FactIds })
+}
+
+/** Replaces the placeholders of `factLink` and `ref` in a text with the id of the fact, and `<id>#<field>` for a field. */
+function idsInText(text: string, ids: FactIds, bad: (what: string) => void): string {
+  return text.replace(TOKEN, (token) => {
+    const found = token.startsWith('⟦fact-ref:')
+      ? refTarget(token)
+      : { fact: links().byToken.get(token), field: undefined }
+    const id = found?.fact ? ids.get(found.fact)?.id : undefined
+    if (id === undefined) {
+      bad(token)
+      return token
+    }
+    return found?.field !== undefined ? `${id}#${found.field}` : id
+  })
+}
+
+const textIn = (text: unknown, ids: FactIds, bad: (what: string) => void): unknown =>
+  typeof text === 'string'
+    ? idsInText(text, ids, bad)
+    : isObject(text)
+      ? Object.fromEntries(
+          Object.entries(text).map(([k, v]) => [k, typeof v === 'string' ? idsInText(v, ids, bad) : v]),
+        )
+      : text
+
+/**
+ * Turns the outcome of the scenarios of example groups into what the build writes. `ref(fact)` and
+ * `ref(fact, 'a.b')` become `{ fact, field? }` and `statementFrom(fact, render)` becomes `{ fact, text }`, with the
+ * id the fact has in `ids`. Everything else is kept as written, and the snippets in `code` are never run. A
+ * reference to an object that is not a fact of this package is a `ref` problem.
+ */
+export function resolveExamples(
+  groups: readonly unknown[],
+  ids: FactIds,
+  origin: string,
+): { groups: unknown[]; problems: Problem[] } {
+  const problems: Problem[] = []
+  const out = groups.map((group) => {
+    if (!isObject(group) || !Array.isArray(group.scenarios)) return group
+    const scenarios = group.scenarios.map((scenario: unknown, si: number) => {
+      if (!isObject(scenario) || !Array.isArray(scenario.outcome)) return scenario
+      const outcome = scenario.outcome.map((item: unknown, oi: number): unknown => {
+        const where = at(origin, `/scenarios/${si}/outcome/${oi}`)
+        const report = (message: string) => problems.push({ code: 'ref', message, location: where })
+        const unlisted = (what: string) =>
+          report(`example outcome ${what} is a fact that is not listed in the \`facts\` of any entry of this package`)
+        if (typeof item === 'string') {
+          const t = WHOLE_REF.test(item) ? refTarget(item) : undefined
+          if (t) {
+            const id = ids.get(t.fact)?.id
+            if (id === undefined) {
+              unlisted('ref(...) points at')
+              return item
+            }
+            return { fact: id, ...(t.field !== undefined ? { field: t.field } : {}) }
+          }
+          return idsInText(item, ids, (token) => unlisted(`text ${token} names`))
+        }
+        if (isBuilt(item)) {
+          const { text, relates } = partsOf(item)
+          if (relates.length !== 1) {
+            report(
+              `example outcome statement relates to ${relates.length} facts, and an outcome takes exactly one (use statementFrom)`,
+            )
+            return item
+          }
+          const id = ids.get(relates[0] as object)?.id
+          if (id === undefined) {
+            unlisted('statementFrom(...) reads from')
+            return item
+          }
+          return { fact: id, text: textIn(text, ids, (token) => unlisted(`text ${token} names`)) }
+        }
+        if (isObject(item) && item.text !== undefined) {
+          return { ...item, text: textIn(item.text, ids, (token) => unlisted(`text ${token} names`)) }
+        }
+        return item
+      })
+      return { ...scenario, outcome }
+    })
+    return { ...group, scenarios }
+  })
+  return { groups: out, problems }
 }

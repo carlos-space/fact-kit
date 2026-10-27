@@ -1,8 +1,9 @@
 import { readFile, stat } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { checkFacts } from './check.ts'
 import type { CheckResult, ExampleInput, IndexInput } from './check.ts'
-import { InputError, LoadError, loadEntries, loadExamples, readPackageName, readSchemas } from './load.ts'
+import { InputError, LoadError, loadEntries, loadExampleGroups, readIndexInput, readPackageName } from './load.ts'
+import type { FactIds } from './author.ts'
 import { buildIndex } from './build.ts'
 import { docRefProblems, findRepoRoot, implProblems, libRowProblems, testIncludes } from './rules.ts'
 import type { KnownFacts } from './rules.ts'
@@ -131,8 +132,10 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
     }
   }
 
+  let ids: FactIds = new Map()
   await guard(async () => {
     const entries = await loadEntries(join(cwd, factsDir), { cwd })
+    ids = entries.ids
     if (entries.length === 0) return
     let packageName: string
     try {
@@ -154,23 +157,15 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
   })
 
   for (const path of config.indexFiles ?? []) {
-    const abs = resolve(cwd, path)
-    const isDir = (await stat(abs).catch(() => undefined))?.isDirectory() ?? false
-    const indexFile = isDir ? join(abs, 'index.json') : abs
-    let index: unknown
-    try {
-      index = JSON.parse(await readFile(indexFile, 'utf8'))
-    } catch (error) {
-      throw new InputError(`cannot read index file ${path}: ${(error as Error).message}`)
-    }
-    indexes.push({ origin: path, index, schemas: await readSchemas(dirname(indexFile)) })
-    problems.push(...installedVersionProblems(index, cwd, path))
+    const { indexFile: _file, ...input } = await readIndexInput(cwd, path)
+    indexes.push(input)
+    problems.push(...installedVersionProblems(input.index, cwd, path))
   }
 
   await guard(async () => {
-    for (const loaded of await loadExamples(join(cwd, examplesDir), examplesDir)) {
-      for (const group of loaded.groups) examples.push({ origin: loaded.origin, group })
-    }
+    const loaded = await loadExampleGroups(join(cwd, examplesDir), examplesDir, ids)
+    problems.push(...loaded.problems)
+    examples.push(...loaded.examples)
   })
 
   // The same comparison the build makes: the sources built now against `derived.lock.json`.

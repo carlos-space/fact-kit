@@ -165,7 +165,10 @@ async function runDiff(argv: string[], io: CliIo): Promise<number> {
       io.out(`impact of ${impact.id}\n`)
       for (const f of impact.facts) io.out(`fact     ${f.id}  (depth ${f.depth}, via ${f.via})\n`)
       for (const d of impact.docs) io.out(`doc      ${d.file}:${d.line}  ${d.id}\n`)
-      if (impact.facts.length + impact.docs.length === 0) io.out('nothing reads or derives from it\n')
+      for (const e of impact.examples) io.out(`example  ${e.spec} ${e.group} / ${e.scenario}  ${e.id}  (in ${e.in})\n`)
+      if (impact.facts.length + impact.docs.length + impact.examples.length === 0) {
+        io.out('nothing reads or derives from it\n')
+      }
     }
     return 0
   }

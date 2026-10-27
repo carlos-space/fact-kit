@@ -5,6 +5,7 @@ import { planAggregate } from './aggregate.ts'
 import { readConfig } from './project.ts'
 import { readPackageName } from './load.ts'
 import { loadOxc } from './oxc.ts'
+import type { ExampleGroup, ExampleScenario } from './examples.ts'
 import type { OxcModule } from './oxc.ts'
 
 export interface Impact {
@@ -14,6 +15,13 @@ export interface Impact {
   facts: { id: string; depth: number; via: string }[]
   /** Where the docs directories refer to the fact or to one of those facts. */
   docs: { file: string; line: number; id: string }[]
+  /**
+   * The example scenarios that name the fact, or one of those facts. `spec` is the aggregate spec the
+   * `examples.json` is published under, `group` the id of the example group, `scenario` the title of the scenario,
+   * `id` the fact named, and `in` where it is named: `facts` for `facts` of the scenario or its group, `outcome`
+   * for a reference in the outcome.
+   */
+  examples: { spec: string; group: string; scenario: string; id: string; in: 'facts' | 'outcome' }[]
 }
 
 export interface ImpactOptions {
@@ -236,6 +244,52 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
       }
     }
   }
+  const examples: Impact['examples'] = []
+  for (const placed of plan.examples) {
+    for (const group of placed.file.examples) {
+      if (typeof group !== 'object' || group === null) continue
+      const g = group as Partial<ExampleGroup>
+      if (typeof g.id !== 'string' || !Array.isArray(g.scenarios)) continue
+      for (const scenario of g.scenarios as ExampleScenario[]) {
+        if (typeof scenario?.title !== 'string') continue
+        // A reference in the `facts` of the group applies to each scenario of it.
+        const names: { id: string; in: 'facts' | 'outcome' }[] = [
+          ...(g.facts ?? []).map((id) => ({ id, in: 'facts' as const })),
+          ...(scenario.facts ?? []).map((id) => ({ id, in: 'facts' as const })),
+          ...(scenario.outcome ?? []).flatMap((item) =>
+            typeof item === 'object' && item !== null && typeof item.fact === 'string'
+              ? [{ id: item.fact, in: 'outcome' as const }]
+              : [],
+          ),
+        ]
+        for (const name of names) {
+          const found = lookup(name.id)
+          if (found === undefined) continue
+          if (
+            examples.some(
+              (e) =>
+                e.spec === placed.spec &&
+                e.group === g.id &&
+                e.scenario === scenario.title &&
+                e.id === found &&
+                e.in === name.in,
+            )
+          )
+            continue
+          examples.push({ spec: placed.spec, group: g.id, scenario: scenario.title, id: found, in: name.in })
+        }
+      }
+    }
+  }
+  const order = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+  examples.sort(
+    (a, b) =>
+      order(a.spec, b.spec) ||
+      order(a.group, b.group) ||
+      order(a.scenario, b.scenario) ||
+      order(a.id, b.id) ||
+      order(a.in, b.in),
+  )
   docs.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : a.line - b.line || (a.id < b.id ? -1 : 1)))
-  return { id, facts, docs }
+  return { id, facts, docs, examples }
 }

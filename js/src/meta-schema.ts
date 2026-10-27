@@ -255,7 +255,20 @@ export const exampleGroupSchema = {
           title: nonEmptyString,
           situation: nonEmptyString,
           code: { type: 'array', items: codeSample },
-          outcome: stringList,
+          outcome: {
+            type: 'array',
+            items: {
+              oneOf: [
+                nonEmptyString,
+                {
+                  type: 'object',
+                  required: ['fact'],
+                  additionalProperties: false,
+                  properties: { fact: nonEmptyString, field: nonEmptyString, text },
+                },
+              ],
+            },
+          },
           points: stringList,
           facts: { type: 'array', minItems: 1, items: nonEmptyString },
         },
