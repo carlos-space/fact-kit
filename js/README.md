@@ -154,6 +154,12 @@ them in by key. Anywhere else it replaces the value at the pointer, which must e
 even when the last member is new. A row that does not fit fails the build and names the key. `check` reports it as
 `history`.
 
+A pointer never goes into an array by index. `'/steps/2/action'`, `'/list/-'` and `'/plain/1'` fail with `history`,
+because a position changes when an item before it is added or removed. Name an item by its key (`remove`,
+`replace` and `add` on a keyed array), or replace the whole array: an array that is not keyed is changed only by
+`replace: { '/names': [...] }` or `set`. A pointer to the array itself, to a key of an object, or the empty root
+pointer is fine.
+
 To relate facts, import the other fact object and put it in `relates: [fact]`, or write `factLink(fact)` inside
 the content, which becomes the fact location (`<id>` in the same entry, `<spec>:<id>` in another). The build
 lists them in `derivedFrom` by object identity, so renaming an id or moving a file does not break the link. A fact
@@ -265,6 +271,90 @@ The parent is added to `relates`, so the subset lists it in `derivedFrom`.
   built index does not.
 - A parent in another entry of the package works the same way. A parent in another package is brought in with
   `derive` first.
+
+### Flows
+
+`stateMachine`, `relations` and `sequence` make a value for `mf.value(name, ...)`. Each keeps its collections
+`keyed`, so the rows of `history(...)` change them by key, and each checks its own output again after every row.
+
+```ts
+import { factsOf, history, observedDoc, relations, sequence, stateMachine } from 'fact-kit'
+
+const mf = factsOf({ tool: 'demo', source: observedDoc({ url: 'https://example.com/doc', fetched: '2026-10-01' }) })
+
+const lifecycle = mf.value(
+  'lifecycle',
+  stateMachine({
+    initial: 'draft',
+    states: ['draft', 'active', 'done'],
+    transitions: [
+      { from: 'draft', to: 'active', event: 'start' },
+      { from: 'active', to: 'done', event: ['finish', 'close'], guard: 'all criteria met' },
+    ],
+  }),
+)
+const model = mf.value(
+  'model',
+  relations({
+    nodes: ['mainline', 'task'],
+    edges: [{ from: 'mainline', to: 'task', name: 'has', cardinality: 'many' }],
+  }),
+)
+const closing = mf.value(
+  'closing',
+  history(
+    {
+      since: '1.0.0',
+      value: sequence({
+        participants: ['user', 'api'],
+        steps: [{ from: 'user', to: 'api', action: 'close' }],
+      }),
+    },
+    { since: '1.1.0', add: { '/steps': [{ from: 'api', to: 'user', action: 'confirm' }] } },
+  ),
+)
+```
+
+| Builder        | Value                              | Collection                                   | Key (how a `history` row names an item)                              |
+| :------------- | :--------------------------------- | :------------------------------------------- | :------------------------------------------------------------------- |
+| `stateMachine` | `{ initial, states, transitions }` | `states`                                     | the name: `remove: { '/states': ['blocked'] }`                       |
+|                |                                    | `transitions` `{ from, to, event?, guard? }` | `from` and `to`: `remove: { '/transitions': [['active', 'done']] }`  |
+| `relations`    | `{ nodes, edges }`                 | `nodes`                                      | the name: `remove: { '/nodes': ['b'] }`                              |
+|                |                                    | `edges` `{ from, to, name, cardinality? }`   | `from`, `to` and `name`: `remove: { '/edges': [['a', 'b', 'has']] }` |
+| `sequence`     | `{ participants, steps }`          | `participants`                               | the name                                                             |
+|                |                                    | `steps` `{ from, to, action }`               | `action`, which no two steps share: `remove: { '/steps': ['ask'] }`  |
+
+- Several events between the same two states are one transition whose `event` is a list. `guard` is a string and
+  holds for every event of the transition.
+- Each rule of `history(...)` applies to these collections: `replace` with a list of items swaps them in by key and
+  fails when no item has the key, `remove` fails the same way, and `add` fails when the key is already there. A key
+  that appears twice in one collection fails, when the builder is called and when a row sets the list whole.
+- `add` appends at the end, so a step can only be added last. To insert a step in the middle or to rename an
+  `action`, replace the list: `replace: { '/steps': keyed([...], ['action']) }`.
+- Every end must be declared. `stateMachine` checks that `initial` and the `from` and `to` of each transition are
+  in `states`, `relations` that the `from` and `to` of each edge are in `nodes`, and `sequence` that the `from`
+  and `to` of each step are in `participants`. A violation throws `BuilderError`, the message names the key
+  (`transition ["a","b"]: "to" is "b", which is not in states`), and `check` reports it as `builder`. `history`
+  runs the check after each row, so a row that removes a state a transition still uses fails until it removes the
+  transition too.
+
+`stateMachineToMermaid`, `relationsToMermaid` and `sequenceToMermaid` take the value, or a fact whose content is
+that value, and return mermaid text without a code fence. Every state, node and participant gets a generated id
+(`s0`, `n0`, `p0`, in the order declared) and keeps its name as the label, so a name with spaces or punctuation is
+safe. `#`, `"`, `;` and `|` in a name become mermaid entities.
+
+```text
+stateDiagram-v2
+    state "draft" as s0
+    state "active" as s1
+    state "done" as s2
+    [*] --> s0
+    s0 --> s1: start
+    s1 --> s2: finish, close [all criteria met]
+```
+
+`relationsToMermaid` draws a `flowchart LR` with `n0["mainline"]` and `n0 -->|has| n1`, and `sequenceToMermaid` a
+`sequenceDiagram` with `participant p0 as user` and `p0->>p1: close`. `cardinality` is not drawn.
 
 ## Check rules
 

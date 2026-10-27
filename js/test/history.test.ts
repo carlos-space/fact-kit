@@ -188,12 +188,13 @@ describe('c001 history: order and rows', () => {
         ),
       ),
     ).toContain('no item has the key "c"')
-    // set runs last: it can reach into the item that add appended.
+    // set runs last: it sees the member that add put in.
     const last = history(
       { since: '1.0.0', value: base },
-      { since: '1.1.0', set: { '/list/2/n': 9 }, add: { '/list': [{ id: 'c', n: 1 }] } },
+      { since: '1.1.0', set: { '/note': 'seen' }, add: { '/list': [{ id: 'c', n: 1 }] } },
     )
-    expect(valueOf(last, 1).list[2]).toEqual({ id: 'c', n: 9 })
+    expect(valueOf(last, 1).list[2]).toEqual({ id: 'c', n: 1 })
+    expect(valueOf(last, 1).note).toBe('seen')
     // All four in one row.
     const all = history(
       { since: '1.0.0', value: base },
@@ -307,5 +308,48 @@ describe('c001 history in a built package', () => {
     expect(check.code).toBe(1)
     expect(JSON.parse(check.stdout).problems[0]).toMatchObject({ code: 'history' })
     expect(JSON.parse(check.stdout).problems[0].message).toContain('["x","y"]')
+  })
+})
+
+describe('c005 history: a pointer does not index into an array', () => {
+  const base = {
+    list: keyed(
+      [
+        { id: 'a', n: 1 },
+        { id: 'b', n: 1 },
+      ],
+      ['id'],
+    ),
+    plain: ['x', 'y'],
+    nested: { items: [{ n: 1 }] },
+  }
+  const row = (body: object) => () => history({ since: '1', value: base }, { since: '2', ...body })
+
+  test.each([
+    ['set', { set: { '/list/0/n': 9 } }, '"/list/0/n"'],
+    ['set at an index of a plain array', { set: { '/plain/1': 'z' } }, '"/plain/1"'],
+    ['set at the end marker', { set: { '/plain/-': 'z' } }, '"/plain/-"'],
+    ['replace an item by index', { replace: { '/list/1': { id: 'b', n: 2 } } }, '"/list/1"'],
+    ['replace past an array', { replace: { '/nested/items/0/n': 2 } }, '"/nested/items/0/n"'],
+    ['remove through an index', { remove: { '/nested/items/0': [] } }, '"/nested/items/0"'],
+    ['add through an index', { add: { '/list/0/tags': [] } }, '"/list/0/tags"'],
+  ])('fails on %s', (_name, body, pointer) => {
+    const message = failure(row(body))
+    expect(message).toContain(pointer)
+    expect(message).toContain('index')
+  })
+
+  test('still takes the array itself, a key and a property of an object', () => {
+    const v = history(
+      { since: '1', value: base },
+      {
+        since: '2',
+        replace: { '/plain': ['q'], '/list': [{ id: 'a', n: 3 }], '/nested': { items: [] } },
+        set: { '/nested/extra': 1 },
+      },
+    )
+    expect(valueOf(v, 1).plain).toEqual(['q'])
+    expect(valueOf(v, 1).list[0]).toEqual({ id: 'a', n: 3 })
+    expect(valueOf(v, 1).nested).toEqual({ items: [], extra: 1 })
   })
 })

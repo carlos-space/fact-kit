@@ -124,19 +124,28 @@ function parsePointer(pointer: string, where: string): string[] {
     })
 }
 
-function step(node: unknown, token: string): { found: boolean; value?: unknown } {
-  if (Array.isArray(node)) {
-    if (!/^(0|[1-9]\d*)$/.test(token) || Number(token) >= node.length) return { found: false }
-    return { found: true, value: node[Number(token)] }
-  }
+/** The error for a pointer that goes into an array by position: positions shift when an item before them changes. */
+function indexError(pointer: string, at: string): HistoryError {
+  return new HistoryError(
+    `${at}: "${pointer}" points into an array by index. Name an item by its key (remove, replace and add on a keyed array), or replace the whole array`,
+  )
+}
+
+function step(node: unknown, token: string, pointer: string, at: string): { found: boolean; value?: unknown } {
+  if (Array.isArray(node)) throw indexError(pointer, at)
   if (isObject(node) && Object.hasOwn(node, token)) return { found: true, value: node[token] }
   return { found: false }
 }
 
-function resolve(root: unknown, tokens: readonly string[]): { found: boolean; value?: unknown } {
+function resolve(
+  root: unknown,
+  tokens: readonly string[],
+  pointer: string,
+  at: string,
+): { found: boolean; value?: unknown } {
   let node = root
   for (const token of tokens) {
-    const next = step(node, token)
+    const next = step(node, token, pointer, at)
     if (!next.found) return { found: false }
     node = next.value
   }
@@ -146,14 +155,12 @@ function resolve(root: unknown, tokens: readonly string[]): { found: boolean; va
 /** Writes `value` at the pointer. Only the last token may be new. Returns the new root. */
 function assign(root: unknown, tokens: readonly string[], value: unknown, pointer: string, where: string): unknown {
   if (tokens.length === 0) return value
-  const parent = resolve(root, tokens.slice(0, -1))
+  const parent = resolve(root, tokens.slice(0, -1), pointer, where)
   const last = tokens[tokens.length - 1] as string
   if (!parent.found) throw new HistoryError(`${where}: "${pointer}" has no parent to put the value in`)
   const node = parent.value
   if (Array.isArray(node)) {
-    const index = last === '-' ? node.length : /^(0|[1-9]\d*)$/.test(last) ? Number(last) : -1
-    if (index < 0 || index > node.length) throw new HistoryError(`${where}: "${pointer}" is not an index of the array`)
-    node[index] = value
+    throw indexError(pointer, where)
   } else if (isObject(node)) {
     node[last] = value
   } else {
@@ -196,7 +203,7 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   let current = root
   for (const [pointer, keysToDrop] of Object.entries(row.remove ?? {})) {
     const at = `${where}: remove "${pointer}"`
-    const target = resolve(current, parsePointer(pointer, at))
+    const target = resolve(current, parsePointer(pointer, at), pointer, at)
     const keys = keysOf(target.value)
     if (!target.found || !Array.isArray(target.value)) throw new HistoryError(`${at}: there is no array there`)
     if (!keys)
@@ -218,7 +225,7 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   for (const [pointer, next] of Object.entries(row.replace ?? {})) {
     const at = `${where}: replace "${pointer}"`
     const tokens = parsePointer(pointer, at)
-    const target = resolve(current, tokens)
+    const target = resolve(current, tokens, pointer, at)
     if (!target.found) throw new HistoryError(`${at}: nothing is there to replace. Use set to put a new value`)
     const keys = keysOf(target.value)
     if (keys && Array.isArray(target.value) && Array.isArray(next) && !keysOf(next)) {
@@ -239,7 +246,7 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   }
   for (const [pointer, items] of Object.entries(row.add ?? {})) {
     const at = `${where}: add "${pointer}"`
-    const target = resolve(current, parsePointer(pointer, at))
+    const target = resolve(current, parsePointer(pointer, at), pointer, at)
     const keys = keysOf(target.value)
     if (!target.found || !Array.isArray(target.value)) throw new HistoryError(`${at}: there is no array there`)
     if (!keys)

@@ -30,6 +30,15 @@ export type {
   ValueFact,
   VersionedFact,
 } from './builders.ts'
+export {
+  relations,
+  relationsToMermaid,
+  sequence,
+  sequenceToMermaid,
+  stateMachine,
+  stateMachineToMermaid,
+} from './flows.ts'
+export type { Relation, Relations, Sequence, SequenceStep, StateMachine, Transition } from './flows.ts'
 export { derive, factLink } from './author.ts'
 export {
   EXAMPLE_GROUP_SCHEMA_ID,
