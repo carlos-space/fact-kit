@@ -1,3 +1,4 @@
+import { FROM, SUBSET, isObject, markOf } from './markers.ts'
 import { loadInstalledIndex } from './read.ts'
 import type { DerivedFact, Fact, FactDecl, FactLike, FactsModule, FactsSource, Problem } from './types.ts'
 
@@ -66,16 +67,23 @@ export interface ResolveContext {
   packageName: string
 }
 
+/** A list that `subsetOf` keeps inside the list of another fact. `parent` and `location` are fact locations. */
+export interface SubsetDecl {
+  /** The id of the subset fact. */
+  id: string
+  /** The location of the parent: `<id>` in the same entry, `<spec>:<id>` in another. */
+  parent: string
+  /** Where the subset fact is declared. */
+  location: string
+}
+
 export interface ResolvedEntry {
   module: FactsModule
   problems: Problem[]
+  subsets: SubsetDecl[]
 }
 
 const at = (origin: string, pointer: string) => `${origin}#${pointer}`
-
-function* factsOf(source: FactsSource): Generator<[number, FactLike]> {
-  for (const [i, fact] of source.facts.entries()) yield [i, fact]
-}
 
 function deriveFact(d: DerivedFact, ctx: ResolveContext): FactDecl {
   if (typeof d.spec !== 'string' || typeof d.id !== 'string') throw new Error('derive(spec, id): both are strings')
@@ -96,14 +104,25 @@ function deriveFact(d: DerivedFact, ctx: ResolveContext): FactDecl {
   return derived
 }
 
-/** Copy of `value` with every string passed through `fn`. */
-function mapStrings(value: unknown, fn: (text: string) => string): unknown {
-  if (typeof value === 'string') return fn(value)
-  if (Array.isArray(value)) return value.map((v) => mapStrings(v, fn))
+/**
+ * Copy of `value` with every string passed through `text`. `from` is called, in document order, for each object
+ * or array that a builder tagged with the fact it was read from. The copy has no tags.
+ */
+function mapDoc(value: unknown, text: (text: string) => string, from: (fact: object) => void): unknown {
+  if (typeof value === 'string') return text(value)
   if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapStrings(v, fn)]))
+    const origin = markOf(value, FROM)
+    if (typeof origin === 'object' && origin !== null) from(origin)
+    if (Array.isArray(value)) return value.map((v) => mapDoc(v, text, from))
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapDoc(v, text, from)]))
   }
   return value
+}
+
+/** The roots of the contents of a fact, where `subsetOf` hides its mark. */
+function contentRoots(decl: FactDecl): unknown[] {
+  const rows = [decl.content, ...(Array.isArray(decl.variants) ? decl.variants.map((v) => v?.content) : [])]
+  return rows.flatMap((c) => (isObject(c) && 'value' in c ? [c.value] : []))
 }
 
 /**
@@ -120,6 +139,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
       facts: [],
     },
     problems: [],
+    subsets: [],
   }))
   // What each declared object ends up as, and where it lives.
   const registry = new Map<object, { entry: string; id: string }>()
@@ -127,7 +147,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
 
   for (const [ei, e] of entries.entries()) {
     const problems = (out[ei] as ResolvedEntry).problems
-    for (const [i, raw] of factsOf(e.source)) {
+    for (const [i, raw] of e.source.facts.entries()) {
       const where = at(e.origin, `/facts/${i}`)
       let decl: FactDecl
       if (isDerived(raw)) {
@@ -194,16 +214,41 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
       if (location !== undefined) add(location)
       else foreign(related, 'relates')
     }
+    // The parent of a subset is a fact it is derived from, and the check tests it at every version boundary.
+    for (const root of contentRoots(decl)) {
+      const parent = markOf(root, SUBSET)
+      if (typeof parent !== 'object' || parent === null) continue
+      const location = locate(parent)
+      if (location === undefined) {
+        if (!(decl.relates ?? []).includes(parent as FactLike)) foreign(parent, 'subsetOf points at')
+        continue
+      }
+      add(location)
+      const subsets = (out[entryIndex] as ResolvedEntry).subsets
+      if (!subsets.some((s) => s.id === decl.id && s.parent === location)) {
+        subsets.push({ id: decl.id, parent: location, location: where })
+      }
+    }
     const { relates: _relates, derivedFrom: _own, ...rest } = decl
-    const replaced = mapStrings(rest, (text) =>
-      text.replace(TOKEN, (token) => {
-        const target = links().byToken.get(token)
-        if (!target) return token
-        const location = locate(target)
-        if (location === undefined) return foreign(target, 'factLink points at')
-        add(location)
-        return location
-      }),
+    const readFrom = new Set<object>()
+    const replaced = mapDoc(
+      rest,
+      (text) =>
+        text.replace(TOKEN, (token) => {
+          const target = links().byToken.get(token)
+          if (!target) return token
+          const location = locate(target)
+          if (location === undefined) return foreign(target, 'factLink points at')
+          add(location)
+          return location
+        }),
+      (origin) => {
+        if (readFrom.has(origin)) return
+        readFrom.add(origin)
+        const location = locate(origin)
+        if (location !== undefined) add(location)
+        else foreign(origin, 'a value read from')
+      },
     ) as Record<string, unknown>
     facts.push({ ...replaced, ...(derivedFrom.length > 0 ? { derivedFrom } : {}) } as unknown as Fact)
   }

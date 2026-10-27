@@ -2,7 +2,7 @@ import { access, readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { resolveEntries } from './author.ts'
-import type { SourceEntry } from './author.ts'
+import type { SourceEntry, SubsetDecl } from './author.ts'
 import type { FactsModule, FactsSource, Problem } from './types.ts'
 
 export interface LoadedEntry {
@@ -14,6 +14,8 @@ export interface LoadedEntry {
   module: FactsModule
   /** Problems found while expanding the sources, such as `relates-foreign` and `derive`. `check` reports them. */
   problems: Problem[]
+  /** The lists that `subsetOf` keeps inside the list of another fact. `check` tests them at every version boundary. */
+  subsets: SubsetDecl[]
   /** JSON Schema files under `<entry>/schemas/`, keyed by path relative to that directory. */
   schemas: { file: string; schema: unknown }[]
 }
@@ -22,8 +24,8 @@ export interface LoadedEntry {
 export class LoadError extends Error {
   readonly file: string
   /** The problem code the CLI reports it as. */
-  readonly code: 'load' | 'history'
-  constructor(file: string, message: string, code: 'load' | 'history' = 'load') {
+  readonly code: 'load' | 'history' | 'builder'
+  constructor(file: string, message: string, code: 'load' | 'history' | 'builder' = 'load') {
     super(message)
     this.name = 'LoadError'
     this.file = file
@@ -127,6 +129,9 @@ export async function loadEntries(factsDir: string, options: LoadEntriesOptions 
       // `history` and `keyed` name the key that does not fit, which is the whole message.
       if ((error as Error | undefined)?.name === 'HistoryError')
         throw new LoadError(file, (error as Error).message, 'history')
+      // The same for a builder, `mf.*` and the rows of `history` that a builder checks again.
+      if ((error as Error | undefined)?.name === 'BuilderError')
+        throw new LoadError(file, (error as Error).message, 'builder')
       throw new LoadError(file, `cannot run the module: ${(error as Error).message}`)
     }
     const value = (mod.default ?? mod) as Partial<FactsSource> | undefined
@@ -151,6 +156,7 @@ export async function loadEntries(factsDir: string, options: LoadEntriesOptions 
       dir: e.dir,
       module: (resolved[i] as (typeof resolved)[number]).module,
       problems: (resolved[i] as (typeof resolved)[number]).problems,
+      subsets: (resolved[i] as (typeof resolved)[number]).subsets,
       schemas: await readSchemas(e.dir),
     })
   }

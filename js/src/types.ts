@@ -156,6 +156,8 @@ export interface Problem {
     | 'impl-imports-facts'
     | 'impl-reads-facts-dist'
     | 'impl-depends-on-facts'
+    | 'builder'
+    | 'subset-of'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string

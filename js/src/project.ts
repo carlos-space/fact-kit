@@ -147,6 +147,7 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
         index: buildIndex(packageName, e),
         schemas: e.schemas,
         source: true,
+        subsets: e.subsets,
       })
     }
   })

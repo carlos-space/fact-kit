@@ -179,6 +179,93 @@ lock, the build fails with `derive-version` and names both versions. Look at wha
 failure, and a package without derived facts gets none. `check` makes the same comparison, and
 `check --index dist/<entry>` compares the version a built index records with the installed upstream.
 
+### Writing facts with `factsOf`
+
+`factsOf({ tool, source, prefix?, topics? })` returns `mf`, which writes the fields every fact of a file repeats. A
+call such as `mf.value(name, value)` builds the fact with the id `<tool>.<prefix>.<name>` (`<tool>.<name>` without
+`prefix`), the title `name`, the topics of `factsOf` followed by those of the call, and the source of `factsOf`.
+`mf.schema(name, schema)` and `mf.statement(name, text)` do the same for the other two kinds of content. The
+optional third argument is `{ title?, topics?, description?, when?, relates?, verify?, source?, note? }`. `note` is
+merged into an observed source, and `source` replaces the source of `factsOf` for that fact. The result goes into
+`facts` as it is.
+
+```ts
+import { factsOf, observedDoc, observedSpike, statementFrom, subsetOf } from 'fact-kit'
+
+const doc = factsOf({
+  tool: 'claude-code',
+  source: observedDoc({ url: 'https://code.claude.com/docs/en/hooks.md', fetched: '2026-10-02' }),
+  topics: ['hook'],
+})
+const trial = factsOf({ tool: 'claude-code', source: observedSpike({ fetched: '2026-10-03' }) })
+
+const events = doc.value('hook-events', ['PreToolUse', 'PostToolUse', 'Stop', 'PreCompact'])
+const blocking = doc.value('hook-blocking-event-names', subsetOf(events, ['PreToolUse', 'Stop']))
+const said = doc.statement(
+  'hook-blocking-events',
+  statementFrom(blocking, (names) => `A hook can block ${names.length} events: ${names.join(', ')}.`),
+  { topics: ['blocking'], verify: { probe: { kind: 'manual', reason: 'Read the page.' }, verifiedOn: '2.1.285' } },
+)
+const compact = trial.statement('precompact-order', 'The hooks ran in the reverse order.', {
+  note: 'One headless run.',
+})
+```
+
+- `observedDoc({ url, fetched })` gives `{ kind: 'observed', basis: 'doc', url, fetched }`, and
+  `observedSpike({ fetched, url? })` gives the same with `basis: 'spike'`. A measured source is written by hand.
+  One `factsOf` has one source, so facts read on different dates come from different `factsOf` calls, or take
+  `source` in the options.
+- A method takes the content, the rows of `history(...)`, or a function that returns either. The rows must start
+  with the kind of the method, and a mismatch throws `BuilderError` (`builder` in `check`). A name that is empty or
+  starts or ends with a dot also throws it.
+- A fact written with one object value has the fields of the value as read-only getters, so `status.states` reads
+  the value of the fact `status`. Each getter returns a copy tagged with its origin, and the build adds the origin
+  to `derivedFrom` where the copy is embedded. A field named like a fact field (`id`, `tool`, `topics`, `title`,
+  `description`, `content`, `variants`, `derivedFrom`, `when`, `source`, `verify`, `relates`) has no getter. A fact
+  written with `history(...)` has none either.
+- A tag sticks to an object or an array, not to a scalar, so `status.initial` or `names.slice(1)` carries no tag.
+  Write the value as a function, `mf.value(name, () => ({ first: status.initial }))`: every read of another fact
+  while the function runs is added to `relates`, scalars included, and only reads inside that function count. An
+  `mf` call inside the function collects its own reads.
+- `contentOf(fact, since?)` returns a tagged copy of the value or schema of one row. A fact with several rows needs
+  `since`, which names one row (any version of a row written as an array). It throws `BuilderError` when no row
+  matches. This is how a fact written with `history(...)` is read.
+- `statementFrom(fact, render, { since? })` calls `render` with `contentOf(fact, since)` and returns the text as a
+  built statement that remembers the fact. Give it to `mf.statement` or to the `statement` of a `history` row, and
+  the fact goes into `relates`, so the sentence follows the value.
+- Order of `derivedFrom`: the `relates` option, the facts a built statement or a subset carries, the facts read by a
+  function, then the tags and `factLink` placeholders in document order, each fact once.
+
+`history(...)` copies the tags of fact-kit along with the values, so tagged values and `keyed` arrays survive every
+row. A builder can put a check on what it makes, and `history` runs that check again after each row. A row that
+breaks it throws `BuilderError` with the row, its `since` and the key.
+
+### Subsets
+
+`subsetOf(parent, items)` returns a keyed copy of `items` that must stay inside the list of the fact `parent`.
+The parent is added to `relates`, so the subset lists it in `derivedFrom`.
+
+- When the parent is a list with a known type, as in `doc.value('events', ['A', 'B'])`, the type checker rejects an
+  item the parent does not have. `subsetOf(events, ['A', 'Z'])` fails to compile.
+- When the parent comes from a conversion, its type is unknown and every item is accepted. Pass the fact object from
+  the converted file, for example `(converted.facts as Fact[]).find((f) => f.id === 'claude-code.hook-events')`. It
+  is the same object that `facts` lists, because Node loads the JSON once. `subsetOf` throws `BuilderError` when the
+  object is missing.
+- `check` and `build` test every subset at the version boundaries of the two facts: `head`, the latest published
+  version, each version a row names, the next patch and the next release line, each with every platform, os and
+  pending label of the rows. An item that the parent row lacks, or a boundary where the parent has no row, is a
+  `subset-of` problem. The message names the oldest version where it happens and the item. Items are compared as
+  JSON, so objects match whatever the order of their keys.
+
+  ```text
+  subset-of: claude-code.hook-blocking-event-names: at 2.1.300, "Setup" is not in claude-code.hook-events
+  ```
+
+- The index has no field for a subset, so only a check of the sources can run this test. `check --index` of a
+  built index does not.
+- A parent in another entry of the package works the same way. A parent in another package is brought in with
+  `derive` first.
+
 ## Check rules
 
 `check` exits with 0 when it finds no problem, 1 when it finds problems and 2 when it can not run: an unknown
@@ -190,7 +277,8 @@ work on a release branch.
 | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------- |
 | `format`, `duplicate-id`, `id-prefix`, `missing-schema-file`, `unknown-fact-id`, `local-path`, `unregistered-domain` | The fact format, ids, `$ref` files, references, paths and domains                                                                                                                                                                                                                   | sources, built indexes                          |
 | `since-format`, `same-line`, `ambiguous-rows`, `describes`                                                           | `since` is a version, `next` or an array of versions on different release lines. Rows are not a tie. `describes` names at most one component and the entries agree                                                                                                                  | sources, built indexes                          |
-| `relation-cycle`, `relates-foreign`, `history`, `derive`                                                             | `derivedFrom` is a DAG. Relations stay in the package. `history` rows fit. `derive` finds its upstream fact                                                                                                                                                                         | sources, installed upstream                     |
+| `subset-of`                                                                                                          | A list made with `subsetOf` has, at every version boundary, only items of the list of its parent. `build` runs it too                                                                                                                                                               | sources                                         |
+| `relation-cycle`, `relates-foreign`, `history`, `builder`, `derive`                                                  | `derivedFrom` is a DAG. Relations stay in the package. `history` rows fit, and so do the arguments of `factsOf` and the checks of builders. `derive` finds its upstream fact                                                                                                        | sources, installed upstream                     |
 | `derive-version`                                                                                                     | `derived.lock.json` and a built index record the installed upstream version                                                                                                                                                                                                         | installed upstream, `derived.lock.json`         |
 | `lib-rows`                                                                                                           | `facts/_lib` holds functions and constants, no row with `since`                                                                                                                                                                                                                     | `facts/_lib`, parsed with oxc                   |
 | `since-ahead`                                                                                                        | `since` is not newer than `describes`, or than `--train <component>=<version>`                                                                                                                                                                                                      | sources, `--train`                              |

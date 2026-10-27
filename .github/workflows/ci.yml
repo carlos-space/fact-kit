@@ -75,11 +75,24 @@ jobs:
     if: needs.scope.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read # release-train.sh: the open Release PR of a release branch
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
+      # The facts of fact-kit are pinned to the next version before the Release PR merges, while describes still
+      # reads js/package.json. facts:check passes the version of the open Release PR to `check --train`, so
+      # the pinned rows are not ahead of describes. Other branches have no Release PR and set nothing.
+      - name: Train of the open Release PR
+        if: startsWith(github.ref, 'refs/heads/release/')
+        run: bash scripts/ci/release-train.sh >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
       - run: pnpm check
 
   build:

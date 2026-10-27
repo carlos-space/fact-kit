@@ -1,6 +1,8 @@
 import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
 import { ambiguousRows, topLevelContent } from './select.ts'
+import { subsetProblems } from './subset.ts'
+import type { SubsetInput } from './subset.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
 import { compareVersions, parseVersion, sinceIssue } from './version.ts'
 import { validateExampleGroup, validateIndex, validateSchemaDocument } from './validate.ts'
@@ -17,6 +19,8 @@ export interface IndexInput {
    * rule, because a published index of format 1.0 may describe several products.
    */
   source?: boolean
+  /** Lists that `subsetOf` keeps inside the list of another fact. Only a source has them, because the index has no place for them. */
+  subsets?: readonly SubsetInput[]
 }
 
 export interface ExampleInput {
@@ -464,6 +468,8 @@ export function checkFacts(options: CheckOptions): CheckResult {
       location: `${idOrigin.get(first) ?? first}/derivedFrom`,
     })
   }
+
+  problems.push(...subsetProblems(options.indexes))
 
   let exampleCount = 0
   for (const ex of options.examples ?? []) {

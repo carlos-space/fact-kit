@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildIndex, readFacts } from '../js/src/index.ts'
-import type { FactReader, ReadErrorCode } from '../js/src/index.ts'
+import type { FactDecl, FactReader, ReadErrorCode } from '../js/src/index.ts'
 import { loadEntries } from '../js/src/load.ts'
 import { cleanTmp, makeTmp, writeTree } from '../js/test/helpers.ts'
 import kit from './fact-kit/facts/fact-kit/index.ts'
@@ -18,7 +18,8 @@ const READ_ERROR_CODES: ReadErrorCode[] = ['not-an-index', 'unsupported-index-fo
 // Only the JS reader has these (m151/d003).
 const JS_ONLY = new Set(['options.onRead'])
 
-const jsRead = kit.facts.find((f) => f.id === 'fact-kit.read-facts')?.content as {
+const jsRead = (kit.facts.find((f) => (f as { id?: string }).id === 'fact-kit.read-facts') as FactDecl | undefined)
+  ?.content as {
   value: { parameters: { name: string }[]; returns: { members: { name: string }[] } }
 }
 
