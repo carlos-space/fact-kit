@@ -14,6 +14,7 @@
 | `go/`                                                 | Go 讀取套件，模組路徑 `github.com/carlos-space/fact-kit/go`，說明在 `go/README.md`                                           | Go module（tag `go/vX.Y.Z`） |
 | `Package.swift`、`Sources/`、`Tests/`                 | Swift 讀取套件 `FactKit`，放在倉庫根是因為 SwiftPM 只讀倉庫根的 `Package.swift`，說明在 `swift/README.md`                    | SwiftPM（純 semver tag）     |
 | `conformance/`                                        | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                                                       | 不發布                       |
+| `consumer/`                                           | 各語言的消費端 harness（`py/`、`rs/`、`go/`、`swift/`），說明在 `consumer/README.md`                                         | 不發布                       |
 
 ## 開發
 
@@ -32,13 +33,41 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 
 ## 發版
 
-發版單元是 `release-please-config.json` 的 `packages` 鍵，目前有 `js`（component 是 `fact-kit`）與 `facts`（匯總套件，component 是 `fact-kit-facts`）。`facts/` 底下的 component 套件是 private，不是發版單元。之後加 `py/`、`rs/` 或 `go/` 時，在這份設定與 `.release-please-manifest.json` 加一筆，腳本和 workflow 不必改。
+發版單元是 `release-please-config.json` 的 `packages` 鍵，共六個。
+
+| 單元（component）            | 路徑          | 發布到                | tag                                  |
+| :--------------------------- | :------------ | :-------------------- | :----------------------------------- |
+| `fact-kit`                   | `js/`         | npm                   | `fact-kit/vX.Y.Z`                    |
+| `fact-kit-facts`（匯總套件） | `facts/`      | npm                   | `fact-kit-facts/vX.Y.Z`              |
+| `py`                         | `py/`         | PyPI                  | `py/vX.Y.Z`                          |
+| `rs`                         | `rs/`         | crates.io             | `rs/vX.Y.Z`                          |
+| `go`                         | `go/`         | Go module（沒有上傳） | `go/vX.Y.Z`                          |
+| `swift`                      | `.`（倉庫根） | SwiftPM（沒有上傳）   | 純 `X.Y.Z`，沒有 component、沒有 `v` |
+
+`facts/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 就是發布。Swift 單元登記在倉庫根，因為 SwiftPM 只讀倉庫根的 `Package.swift`。它的 tag 不帶 `v`，因為 `v` 開頭的根 tag 會被 SwiftPM 當版本。
+
+四個讀取單元第一次發布的版號是切線時的 `<line>.0`（例如 0.3 線是 `0.3.0-alpha.1`），所以 `.release-please-manifest.json` 先寫 `0.0.0`，release-please 看到 `0.0.0` 就當作沒發布過，改用 `initial-version`。`release-policy.json` 的 stages 是 `["alpha", "ga"]`，所以第一版先發 alpha。
+
+**新增一個單元要改的地方**
+
+1. `release-please-config.json`：在 `packages` 加一筆，寫 `component` 與 `release-type`。
+2. `.release-please-manifest.json`：加同一個路徑，版號寫 `0.0.0`。
+3. `release-policy.json`：以 component 為鍵加一筆，寫 `kind` 與 `stages`。
+4. 單元自己的版本檔：Python 是 `pyproject.toml`，Rust 是 `Cargo.toml` 與 `Cargo.lock`，版號要等於 manifest。
+5. 單元發布到新種類的註冊中心時：`scripts/lib/release-stages.sh` 的 `unit_registry`、`scripts/release/publish-units.sh` 加一段，`.github/workflows/publish.yml` 加一個 job，`scripts/ci/assembled-check.sh` 加一個 case，並在 `consumer/` 加該語言的 harness 與 `.github/workflows/verify-install.yml` 的 job。已有的種類只要前四步。
+6. `scripts/release/release-config.test.ts` 的 `expected` 加一筆。
+7. 在倉庫根新增頂層目錄時：把它加進 swift 單元的 `exclude-paths`（`release-please-config.json`），否則只改那個目錄的 commit 也會讓 Swift 升版。`release-config.test.ts` 會檢查這件事。
+8. 要納入 CI 的新目錄：`scripts/ci/ci-scope.conf`。
 
 整個倉庫同一時間最多一條發布分支 `release/vX.Y`（train），用 `--units` 選要入版的單元（用 component 名稱）。入版的單元各自有版號和 tag `<component>/vX.Y.Z`，例如 `fact-kit/v0.7.0`。每次發布另外指派一個產品版號，產品 tag 是 `product/vX.Y.Z`，版號記在 root `package.json` 的 `version`。main 只收 PR，上面不會出現 release-please 開的 commit。版號檔、CHANGELOG、manifest 與產品版號在 GA 之後，隨 `release/vX.Y--to-main` 這個 squash 合回 PR 進 main。
 
 `--line X.Y` 是產品線，用來命名分支，不決定單元版號。單元版號由 release-please 依 commit 算出，這條線上只放 `fix:` commit 時單元只升 patch，放 `feat:` 會升 minor。產品版號由 `--product-version` 指定，每次發布必填。這條線已經有產品 tag `product/vX.Y.Z` 時，切分支必須帶 `--from <最新的產品 tag>`。
 
 預發布版的 npm dist-tag 等於階段名（`alpha`、`beta`、`rc`），只有 GA 進 `latest`，所以 `npm install` 不會裝到預發布版。腳本需要 bash 4 以上（macOS 用 `brew install bash`）、`gh`、`jq`，並且在乾淨的工作區執行。所有腳本都可以加 `--dry-run` 先看會做什麼，不寫遠端也不推送。
+
+`publish.yml` 每個註冊中心一個 job。PyPI 與 crates.io 用 Trusted Publishing，所以不存任何 token，兩個 job 分別在 GitHub Environment `pypi` 與 `crates-io` 裡跑，Environment 的 required reviewer 在 repository 設定裡指定，job 要等核准才會開始。PyPI 的版號不在這裡轉換：release-please 照寫 SemVer（`0.3.0-alpha.1`），`uv build` 的後端正規化成 PEP 440（`0.3.0a1`），發布腳本從建出的 wheel 讀回實際版號。crates.io 只能對已存在的 crate 設 Trusted Publishing，所以 crate 第一版由使用者用環境變數 `CARGO_REGISTRY_TOKEN` 手動發，crate 還不存在時 `crates` job 只在 summary 說明並略過。`publish.yml` 的 `dry_run` 輸入會讓所有上傳變成 dry run。
+
+發布後用 `verify-install.yml` 驗證：手動派送，輸入各套件的版號。每個 job 在新的 runner 上只 sparse checkout `conformance/` 與該語言的 `consumer/<語言>/`，從註冊中心（Swift 是這個倉庫的 tag）裝指定版號，跑共用樣本並印出套件從哪裡載入。
 
 以下以產品線 0.1、產品版號 0.1.0 為例。
 

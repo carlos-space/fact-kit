@@ -148,7 +148,7 @@ jobs:
       - uses: ./.github/actions/setup-workspace
       - run: pnpm vitest run js/test/convert.test.ts js/test/convert-agent-sdk.test.ts
 
-  # Assembled-system check against packed tarballs. Only on a release branch: this is the stabilisation
+  # Assembled-system check against the packed packages (tarballs, wheel, crate, Go module, Swift package). Only on a release branch: this is the stabilisation
   # window, and finalize-release.sh --phase ga refuses to proceed until this run is green.
   assembled:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/release/')
@@ -161,5 +161,17 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
       - run: pnpm build
+      # The toolchains of the readers: assembled-check.sh builds the wheel (uv), packages the crate (cargo), copies
+      # the Go module and assembles the Swift package, then runs the consumer harnesses on them. ubuntu-latest
+      # ships a Swift toolchain, as the swift-linux job of conformance.yml relies on.
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          cache: false
+      - run: swift --version | head -1
       - name: Pack, install into an empty directory, smoke test
         run: bash scripts/ci/assembled-check.sh

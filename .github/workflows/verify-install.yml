@@ -1,0 +1,195 @@
+name: verify-install
+
+# Installs the published readers from their registries on a new runner and runs the shared samples through them.
+# Run by hand after a release, with the version of each package to check (SemVer style, e.g. 0.3.0-alpha.1);
+# leave a version empty to skip that package. A job checks out only conformance/ and its own harness under
+# consumer/, so the package under test can only come from the registry (PyPI, crates.io, the Go proxy, or the
+# git tag of this repository for SwiftPM), never from the sources beside it. Each harness prints where the
+# package was loaded from; the log and the job summary keep that proof.
+on:
+  workflow_dispatch:
+    inputs:
+      py:
+        description: 'PyPI fact-kit version, e.g. 0.3.0-alpha.1 (installed as 0.3.0a1)'
+        required: false
+        type: string
+      rs:
+        description: 'crates.io fact-kit version, e.g. 0.3.0-alpha.1'
+        required: false
+        type: string
+      go:
+        description: 'Go module github.com/carlos-space/fact-kit/go version without the v, e.g. 0.3.0-alpha.1'
+        required: false
+        type: string
+      swift:
+        description: 'Swift package version, the bare tag of the repository, e.g. 0.3.0-alpha.1'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  py:
+    if: inputs.py != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/py/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Install fact-kit from PyPI and run the samples
+        env:
+          VERSION: ${{ inputs.py }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/py/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### PyPI fact-kit'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
+
+  rs:
+    if: inputs.rs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/rs/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+      - name: Build against fact-kit from crates.io and run the samples
+        env:
+          VERSION: ${{ inputs.rs }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/rs/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### crates.io fact-kit'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
+
+  go:
+    if: inputs.go != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/go/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26'
+          cache: false
+      - name: Build against fact-kit/go from the Go proxy and run the samples
+        env:
+          VERSION: ${{ inputs.go }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/go/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### Go proxy fact-kit/go'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
+
+  swift:
+    if: inputs.swift != ''
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/swift/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - run: xcodebuild -version && swift --version | head -1
+      - name: Build against FactKit at the tag of this repository on macOS and run the samples
+        env:
+          VERSION: ${{ inputs.swift }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/swift/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### SwiftPM on macOS'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
+
+  swift-linux:
+    if: inputs.swift != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/swift/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - run: swift --version | head -1
+      - name: Build against FactKit at the tag of this repository on Linux and run the samples
+        env:
+          VERSION: ${{ inputs.swift }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/swift/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### SwiftPM on Linux'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
