@@ -8,7 +8,8 @@ license = "MIT"
 repository = "https://github.com/carlos-space/fact-kit"
 readme = "README.md"
 # tests/ read conformance/ and facts/ outside the crate, so they only run in the repository
-exclude = ["tests/"]
+# .release-marker only lives on release branches (scripts/lib/release-stages.sh, release_as_commit)
+exclude = ["tests/", ".release-marker"]
 keywords = ["fact-kit", "facts", "semver"]
 
 [lib]
