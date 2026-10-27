@@ -22,6 +22,10 @@ function fixture(options: { prs: { headRefName: string }[]; manifest: unknown })
     join(dir, 'release-please-config.json'),
     JSON.stringify({ packages: { js: { component: 'fact-kit' }, facts: { component: 'fact-kit-facts' } } }),
   )
+  writeFileSync(
+    join(dir, 'release-policy.json'),
+    JSON.stringify({ units: { 'fact-kit': {}, 'fact-kit-facts': {}, py: {} } }),
+  )
   writeFileSync(join(dir, 'prs.json'), JSON.stringify(options.prs))
   writeFileSync(join(dir, 'manifest.json'), JSON.stringify(options.manifest))
   // `gh pr list ... --jq <filter>` and `gh api ... --jq .content`: the fake applies the filter with jq itself.
@@ -84,6 +88,14 @@ describe('release-train.sh', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
     expect(r.stderr).toContain('no open Release PR')
+  })
+
+  test('prints nothing for a unit of the policy that is not on this train', () => {
+    const dir = fixture({ prs: [{ headRefName: 'release-please--branches--release/v0.8' }], manifest: {} })
+    const r = run(dir, env, 'py')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(r.stderr).toContain('py is not on the train of release/v0.8')
   })
 
   test('fails when the manifest has no version for the unit, and when the component is unknown', () => {

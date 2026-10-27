@@ -3,7 +3,8 @@
 #   FACT_KIT_TRAIN=--train fact-kit=<version>
 # The facts are pinned to that version on the release branch before the Release PR merges, while describes
 # still reads the old version from js/package.json. `check --train` lets since be as new as the train, and it
-# fails a row that is still `next`. Prints nothing when the branch has no open Release PR.
+# fails a row that is still `next`. Prints nothing when the branch has no open Release PR, or when the unit is
+# in release-policy.json but not on this branch's train.
 #
 # The version is the one release-please wrote into .release-please-manifest.json on the Release PR branch.
 # That file is what release-please releases from, so it is the version the tag will carry. The unit is found
@@ -20,7 +21,16 @@ branch="${BRANCH:?BRANCH is not set}"
 repo="${REPO:?REPO is not set}"
 
 path="$(jq -r --arg c "$component" '.packages | to_entries[] | select((.value.component // (.key | split("/") | last)) == $c) | .key' release-please-config.json | head -1)"
-[[ -n "$path" ]] || { echo "release-train: no unit of component $component in release-please-config.json" >&2; exit 1; }
+if [[ -z "$path" ]]; then
+  # A release branch's config lists only its train. A unit of release-policy.json that is not on this train
+  # releases nothing here, so there is no version to check since against.
+  if jq -e --arg c "$component" '.units | has($c)' release-policy.json >/dev/null 2>&1; then
+    echo "release-train: $component is not on the train of $branch, so no --train" >&2
+    exit 0
+  fi
+  echo "release-train: no unit of component $component in release-please-config.json" >&2
+  exit 1
+fi
 
 head="$(gh pr list --repo "$repo" --base "$branch" --state open --json headRefName \
   --jq '[.[] | select(.headRefName | startswith("release-please--"))][0].headRefName // empty')"
