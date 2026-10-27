@@ -2,7 +2,7 @@
 import { readerFacts } from '../../../readers-lib.ts'
 
 const options = [
-  { name: 'opts.Version', js: 'options.version', type: 'string', required: false, default: '""' },
+  { name: 'opts.Version', js: 'options.version', type: '*string', required: false, default: 'nil' },
   { name: 'opts.Include', js: 'options.include', type: '[]string', required: false, default: 'nil' },
   { name: 'opts.Platform', js: 'options.platform', type: 'string', required: false, default: '""' },
   { name: 'opts.OS', js: 'options.os', type: 'string', required: false, default: '""' },

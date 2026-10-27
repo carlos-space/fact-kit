@@ -1,8 +1,9 @@
 name: conformance
 
 # Every language reads the same samples in conformance/ and must produce the expected output. One job per
-# language, named after it. Only JS exists so far; a language joins by adding a job here that installs its
-# toolchain and runs its conformance test against the same directory (conformance/README.md, last section).
+# language, named after it, that installs its toolchain and runs its conformance test against the same
+# directory (conformance/README.md, last section). Each job also builds facts/dist, because every reader has a
+# test that reads its own facts (fact-kit-facts/<language>) and checks the error codes against them.
 on:
   pull_request:
   workflow_dispatch:
@@ -34,4 +35,76 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm conformance:js
+      # verbose lists every case by name, so the log shows which samples ran, as the other languages do
+      - run: pnpm conformance:js --reporter=verbose
+
+  py:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # The lowest Python the package supports (requires-python).
+      - run: uv run --python 3.11 pytest -v
+        working-directory: py
+
+  rs:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # rust-version in Cargo.toml, and the current stable.
+        toolchain: ['1.95', stable]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test --locked -- --nocapture
+        working-directory: rs
+
+  go:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The go directive in go.mod, and the next release.
+        go: ['1.26', '1.27']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go/go.sum
+      - run: go test -v ./...
+        working-directory: go
+
+  swift:
+    if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - run: pnpm build
+      - run: xcodebuild -version && swift --version | head -1
+      - run: swift test
