@@ -4,13 +4,16 @@
 
 ## 內容
 
-| 路徑                                                  | 內容                                                                                                                         | 發布到哪    |
-| :---------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- | :---------- |
-| `js/`                                                 | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                        | npm（公開） |
-| `facts/fact-kit/`                                     | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                                                               | 不發布      |
-| `facts/py/`、`facts/rs/`、`facts/go/`、`facts/swift/` | 其他語言讀取套件的公開 API，還沒發布前都帶 pending 標籤 `readers`，要用 `version: 'head'` 加 `include: ['readers']` 才讀得到 | 不發布      |
-| `py/`、`rs/`、`go/`、`swift/`                         | 其他語言的實作，之後加入                                                                                                     | 之後決定    |
-| `conformance/`                                        | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                                                       | 不發布      |
+| 路徑                                                  | 內容                                                                                                                         | 發布到哪                     |
+| :---------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- | :--------------------------- |
+| `js/`                                                 | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                        | npm（公開）                  |
+| `facts/fact-kit/`                                     | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                                                               | 不發布                       |
+| `facts/py/`、`facts/rs/`、`facts/go/`、`facts/swift/` | 其他語言讀取套件的公開 API，還沒發布前都帶 pending 標籤 `readers`，要用 `version: 'head'` 加 `include: ['readers']` 才讀得到 | 不發布                       |
+| `py/`                                                 | Python 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `py/README.md`                                                       | PyPI                         |
+| `rs/`                                                 | Rust 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `rs/README.md`                                                         | crates.io                    |
+| `go/`                                                 | Go 讀取套件，模組路徑 `github.com/carlos-space/fact-kit/go`，說明在 `go/README.md`                                           | Go module（tag `go/vX.Y.Z`） |
+| `Package.swift`、`Sources/`、`Tests/`                 | Swift 讀取套件 `FactKit`，放在倉庫根是因為 SwiftPM 只讀倉庫根的 `Package.swift`，說明在 `swift/README.md`                    | SwiftPM（純 semver tag）     |
+| `conformance/`                                        | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                                                       | 不發布                       |
 
 ## 開發
 

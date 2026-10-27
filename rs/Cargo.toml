@@ -1,0 +1,18 @@
+[package]
+name = "fact-kit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Read the facts of a fact-kit index.json from Rust"
+license = "MIT"
+repository = "https://github.com/carlos-space/fact-kit"
+readme = "README.md"
+
+[lib]
+name = "fact_kit"
+path = "src/lib.rs"
+
+[dependencies]
+oxc_resolver = "11.24.3"
+semver = "1.0.28"
+serde_json = { version = "1.0.154", features = ["preserve_order"] }

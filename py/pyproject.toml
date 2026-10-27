@@ -1,0 +1,28 @@
+[project]
+name = "fact-kit"
+version = "0.0.0"
+description = "Reads the fact packages built by fact-kit"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "orjson>=3.10",
+    "semver>=3.0",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Repository = "https://github.com/carlos-space/fact-kit"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

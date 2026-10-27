@@ -1,6 +1,6 @@
 # conformance
 
-五種語言的讀取實作共用的規格與測試資料。每種語言讀同一份 `cases/`、`resolve/` 與 `semver.json`，輸出必須和 `expected.json` 相同。目前只有 JS 實作（`js/test/conformance.test.ts`），其他語言加入時照同一個形狀加一個 job（見最後一節）。
+五種語言的讀取實作共用的規格與測試資料。每種語言讀同一份 `cases/`、`resolve/` 與 `semver.json`，輸出必須和 `expected.json` 相同。五種語言的測試都在 `.github/workflows/conformance.yml` 各自一個 job：JS 是 `js/test/conformance.test.ts`，Python 是 `py/tests/test_conformance.py`，Rust 是 `rs/tests/conformance.rs`，Go 是 `go/conformance_test.go`，Swift 是 `Tests/FactKitTests/ConformanceTests.swift`。各語言的測試先看環境變數 `FACT_KIT_CONFORMANCE` 找這個目錄，沒有時從測試檔的位置往上找，所以新增案例不用改程式。
 
 ## 目錄
 
@@ -153,7 +153,7 @@ fact 與選列有關的欄位：
 1. **self-reference**：從 `root` 往上找最近的 `package.json`。它的 `name` 等於被讀的套件名，而且有 `exports` 時，用它解析，不再找 `node_modules`。只看最近的一個 `package.json`，更上層的不看。名稱不符或沒有 `exports` 時，繼續下一步。
 2. **往上層找**：從 `root` 往上，找第一個有 `node_modules/<套件>` 的目錄。近的優先。找到最近的套件後就用它，它沒有 export 那個檔案時回 `not-found`，不會再往更遠的層找。
 3. **跟著符號連結**：`node_modules/<套件>` 可以是符號連結，指到 `root` 之外的目錄，像 pnpm 那樣。解析以連結指向的真實目錄為準。
-4. **沒有 `exports` 欄位**：套件的 `package.json` 沒有 `exports` 時，退回檔案路徑解析，直接找 `<套件目錄>/<路徑>/index.json`（只寫套件名時是 `<套件目錄>/index.json`）。檔案不存在時回 `not-found`。
+4. **沒有 `exports` 欄位**：套件的 `package.json` 沒有 `exports` 時，退回檔案路徑解析，直接找 `<套件目錄>/<路徑>/index.json`（只寫套件名時是 `<套件目錄>/index.json`）。檔案不存在時，照 Node 的規則往上一層的 `node_modules` 繼續找，都找不到才回 `not-found`。這和有 `exports` 的套件不同，有 `exports` 但沒 export 那個檔案時直接回 `not-found`，不再往上找。
 
 `exports` 的條件與目標：
 
@@ -173,7 +173,7 @@ fact 與選列有關的欄位：
 
 ## 加一種語言
 
-1. 實作 `selectFacts` 對應的純函式和 `readFacts` 對應的讀取函式（名稱見 m151 定的 `select_facts`、`SelectFacts`、`selectFacts`），其中 `readFacts` 建在 `selectFacts` 上。
+1. 實作 `selectFacts` 對應的純函式和 `readFacts` 對應的讀取函式，其中 `readFacts` 建在 `selectFacts` 上。函式名照該語言慣例，參數和 JS 的 `readFacts(spec, options)` 一一對應，寫進 `facts/<語言>/` 的 facts。
 2. 寫一個測試，逐一讀 `cases/`、`resolve/` 與 `semver.json`，輸出和 `expected.json` 逐欄相同。
 3. 在 `.github/workflows/conformance.yml` 加一個 job，名稱是語言名，步驟是安裝該語言的工具鏈後跑那個測試。不改 `conformance/` 以外的規格。
 

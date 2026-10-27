@@ -7,3 +7,10 @@ CHANGELOG.md
 .release-please-manifest.json
 # Generated test data, compared byte for byte with converter output
 js/test/fixtures
+# Build output and lock files of the readers in other languages
+rs/target
+py/.venv
+py/.pytest_cache
+.build
+.swiftpm
+Package.resolved

@@ -154,3 +154,7 @@ tmp/
 # The resolve samples of conformance/ hold installed packages on purpose
 !conformance/resolve/**/node_modules/
 !conformance/resolve/**/dist/
+
+# Swift build output (Package.swift is at the repository root)
+.build/
+.swiftpm/
