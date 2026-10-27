@@ -29,7 +29,7 @@
 | py    | wheel 檔                                                 | `uv build --wheel --out-dir <dir> py`                     |
 | rs    | `.crate` 檔或解開後的目錄，用 `[patch.crates-io]` 指過去 | `cargo package --manifest-path rs/Cargo.toml`             |
 | go    | 含 `go.mod` 的模組目錄，用 `replace` 指過去              | 複製 `go/`                                                |
-| swift | 含 `Package.swift` 與 `Sources/` 的目錄，用 path 依賴    | 複製 `unit_content_paths` 列的檔案，見 assembled-check.sh |
+| swift | 含 `Package.swift` 與 `swift/Sources/` 的目錄，用 path 依賴| 複製 `unit_content_paths` 列的檔案，見 assembled-check.sh |
 
 `FACT_KIT_CONFORMANCE` 指定 `conformance/` 目錄，沒設時用 `../../conformance`。乾淨 runner 上只有 `conformance/` 與 `consumer/<語言>/`，這個預設剛好找得到。
 

@@ -111,7 +111,7 @@ test('the version file of the Python and Rust units equals the manifest version'
 // every top-level directory that is not Swift has to be listed, or a commit that touches only that directory
 // releases the Swift unit.
 test('every top-level directory that is not Swift is in the exclude-paths of the Swift unit', () => {
-  const swiftOwned = ['Sources', 'Tests', 'swift']
+  const swiftOwned = ['swift']
   const tracked = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root,
     encoding: 'utf8',

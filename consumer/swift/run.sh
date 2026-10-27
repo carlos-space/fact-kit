@@ -2,7 +2,7 @@
 # Build a small package that depends on FactKit and run the shared samples through it.
 #   run.sh <version>         depend on https://github.com/carlos-space/fact-kit at exactly <version>; SwiftPM
 #                            reads the bare tag <version> (the check against the repository)
-#   run.sh --local <dir>     depend on a local copy by path: a directory that holds Package.swift and Sources/
+#   run.sh --local <dir>     depend on a local copy by path: a directory that holds Package.swift and swift/Sources/
 #                            (the local check)
 # The package lives in a temporary directory. A local copy is copied there as fact-kit/, so the package gets the
 # same identity (fact-kit) as the one cloned from the repository. SwiftPM has no registry for this package: the

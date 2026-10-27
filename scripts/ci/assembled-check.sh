@@ -66,12 +66,12 @@ for p in "${paths[@]}"; do
       mkdir -p "$work/go-module"; cp -R "$root/$p/." "$work/go-module/"
       bash "$root/consumer/go/run.sh" --local "$work/go-module" ;;
     swift)
-      # what SwiftPM needs from the repository root: Package.swift, Package.resolved, Sources/, Tests/ (the
+      # what SwiftPM needs from the repository root: Package.swift, Package.resolved, swift/Sources/, swift/Tests/ (the
       # manifest declares a test target, so SwiftPM wants the directory) and the license
       mkdir -p "$work/swift-package"
-      while IFS= read -r f; do [[ -e "$root/$f" ]] && cp -R "$root/$f" "$work/swift-package/"; done < <(cd "$root" && unit_content_paths "$p" | sed 's#^\./##')
+      while IFS= read -r f; do [[ -e "$root/$f" ]] || continue; mkdir -p "$work/swift-package/$(dirname "$f")"; cp -R "$root/$f" "$work/swift-package/$(dirname "$f")/"; done < <(cd "$root" && unit_content_paths "$p" | sed 's#^\./##')
       cp "$root/LICENSE" "$work/swift-package/"
-      (cd "$work/swift-package" && find . -not -path './Sources/*' -not -path './Tests/*' | sort | sed 's/^/  assembled /')
+      (cd "$work/swift-package" && find . -not -path './swift/Sources/*' -not -path './swift/Tests/*' | sort | sed 's/^/  assembled /')
       for d in js facts conformance py rs go scripts; do
         [[ ! -e "$work/swift-package/$d" ]] || { printf '%s\n' "the Swift package contains $d/" >&2; exit 1; }
       done
