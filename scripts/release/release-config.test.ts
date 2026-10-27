@@ -10,6 +10,7 @@ const manifest = readJson('.release-please-manifest.json')
 
 const expected: Record<string, string> = {
   js: 'fact-kit',
+  facts: 'fact-kit-facts',
 }
 
 // On main the config lists every unit. A release branch scopes it to the units of its train
