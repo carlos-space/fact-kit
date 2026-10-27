@@ -3,12 +3,16 @@ name: verify-install
 # Installs the published readers from their registries on a new runner and runs the shared samples through them.
 # Run by hand after a release, with the version of each package to check (SemVer style, e.g. 0.3.0-alpha.1);
 # leave a version empty to skip that package. A job checks out only conformance/ and its own harness under
-# consumer/, so the package under test can only come from the registry (PyPI, crates.io, the Go proxy, or the
+# consumer/, so the package under test can only come from the registry (npm, PyPI, crates.io, the Go proxy, or the
 # git tag of this repository for SwiftPM), never from the sources beside it. Each harness prints where the
 # package was loaded from; the log and the job summary keep that proof.
 on:
   workflow_dispatch:
     inputs:
+      js:
+        description: 'npm fact-kit version, e.g. 0.8.0'
+        required: false
+        type: string
       py:
         description: 'PyPI fact-kit version, e.g. 0.3.0-alpha.1 (installed as 0.3.0a1)'
         required: false
@@ -34,6 +38,39 @@ defaults:
     shell: bash
 
 jobs:
+  js:
+    if: inputs.js != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Only the shared samples and this language's harness: no sources of the packages, no scripts, no
+      # lock files. The package can only come from the registry.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /conformance/
+            /consumer/js/
+          sparse-checkout-cone-mode: false
+      - name: Show what was checked out
+        run: |
+          find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
+          [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Install fact-kit from npm and run the samples
+        env:
+          VERSION: ${{ inputs.js }}
+        run: |
+          # a registry or proxy can take a few minutes to serve a version that was just published
+          for attempt in 1 2 3 4 5 6; do
+            if bash consumer/js/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
+            echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
+          done
+          { echo '### npm fact-kit'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [[ "${ok:-0}" == 1 ]]
+
   py:
     if: inputs.py != ''
     runs-on: ubuntu-latest
