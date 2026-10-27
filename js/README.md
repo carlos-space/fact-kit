@@ -272,6 +272,100 @@ The parent is added to `relates`, so the subset lists it in `derivedFrom`.
 - A parent in another entry of the package works the same way. A parent in another package is brought in with
   `derive` first.
 
+### Field references
+
+`ref(fact, field?)` points at a fact of this package, or at a field of it, from the content of another fact. `fact` is
+the fact object you import, not an id string. `field` is a dotted path such as `'limits.max'`: a schema is followed
+through `properties`, a value through its object keys, and an array is not followed. When the type of the fact is
+known, `ref(mainline, 'idd')` fails to compile. A fact written with `history(...)` or taken from a conversion accepts
+any string, and `check` tests it.
+
+```ts
+import { factsOf, observedDoc, ref } from 'fact-kit'
+
+const mf = factsOf({ tool: 'demo', source: observedDoc({ url: 'https://example.com/doc', fetched: '2026-10-01' }) })
+
+const criterion = mf.schema('criterion', { type: 'object', properties: { text: { type: 'string' } } })
+const mainline = mf.schema('mainline', {
+  type: 'object',
+  properties: { id: { type: 'string' }, criteria: { type: 'array', items: ref(criterion) } },
+})
+const closed = mf.schema('mainline-closed', {
+  type: 'object',
+  properties: { mainline: ref(mainline, 'id') },
+})
+const limits = mf.value('limits', { max: 3 })
+const usage = mf.value('usage', { max: ref(limits, 'max'), whole: ref(limits) })
+```
+
+A `ref` is written in one of two ways, by where it stands.
+
+| Where the `ref` stands                                                                         | Output                                                                                                                                 |
+| :--------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
+| It is the whole value of a subschema (`properties`, `items`, `allOf`, `$defs` ...) of a schema | `{ "$ref": "#/$defs/<id>" }`, or `{ "$ref": "#/$defs/<id>/properties/a/properties/b" }` with the field `'a.b'`                         |
+| Anywhere else: a value, a statement, a `const`, a longer string                                | `<location>`, or `<location>#a.b` with a field. The location is `<id>` in the same entry and `<package>/<entry>:<id>` in another entry |
+
+For `closed` above, the build writes the `$ref` and puts the schema of the target into the `$defs` of the root:
+
+```json
+{
+  "type": "object",
+  "properties": { "mainline": { "$ref": "#/$defs/demo.mainline/properties/id" } },
+  "$defs": {
+    "demo.mainline": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "criteria": { "type": "array", "items": { "$ref": "#/$defs/demo.criterion" } }
+      }
+    },
+    "demo.criterion": { "type": "object", "properties": { "text": { "type": "string" } } }
+  }
+}
+```
+
+and `usage` becomes `{ "max": "demo.limits#max", "whole": "demo.limits" }`. Both facts list what they point at in
+`derivedFrom`: `demo.mainline` for `closed` and `demo.limits` for `usage`.
+
+- `$defs` is keyed by fact id. A schema embedded by several `ref`s is there once, and the `$defs` of an embedded
+  schema are moved up to the root, so the `$ref`s inside it stay valid.
+- A `ref` in a subschema position must point at a schema. A `$ref` to a value or a statement is a `ref` problem,
+  and so is a field of a statement.
+- A fact object that no entry lists in `facts` is `relates-foreign`, and the message says to list it. An object that
+  comes from another package is also `relates-foreign`, and the message says to use `derive`.
+- `check` reads the rows of the fact that writes the `ref` and of the target at every version boundary of the two
+  (the boundaries of `subset-of`). Where a reader gets a row that writes the `ref`, the target must have a row for
+  that reader with the field, or the problem is `ref` and the message names the oldest version:
+
+  ```text
+  ref: demo.user: at 1.1.0, ref(demo.target, "old") points at nothing: it has no field "old"
+  ```
+
+- When the target has several rows, the schema in `$defs` is the one a reader of the latest published version gets.
+  `check` reports `ref` at each reader whose row of the target is a different schema.
+- A schema that embeds itself, or two schemas that embed each other, is a `ref` problem that lists the loop. So is a
+  `$defs` key that already holds another schema, a field path with an empty part, a field whose name has a dot, and a
+  schema of another entry with a file `$ref` (`schemas/x.schema.json`), because the relative path breaks once the
+  schema is embedded in another entry.
+- `guard` of a `stateMachine` transition takes a `ref(fact)`. The built value holds the location, and
+  `stateMachineToMermaid` draws it as the label.
+
+### Entity identity
+
+`x-identity` is a registered keyword of a schema. Its value is the name of one field, or at least two distinct names
+for an identity made of several fields. A list of one name is not valid, so one identity has one way to be written.
+
+```json
+{
+  "type": "object",
+  "x-identity": ["mainline", "id"],
+  "properties": { "mainline": { "type": "string" }, "id": { "type": "string" } }
+}
+```
+
+`check` tests that every name is in the `properties` of the same schema, in every row of a fact and in every file
+under `schemas/`, and reports `schema-property` with the names that are missing.
+
 ### Flows
 
 `stateMachine`, `relations` and `sequence` make a value for `mf.value(name, ...)`. Each keeps its collections
@@ -368,6 +462,8 @@ work on a release branch.
 | `format`, `duplicate-id`, `id-prefix`, `missing-schema-file`, `unknown-fact-id`, `local-path`, `unregistered-domain` | The fact format, ids, `$ref` files, references, paths and domains                                                                                                                                                                                                                   | sources, built indexes                          |
 | `since-format`, `same-line`, `ambiguous-rows`, `describes`                                                           | `since` is a version, `next` or an array of versions on different release lines. Rows are not a tie. `describes` names at most one component and the entries agree                                                                                                                  | sources, built indexes                          |
 | `subset-of`                                                                                                          | A list made with `subsetOf` has, at every version boundary, only items of the list of its parent. `build` runs it too                                                                                                                                                               | sources                                         |
+| `ref`                                                                                                                | A `ref(fact, field?)` points at a field that exists in the rows the two facts share, a `$ref` points at a schema, and `$defs` has no loop or clash. `build` runs it too                                                                                                             | sources                                         |
+| `schema-property`                                                                                                    | Every name in `x-identity` is in the `properties` of the same schema                                                                                                                                                                                                                | sources, built indexes, `schemas/`              |
 | `relation-cycle`, `relates-foreign`, `history`, `builder`, `derive`                                                  | `derivedFrom` is a DAG. Relations stay in the package. `history` rows fit, and so do the arguments of `factsOf` and the checks of builders. `derive` finds its upstream fact                                                                                                        | sources, installed upstream                     |
 | `derive-version`                                                                                                     | `derived.lock.json` and a built index record the installed upstream version                                                                                                                                                                                                         | installed upstream, `derived.lock.json`         |
 | `lib-rows`                                                                                                           | `facts/_lib` holds functions and constants, no row with `since`                                                                                                                                                                                                                     | `facts/_lib`, parsed with oxc                   |

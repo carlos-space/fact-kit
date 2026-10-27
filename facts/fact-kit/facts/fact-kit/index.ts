@@ -323,6 +323,17 @@ const xKeywords = {
   'x-defaultRule': { type: 'string' },
 }
 
+/**
+ * `x-identity` names the field that identifies an entity, or two or more that do together. `check` reports
+ * `schema-property` when a name is not in the `properties` of the same schema.
+ */
+const xIdentity = {
+  oneOf: [
+    { type: 'string', minLength: 1 },
+    { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 2, uniqueItems: true },
+  ],
+}
+
 const dirOption = (flag: string, value: string, defaultValue: string, summary: string) => ({
   flag,
   value,
@@ -1006,6 +1017,12 @@ const newApi = [
     summary:
       'A `sequenceDiagram` of a sequence, without a code fence. Each participant is declared as `participant p<i> as <name>` and each step is `p<i>->>p<j>: <action>`. The ids are generated.',
   },
+  {
+    name: 'ref',
+    signature: 'ref(fact: Fact, field?: string) => FactRef',
+    summary:
+      "A reference to a fact of this package, or to a field of it written with dots such as `'limits.max'`, for the content of another fact. It returns a placeholder that the build replaces. When it is the whole value of a subschema, the build writes `{ $ref: '#/$defs/<id>' }`, or `{ $ref: '#/$defs/<id>/properties/a/properties/b' }` with a field, and puts the schema of the target into `$defs` of the root schema, flat and once per id. Anywhere else (a value, a statement, a longer string, a `const`) it writes the location of the fact, followed by `#a.b` with a field. The target goes into `derivedFrom`. A field the type checker knows is not in the target fails to compile. `check` reports `ref` when the field is missing from a row the two facts share, and `relates-foreign` when the target is no fact of any entry of the package. It also fits `guard` of a transition.",
+  },
 ]
 
 const facts: FactDecl[] = [
@@ -1047,6 +1064,16 @@ const facts: FactDecl[] = [
               code: 'subset-of',
               rule: 'A list declared with `subsetOf` has, at some version boundary, a value that the list of its parent lacks, or the parent has no row that applies there. The boundaries are those of `ambiguous-rows`, taken over the rows of both facts. The message names the oldest version where it happens and the value. `build` runs this rule too.',
               reads: 'sources',
+            },
+            {
+              code: 'ref',
+              rule: 'A `ref(fact, field?)` does not resolve. At some version boundary of the two facts, the reader gets a row of the fact that writes the `ref` but no row of the target applies, the target lacks the field (a field name with a dot can not be referenced), the target is a statement and the `ref` has a field, or the target is not a schema where the `ref` is a `$ref`. Also: a field path with an empty part, `$defs` that already has the key with another schema, schemas that embed each other in a loop, a schema of another entry with a file `$ref` embedded here, and a target with several rows whose schema in `$defs` is not the one a reader gets. The message names the oldest version where it happens. `build` runs this rule too.',
+              reads: 'sources',
+            },
+            {
+              code: 'schema-property',
+              rule: 'An `x-identity` names a field that is not in the `properties` of the same schema. It reads every schema of a fact, in every row, and every file under `schemas/`. A `required` list that builders make is checked by `builder`, not by this rule.',
+              reads: 'sources and built indexes',
             },
           ],
         },
@@ -1106,7 +1133,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The only `x-` keywords a schema in a fact may use, each with the shape of its value. Any other `x-` keyword fails `check`.',
     },
-    content: { value: xKeywords },
+    variants: history({ since: since070, value: xKeywords }, { since: 'next', set: { '/x-identity': xIdentity } }),
   }),
   fact({
     id: 'fact-kit.cli',
@@ -1121,7 +1148,7 @@ const facts: FactDecl[] = [
     description: { en: 'The stable `code` of each problem. The message is for people and can change.' },
     variants: history(
       { since: since070, value: problemCodes },
-      { since: 'next', add: { '': ['builder', 'subset-of'] } },
+      { since: 'next', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
     ),
   }),
   fact({
