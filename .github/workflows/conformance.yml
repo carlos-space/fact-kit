@@ -35,7 +35,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm conformance:js
+      # verbose lists every case by name, so the log shows which samples ran, as the other languages do
+      - run: pnpm conformance:js --reporter=verbose
 
   py:
     if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
