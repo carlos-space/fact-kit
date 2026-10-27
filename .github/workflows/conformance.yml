@@ -93,7 +93,9 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache-dependency-path: go/go.sum
-      - run: go test -v ./...
+      # -count=1: the test cache does not see conformance/, which is outside the module, so a new sample
+      # would otherwise be skipped by a cached result.
+      - run: go test -count=1 -v ./...
         working-directory: go
 
   swift:
