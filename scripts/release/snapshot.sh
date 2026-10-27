@@ -36,7 +36,13 @@ jq -r 'to_entries[] | "\(.key) \(.value)"' .release-please-manifest.json | while
   # unit 名稱一律取設定的 component，設定沒有時才退回資料夾名稱（ADR-004 第 36 項）
   unit="$(jq -r --arg p "$pkg_path" '.packages[$p].component // empty' release-please-config.json)"
   [[ -z "$unit" ]] && unit="${pkg_path##*/}"
-  tag="$unit/v$ver"
+  # the tag shape comes from the config, one rule for every unit (scripts/lib/unit-tag.jq): fact-kit/v0.8.0,
+  # py/v0.3.0, and the bare 0.3.0 of the Swift unit. unit_tags lists the versions the unit has tags for:
+  # what follows the part of the tag before the version, kept only when it is a semver. The bare shape has no
+  # prefix, so without that filter every other tag would be listed.
+  tag="$(jq -r --arg p "$pkg_path" --arg v "$ver" -f scripts/lib/unit-tag.jq release-please-config.json)"
+  tag_prefix="$(jq -r --arg p "$pkg_path" --arg v '@V@' -f scripts/lib/unit-tag.jq release-please-config.json)"; tag_prefix="${tag_prefix%%@V@*}"
+  unit_tags() { git tag --list "${tag_prefix}*" | sed "s#^${tag_prefix}##" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || true; }
   tag_status="$tag"
   if (( check )); then
     prev_ver="$(printf '%s\n' "$prev" | jq -r --arg p "$pkg_path" '.[$p] // empty')"
@@ -44,12 +50,12 @@ jq -r 'to_entries[] | "\(.key) \(.value)"' .release-please-manifest.json | while
       tag_status="未入版（同 ${since:-基準}）"
     elif git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
       tag_status="$tag ✓"
-    elif [[ -z "$(git tag --list "$unit/v*" --no-contains "$tag" 2>/dev/null)" && -z "$(git tag --list "$unit/v*")" ]]; then
+    elif [[ -z "$(unit_tags)" ]]; then
       tag_status="未發布"
     else
       # 該版號從未有對應 tag，但該單元有其他 tag：可能是它在本版之後才首次發布。
       # 以「是否存在比本版號更早的該單元 tag」區分：沒有更早的即代表本版時它尚未發布過。
-      earlier="$(git tag --list "$unit/v*" | sed "s#^$unit/v##" | sort -V | awk -v v="$ver" '$0 < v' | head -1)"
+      earlier="$(unit_tags | sort -V | awk -v v="$ver" '$0 < v' | head -1)"
       if [[ -z "$earlier" ]]; then tag_status="未發布"; else tag_status="$tag ✗ missing"; fi
     fi
   fi

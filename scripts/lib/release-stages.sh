@@ -9,7 +9,7 @@
 #   - mobile apps (MOBILE_UNITS): apps/<app>/release-channels.json, an object from stage to store
 #     channel, e.g. {"beta": "testflight-external", "rc": "testflight-internal", "ga": "app-store"}.
 #     A stage that is absent or maps to an empty string has no channel.
-#   - package units: a unit in release-please-config.json that publishes to a registry
+#   - package units: a unit in release-please-config.json that publishes to a registry or by tag
 #     (unit_registry) and is not a private npm package. The registry is the environment of every
 #     prerelease stage, because alpha, beta and rc all publish (publish-units.sh). Deployment stays
 #     per declaration: a unit without a stage's values file or channel is not deployed there.
@@ -53,13 +53,27 @@ mobile_channel() {
   printf '%s\n' "$ch"
 }
 
-# unit_registry <dir> → npm | pypi | crates, from the file the unit directory carries; fails when none.
-# publish-units.sh picks the registry with this same function.
+# unit_registry <dir> → npm | pypi | crates | go | swift, from the file the unit directory carries; fails when none.
+# publish-units.sh picks the registry with this same function. go and swift have no registry to upload to: the
+# tag release-please creates is the release, because the Go proxy and SwiftPM both read it from the repository.
+# Package.swift is looked at first because the Swift unit sits at the repository root, which also carries
+# the monorepo's package.json.
 unit_registry() {
-  if [[ -f "$1/package.json" ]]; then printf '%s\n' npm
+  if [[ -f "$1/Package.swift" ]]; then printf '%s\n' swift
+  elif [[ -f "$1/go.mod" ]]; then printf '%s\n' go
+  elif [[ -f "$1/package.json" ]]; then printf '%s\n' npm
   elif [[ -f "$1/pyproject.toml" ]]; then printf '%s\n' pypi
   elif [[ -f "$1/Cargo.toml" ]]; then printf '%s\n' crates
   else return 1; fi
+}
+
+# unit_content_paths <dir> → the paths that make up the unit, one per line: the directory itself, except for
+# the Swift unit. It sits at the repository root, where "the directory" would be the whole repository, so its
+# own files are named: the manifest, the lock file and the two source directories SwiftPM reads.
+unit_content_paths() {
+  if [[ "$(unit_registry "$1" 2>/dev/null || true)" == swift ]]; then
+    printf '%s\n' "$1/Package.swift" "$1/Package.resolved" "$1/Sources" "$1/Tests"
+  else printf '%s\n' "$1"; fi
 }
 
 # has_publishable_units <root> → whether the repo at <root> has a package unit that publishes: an
@@ -72,7 +86,7 @@ has_publishable_units() {
     [[ -n "$p" ]] || continue
     case "$(unit_registry "$root/$p")" in
       npm) [[ "$(jq -r '.private // false' "$root/$p/package.json")" == true ]] || return 0 ;;
-      pypi | crates) return 0 ;;
+      pypi | crates | go | swift) return 0 ;;
     esac
   done < <(jq -r '.packages // {} | keys[]' "$cfg")
   return 1

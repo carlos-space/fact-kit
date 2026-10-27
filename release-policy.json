@@ -2,6 +2,10 @@
   "product": { "name": "fact-kit", "members": [] },
   "units": {
     "fact-kit": { "kind": "package", "stages": ["alpha", "ga"] },
-    "fact-kit-facts": { "kind": "package", "stages": ["ga"] }
+    "fact-kit-facts": { "kind": "package", "stages": ["alpha", "ga"] },
+    "py": { "kind": "package", "stages": ["alpha", "ga"] },
+    "rs": { "kind": "package", "stages": ["alpha", "ga"] },
+    "go": { "kind": "package", "stages": ["alpha", "ga"] },
+    "swift": { "kind": "package", "stages": ["alpha", "ga"] }
   }
 }

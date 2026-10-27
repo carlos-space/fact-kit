@@ -1,12 +1,15 @@
 [package]
 name = "fact-kit"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.95"
 description = "Read the facts of a fact-kit index.json from Rust"
 license = "MIT"
 repository = "https://github.com/carlos-space/fact-kit"
 readme = "README.md"
+# tests/ read conformance/ and facts/ outside the crate, so they only run in the repository
+exclude = ["tests/"]
+keywords = ["fact-kit", "facts", "semver"]
 
 [lib]
 name = "fact_kit"

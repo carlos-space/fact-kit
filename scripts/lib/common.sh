@@ -140,9 +140,28 @@ unit_component() { # unit_component js -> fact-kit; the folder name when the con
   printf '%s\n' "${c:-${p##*/}}"
 }
 
+# unit_tag <path> <version> → the tag release-please gives the unit at that version: fact-kit/v0.8.0 for js,
+# py/v0.3.0 for py, and the bare 0.3.0 for the Swift unit at ".", which sets include-component-in-tag and
+# include-v-in-tag to false. The rule lives in scripts/lib/unit-tag.jq so snapshot.sh, which does not
+# source this file, reads the same one.
+unit_tag() { jq -r --arg p "${1%/}" --arg v "$2" -f "$REPO_ROOT/scripts/lib/unit-tag.jq" "$CONFIG"; }
+
 # whether the unit has shipped before: release-please only applies its versioning strategy on top of a
-# previous release; without one it takes initial-version verbatim (1.0.0 when unset)
-unit_released() { [[ -n "$(git tag --list "$1/v*" | head -1)" ]]; }
+# previous release; without one it takes initial-version verbatim (1.0.0 when unset). <unit> is a component.
+# A tag counts when it is the unit's tag shape with a semver where the version goes. That check is what keeps
+# the Swift unit apart: its tag has no prefix, so a bare prefix glob would also match fact-kit/v0.8.0.
+unit_released() {
+  local p prefix t
+  p="$(unit_path "$1")" || return 1
+  prefix="$(unit_tag "$p" '@V@')"; prefix="${prefix%%@V@*}"
+  while IFS= read -r t; do
+    [[ "${t#"$prefix"}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] && return 0
+  done < <(git tag --list "${prefix}*")
+  return 1
+}
+
+# unit_release_type <path> → the release-please release-type of the entry
+unit_release_type() { jq -r --arg p "${1%/}" '.packages[$p]["release-type"] // empty' "$CONFIG" 2>/dev/null; }
 
 unit_kind() { # service | mobile
   local u="$1"
@@ -187,10 +206,12 @@ workspace_dependents() { # workspace_dependents <unit>... → dependent unit nam
   while (( ${#frontier[@]} )); do
     u="${frontier[0]}"; frontier=("${frontier[@]:1}")
     p="$(unit_path "$u" 2>/dev/null)" || continue
+    [[ "$(unit_release_type "$p")" == node ]] || continue
     pkgname="$(jq -r '.name // empty' "$p/package.json" 2>/dev/null)"
     [[ -n "$pkgname" ]] || continue
     while IFS= read -r d; do
-      [[ -f "$d/package.json" ]] || continue
+      # only node units have workspace dependencies; the Swift unit sits at "." beside the root package.json
+      [[ "$(unit_release_type "$d")" == node && -f "$d/package.json" ]] || continue
       dn="$(unit_component "$d")"
       [[ "$dn" == "$u" ]] && continue
       if jq -e --arg n "$pkgname" '((.dependencies // {}) + (.peerDependencies // {})) | has($n)' "$d/package.json" >/dev/null 2>&1; then

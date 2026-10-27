@@ -1,28 +1,47 @@
 name: publish
 
-# Publishes the packages a release created (fact-kit today) to the public npm registry.
+# Publishes the units a release created: npm (fact-kit, fact-kit-facts), PyPI (py), crates.io (rs), and the
+# Go module (go) and the Swift package (swift), which have no registry: their tag is the release.
 # release-please.yml dispatches it (gh workflow run) after each release, on the release branch and with the
-# train's stage; it can also be run by hand. It is not a workflow_call target: npm trusts this workflow file as a Trusted Publisher, and a called workflow's
-# OIDC token names the caller, which would not match.
+# train's stage; it can also be run by hand. It is not a workflow_call target: npm, PyPI and crates.io trust this
+# workflow file as a Trusted Publisher, and a called workflow's OIDC token names the caller, which would not match.
 #
 # The stage picks the npm dist-tag: alpha, beta and rc publish under a tag of the same name and only ga
-# publishes under latest, so a prerelease never becomes what `npm install` picks. publish-units.sh refuses a
-# package whose version does not belong to the stage.
+# publishes under latest, so a prerelease never becomes what `npm install` picks. PyPI and crates.io have no
+# dist-tags; pip and cargo skip a prerelease unless asked. publish-units.sh refuses a unit whose version does not
+# belong to the stage. Its checks run for every unit in the plan job first, so one wrong version stops the run
+# before any registry is written.
 #
-# npm accepts OIDC tokens only from GitHub-hosted runners. The job is idempotent: a version already in the
-# registry is skipped, so re-running after a partial failure is safe.
+# One job per registry, so each can fail and be re-run alone. The PyPI and crates.io jobs wait for a reviewer:
+# they run in the GitHub Environments `pypi` and `crates-io`, whose required reviewer is set in the repository
+# settings. Trusted Publishing is registered with this file name and that environment name (PyPI: owner
+# carlos-space, repository fact-kit, workflow publish.yml, environment pypi; crates.io: the same, environment
+# crates-io). npm and PyPI accept OIDC tokens only from GitHub-hosted runners. Every job is idempotent: a
+# version already in a registry is skipped, so re-running after a partial failure is safe.
+#
+# crates.io can set up Trusted Publishing only for a crate that exists, so the first version of the crate is
+# published by hand (CARGO_REGISTRY_TOKEN from the environment, never `cargo login`). Until the crate exists the
+# crates job says so in its summary and publishes nothing.
+#
+# dry_run: every upload becomes a dry run (npm publish --dry-run, uv publish --dry-run, cargo publish
+# --dry-run), to rehearse the pipeline without writing a registry.
 on:
   workflow_dispatch:
     inputs:
       paths:
-        description: 'JSON array of package paths to publish, e.g. ["js"]; each must be a key of packages in release-please-config.json'
+        description: 'JSON array of unit paths to publish, e.g. ["js","py"]; each must be a key of packages in release-please-config.json'
         required: true
         type: string
       stage:
-        description: 'release stage of the train; every package version must belong to it'
+        description: 'release stage of the train; every unit version must belong to it'
         required: true
         type: choice
         options: [alpha, beta, rc, ga]
+      dry_run:
+        description: 'rehearse: run every upload as a dry run'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,14 +50,52 @@ defaults:
   run:
     shell: bash
 
-# One pending run per group; only a repeat of the same request (same stage and packages) waits behind the
+# One pending run per group; only a repeat of the same request (same stage, units and mode) waits behind the
 # running one.
 concurrency:
-  group: publish-${{ inputs.stage }}-${{ inputs.paths }}
+  group: publish-${{ inputs.stage }}-${{ inputs.paths }}-${{ inputs.dry_run }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # Which registries the units need, and every check that does not write: file version equals the manifest,
+  # version belongs to the stage, unit equals its tag.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      npm: ${{ steps.reg.outputs.npm }}
+      pypi: ${{ steps.reg.outputs.pypi }}
+      crates: ${{ steps.reg.outputs.crates }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: reg
+        env:
+          PATHS: ${{ inputs.paths }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          [[ ${#paths[@]} -gt 0 ]] || { echo "no unit in this release"; exit 0; }
+          bash scripts/release/publish-units.sh --registries "${paths[@]}" | tee -a "$GITHUB_OUTPUT"
+      - id: tag
+        env:
+          REGISTRIES: ${{ toJSON(steps.reg.outputs) }}
+        run: |
+          if jq -e '.go == "true" or .swift == "true"' <<<"$REGISTRIES" >/dev/null; then echo "tag=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Check every unit
+        env:
+          PATHS: ${{ inputs.paths }}
+          STAGE: ${{ inputs.stage }}
+          PUBLISH_CHECK_ONLY: '1'
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          [[ ${#paths[@]} -gt 0 ]] || exit 0
+          bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
+
+  npm:
+    needs: plan
+    if: needs.plan.outputs.npm == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -68,7 +125,107 @@ jobs:
           PATHS: ${{ inputs.paths }}
           STAGE: ${{ inputs.stage }}
           PUBLISH_OUT: ${{ runner.temp }}/publish
+          PUBLISH_REGISTRIES: npm
+          PUBLISH_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
         run: |
           mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
-          [[ ${#paths[@]} -gt 0 ]] || { echo "no package in this release"; exit 0; }
+          bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
+
+  pypi:
+    needs: plan
+    if: needs.plan.outputs.pypi == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # uv builds the wheel and sdist, reads the PEP 440 version back from the wheel, and uploads with the
+      # job's OIDC token (--trusted-publishing always). No PyPI token exists anywhere.
+      - name: Publish to PyPI (trusted publishing)
+        env:
+          PATHS: ${{ inputs.paths }}
+          STAGE: ${{ inputs.stage }}
+          PUBLISH_OUT: ${{ runner.temp }}/publish
+          PUBLISH_REGISTRIES: pypi
+          PUBLISH_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
+
+  crates:
+    needs: plan
+    if: needs.plan.outputs.crates == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: crate
+        env:
+          PATHS: ${{ inputs.paths }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          if bash scripts/release/publish-units.sh --crate-exists "${paths[@]}"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            rc=$?
+            [[ $rc == 1 ]] || { echo "::error::crates.io could not be asked whether the crate exists"; exit "$rc"; }
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::the crate is not on crates.io yet, so nothing was published; its first version is published by hand"
+            {
+              echo "### crates.io"
+              echo "- The crate does not exist on crates.io yet. Trusted Publishing can only be set up for an existing crate, so the first version is published by hand with CARGO_REGISTRY_TOKEN. Nothing was published here."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        if: steps.crate.outputs.exists == 'true'
+        with:
+          toolchain: stable
+      # The token is short-lived and only for this job: crates.io exchanges the job's OIDC token for it.
+      - id: auth
+        if: steps.crate.outputs.exists == 'true'
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Publish to crates.io (trusted publishing)
+        if: steps.crate.outputs.exists == 'true'
+        env:
+          PATHS: ${{ inputs.paths }}
+          STAGE: ${{ inputs.stage }}
+          PUBLISH_OUT: ${{ runner.temp }}/publish
+          PUBLISH_REGISTRIES: crates
+          PUBLISH_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
+
+  # Go and Swift upload nothing. This job only confirms the tag release-please made (go/vX.Y.Z, bare X.Y.Z), so
+  # the run shows what was released and a missing tag fails here.
+  tag:
+    needs: plan
+    if: needs.plan.outputs.tag == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Confirm the tags
+        env:
+          PATHS: ${{ inputs.paths }}
+          STAGE: ${{ inputs.stage }}
+          PUBLISH_REGISTRIES: go,swift
+          PUBLISH_DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
           bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"

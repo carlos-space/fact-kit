@@ -1,10 +1,11 @@
 name: release-please
 
 # Versioning engine, and it runs only on release branches: release/vX.Y, one per repository at a time,
-# carrying the packages picked with cut-release.sh --units (today fact-kit in js/). main never carries
+# carrying the units picked with cut-release.sh --units (fact-kit, fact-kit-facts, py, rs, go, swift). main never carries
 # a release-please commit. scripts/release/cut-release.sh scopes release-please-config.json to the
 # train's packages and puts it in prerelease mode; finalize-release.sh --phase ga takes it back out.
-# Merging the Release PR tags <component>/v<version> and creates the GitHub Release. A tag created with
+# Merging the Release PR tags <component>/v<version> (the Swift unit at the repository root: the bare <version>) and
+# creates the GitHub Release; for the Go and Swift units that tag is the release. A tag created with
 # GITHUB_TOKEN raises no events, so this workflow dispatches publish.yml itself after a release, with the
 # train's stage.
 #
@@ -23,7 +24,7 @@ on:
     # Only a change to a unit or to the release config can change a version. Chore commits on a release
     # branch (restoring tooling, fixing the config) cannot, and each would cost a run. A workflow filter
     # cannot read the unit paths from release-please-config.json, so it names what is never a unit instead:
-    # new units (py/, rs/, go/, facts/*) need no edit here. paths-ignore and branches are ANDed.
+    # new units need no edit here. paths-ignore and branches are ANDed.
     paths-ignore:
       - 'scripts/**'
       - '.github/**'
