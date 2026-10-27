@@ -404,20 +404,23 @@ const commands = {
     summary:
       'List the fact ids added, removed and changed between two index.json files. With --impact, list instead what a change to one fact reaches.',
     arguments: ['<old>', '<new>'],
-    options: [
-      {
-        flag: '--json',
-        summary:
-          'Print the result as JSON: { added, removed, changed }, or with --impact { id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }.',
-      },
-      {
-        flag: '--impact',
-        value: '<id>',
-        summary:
-          'Take no files. Read the built indexes of the components in the aggregate config, follow derivedFrom downstream, and search docsDirs for references. Needs oxc-parser when docsDirs hold TypeScript.',
-      },
-      dirOption('--cwd', '<dir>', 'the current directory', 'With --impact: the aggregate package directory.'),
-    ],
+    options: keyed(
+      [
+        {
+          flag: '--json',
+          summary:
+            'Print the result as JSON: { added, removed, changed }, or with --impact { id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }.',
+        },
+        {
+          flag: '--impact',
+          value: '<id>',
+          summary:
+            'Take no files. Read the built indexes of the components in the aggregate config, follow derivedFrom downstream, and search docsDirs for references. Needs oxc-parser when docsDirs hold TypeScript.',
+        },
+        dirOption('--cwd', '<dir>', 'the current directory', 'With --impact: the aggregate package directory.'),
+      ],
+      ['flag'],
+    ),
   },
   pin: {
     summary:
@@ -1172,7 +1175,18 @@ const facts: FactDecl[] = [
     topics: ['check', 'config'],
     title: { en: 'Settings in fact-kit.config.json' },
     description: { en: 'Command-line options override the file.' },
-    content: { schema: configSchema },
+    variants: history(
+      { since: since070, schema: configSchema },
+      {
+        since: 'next',
+        set: {
+          '/properties/examplesDir/description':
+            'Directory of example files, relative to the package. `check` reads them, and `build` writes them to `dist/examples.json` when the package has facts.',
+          '/properties/indexFiles/description':
+            'Built `index.json` files (or directories holding one) that `check` reads as well. `build` reads them too, to find the facts the examples name.',
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.x-keywords',
@@ -1187,7 +1201,25 @@ const facts: FactDecl[] = [
     id: 'fact-kit.cli',
     topics: ['cli', 'check', 'build', 'diff', 'pin', 'merge-since'],
     title: { en: 'fact-kit commands and options' },
-    content: { value: commands },
+    variants: history(
+      { since: since070, value: commands },
+      {
+        since: 'next',
+        set: {
+          '/build/summary':
+            'Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/, and the example groups of the examples directory into dist/examples.json (nothing is written when there are none). The snippets in the groups are not run. In an aggregate package (`aggregate` in the config) copy the built indexes and examples.json of its component packages into dist/ instead.',
+        },
+        replace: {
+          '/diff/options': [
+            {
+              flag: '--json',
+              summary:
+                'Print the result as JSON: { added, removed, changed }, or with --impact { id, facts: [{ id, depth, via }], docs: [{ file, line, id }], examples: [{ spec, group, scenario, id, in }] }.',
+            },
+          ],
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.problem-codes',
@@ -1206,7 +1238,26 @@ const facts: FactDecl[] = [
     description: {
       en: 'How `build` places the indexes of component packages in the published package, and what it rewrites in them.',
     },
-    content: { value: aggregateLayout },
+    variants: history(
+      { since: since070, value: aggregateLayout },
+      {
+        since: 'next',
+        set: {
+          '/exports': [
+            './<dir>/index.json',
+            './<dir>/schemas/*',
+            './<sub-path>/examples.json (`./examples.json` for the root), for each component that built examples',
+          ],
+          '/examples': {
+            file: 'examples.json',
+            dir: '<sub-path> (empty for the root), whatever number of entries the component has',
+            spec: '<aggregate>/<sub-path>, which is what `diff --impact` prints as `spec` of an example',
+            rewritten: { package: 'the aggregate package name' },
+            copied: 'the groups as built by the component, unchanged',
+          },
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.read-facts',
@@ -1231,6 +1282,19 @@ const facts: FactDecl[] = [
               summary:
                 "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`. The result is still an array of variants, and `mf.value(name, history(...))` takes it. After each row, the check of the builder that made the content runs again, and a row that breaks it throws `BuilderError`, which `check` reports as `builder`. `remove` and `add` also work on an object by property name, such as the `properties` of an `entity`.",
             },
+            {
+              name: 'defineExamples',
+              signature: 'defineExamples(examples: ExampleGroupSource | ExampleGroupSource[]) => typeof examples',
+              summary:
+                'Identity helper that types an example file. Each group follows `fact-kit.example-group`. In `outcome` an item may also be `ref(fact)`, `ref(fact, field)` or `statementFrom(fact, render)`, which the build turns into `{ fact, field?, text? }`.',
+            },
+            {
+              name: 'exampleFactRefs',
+              signature:
+                "exampleFactRefs(group: ExampleGroup) => { id: string; location: string; in: 'facts' | 'outcome'; field?: string }[]",
+              summary:
+                'Every fact id an example group references, with the JSON pointer where it is referenced. `in` is `facts` for `facts` of the group or of a scenario and `outcome` for a `{ fact }` item of an outcome, and `field` is the field that item names.',
+            },
           ],
         },
         add: { '/exports': newApi },
@@ -1250,8 +1314,31 @@ const facts: FactDecl[] = [
     id: 'fact-kit.example-group',
     topics: ['examples', 'schema'],
     title: { en: 'Fields of an example group' },
-    description: { en: 'One group in an example package, checked by `check`.' },
-    content: { schema: exampleGroupSchema },
+    description: { en: 'One group in an example package, checked by `check` and written by `build`.' },
+    variants: history(
+      { since: since070, schema: exampleGroupSchema },
+      {
+        since: 'next',
+        set: {
+          '/properties/scenarios/items/properties/outcome': {
+            description:
+              'What appears on disk or in the terminal after running the code. An item is a string, or `{ fact, field?, text? }` that names a fact: `field` is a dotted path in it and `text` is what to show, such as a sentence rendered from the fact. In a `.ts` example file write `ref(fact)`, `ref(fact, "a.b")` or `statementFrom(fact, render)`, and the build writes the object. `fact` must exist (`unknown-fact-id`), and `field` must be in at least one row of the fact (`ref`).',
+            type: 'array',
+            items: {
+              oneOf: [
+                nonEmpty,
+                {
+                  type: 'object',
+                  required: ['fact'],
+                  additionalProperties: false,
+                  properties: { fact: nonEmpty, field: nonEmpty, text: defs.Text },
+                },
+              ],
+            },
+          },
+        },
+      },
+    ),
   }),
 ]
 
