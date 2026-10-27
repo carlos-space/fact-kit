@@ -130,12 +130,48 @@ importers:
       '@component/fact-kit':
         specifier: workspace:*
         version: link:fact-kit
+      '@component/go':
+        specifier: workspace:*
+        version: link:go
+      '@component/py':
+        specifier: workspace:*
+        version: link:py
+      '@component/rs':
+        specifier: workspace:*
+        version: link:rs
+      '@component/swift':
+        specifier: workspace:*
+        version: link:swift
 
   facts/fact-kit:
     devDependencies:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+      fact-kit:
+        specifier: workspace:*
+        version: link:../../js
+
+  facts/go:
+    devDependencies:
+      fact-kit:
+        specifier: workspace:*
+        version: link:../../js
+
+  facts/py:
+    devDependencies:
+      fact-kit:
+        specifier: workspace:*
+        version: link:../../js
+
+  facts/rs:
+    devDependencies:
+      fact-kit:
+        specifier: workspace:*
+        version: link:../../js
+
+  facts/swift:
+    devDependencies:
       fact-kit:
         specifier: workspace:*
         version: link:../../js

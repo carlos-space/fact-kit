@@ -1,0 +1,16 @@
+{
+  "name": "@component/swift",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../js/src/bin.ts build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "fact-kit": "workspace:*"
+  },
+  "exports": {
+    "./swift/index.json": "./dist/swift/index.json"
+  }
+}
