@@ -85,13 +85,14 @@ jobs:
       - uses: ./.github/actions/setup-workspace
       # The facts of fact-kit are pinned to the next version before the Release PR merges, while describes still
       # reads js/package.json. facts:check passes the version of the open Release PR to `check --train`, so
-      # the pinned rows are not ahead of describes. Other branches have no Release PR and set nothing.
+      # the pinned rows are not ahead of describes. A push to a release branch and a pull request into one both
+      # read the Release PR of that release branch. Other branches have no Release PR and set nothing.
       - name: Train of the open Release PR
-        if: startsWith(github.ref, 'refs/heads/release/')
+        if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.base_ref, 'release/')
         run: bash scripts/ci/release-train.sh >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ github.ref_name }}
+          BRANCH: ${{ github.base_ref || github.ref_name }}
           REPO: ${{ github.repository }}
       - run: pnpm check
 
