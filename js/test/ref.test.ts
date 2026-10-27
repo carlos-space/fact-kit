@@ -276,7 +276,7 @@ const facts = [target, user]`),
     expect(await problems(dir)).toEqual({ code: 0, list: [] })
   })
 
-  test('a schema that embeds a target with several rows must get the schema the reader would, else code ref', async () => {
+  test('a schema that embeds a target with several rows gets a row for each, so check passes', async () => {
     const same = project('ref-embed-same', {
       'facts/flow/index.ts': entry(`
 const target = mf.schema('target', history(
@@ -296,12 +296,8 @@ const target = mf.schema('target', history(
 const user = mf.schema('user', { type: 'object', properties: { t: ref(target) } })
 const facts = [target, user]`),
     })
-    const { code, list } = await problems(differ)
-    expect(code).toBe(1)
-    expect(list.map((p) => p.code)).toEqual(['ref'])
-    expect(list[0]?.message).toContain('demo.user')
-    expect(list[0]?.message).toContain('at 1.0.0')
-    expect(list[0]?.message).toContain('not the schema')
+    // The build gives `user` a row for each row of `target`, so the readers of both get the schema of their row.
+    expect(await problems(differ)).toEqual({ code: 0, list: [] })
   })
 
   test('schemas that embed each other fail with code ref and list the loop', async () => {

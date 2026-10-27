@@ -341,14 +341,41 @@ and `usage` becomes `{ "max": "demo.limits#max", "whole": "demo.limits" }`. Both
   ref: demo.user: at 1.1.0, ref(demo.target, "old") points at nothing: it has no field "old"
   ```
 
-- When the target has several rows, the schema in `$defs` is the one a reader of the latest published version gets.
-  `check` reports `ref` at each reader whose row of the target is a different schema.
+- A schema that was embedded keeps working when it points at its own root. In the embedded copy, `$ref: "#"` and
+  `$ref: "#/properties/x"` become `#/$defs/<id>` and `#/$defs/<id>/properties/x`. A `$ref` into its own `$defs`
+  (`#/$defs/name`), a plain-name anchor (`#name`) and a `$ref` with a file or URL stay as they are, and a schema that
+  has an `$id` at its top is a root of its own and is left whole. `$dynamicRef`, `$recursiveRef`, and a `#`-relative
+  `$ref` inside a subschema that has its own `$id` can not be moved safely, so they are `ref` problems.
 - A schema that embeds itself, or two schemas that embed each other, is a `ref` problem that lists the loop. So is a
   `$defs` key that already holds another schema, a field path with an empty part, a field whose name has a dot, and a
   schema of another entry with a file `$ref` (`schemas/x.schema.json`), because the relative path breaks once the
   schema is embedded in another entry.
 - `guard` of a `stateMachine` transition takes a `ref(fact)`. The built value holds the location, and
   `stateMachineToMermaid` draws it as the label.
+
+#### Rows of the target
+
+When the target has several rows, the build aligns the rows of the fact that writes the `ref` with them. The fact gets
+one row for each combination of its own row and the rows of the target that some reader gets together, found at every
+version boundary of the two facts (the boundaries of `subset-of`). The `$defs` of each row holds the schema of the
+target for that combination. A fact that wrote one row becomes a fact with `variants`, and the output is a standard
+JSON Schema, so a reader changes nothing. Afterwards the build reads again the row each reader gets and compares it
+with the row that reader gets from the target. A `ref` problem that names the reader is reported when they differ, and
+when the rows can not be written: a `since` that is an array on one row and another `since` on the row it combines
+with, or two different `pending` labels. A row keeps its `stability`, and gets the `platforms` and `os` that both
+rows share.
+
+```ts
+const target = mf.schema(
+  'target',
+  history(
+    { since: '0.7.0', schema: { type: 'object', properties: { id: { type: 'string' } } } },
+    { since: 'next', schema: { type: 'object', properties: { id: { type: 'string' }, extra: { type: 'integer' } } } },
+  ),
+)
+const user = mf.schema('user', { type: 'object', properties: { t: ref(target) } }) // one row
+// built: user has two rows, `0.7.0` whose $defs holds the first schema and `next` whose $defs holds the second
+```
 
 ### Entity identity
 

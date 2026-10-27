@@ -1,6 +1,8 @@
 import { FROM, REF_TOKEN, SUBSET, WHOLE_REF, isObject, markOf, refTarget } from './markers.ts'
 import { SUB_LIST, SUB_MAP, SUB_ONE, subschemas } from './schema-walk.ts'
-import { canonical, topLevelContent } from './select.ts'
+import { alignFact, rewriteRootRefs } from './align.ts'
+import type { AlignSlot } from './align.ts'
+import { canonical, factRows, topLevelContent } from './select.ts'
 import { loadInstalledIndex } from './read.ts'
 import type { DerivedFact, Fact, FactDecl, FactLike, FactsModule, FactsSource, Problem } from './types.ts'
 
@@ -196,6 +198,12 @@ function contentRoots(decl: FactDecl): unknown[] {
 }
 
 const escapePointer = (name: string): string => name.replaceAll('~', '~0').replaceAll('/', '~1')
+
+/** A schema root with the facts it embeds, and whether each is in another entry. */
+interface BuildSlot extends AlignSlot {
+  foreign: boolean[]
+  root: Record<string, unknown>
+}
 
 /** One `ref` that a fact writes, before it becomes a {@link RefDecl}. */
 interface RefUse {
@@ -394,6 +402,67 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
       return resolveDecl(xi) as Fact
     }
 
+    /** The embedding slots of the schemas of this fact, one for each schema root that has a `ref`. */
+    const slots: BuildSlot[] = []
+    const said = new Set<string>()
+    const say = (message: string) => {
+      if (said.has(message)) return
+      said.add(message)
+      report('ref', message)
+    }
+
+    /**
+     * The `$defs` of a schema root: what the author wrote, then the schema of each embedded fact from its row
+     * `picks[i]`, or from its latest published row, and what that schema had in its own `$defs`.
+     */
+    const defsFor = (slot: BuildSlot, picks: readonly (number | undefined)[]): Record<string, unknown> => {
+      const defs: Record<string, unknown> = { ...slot.authored }
+      const put = (key: string, schema: unknown) => {
+        if (Object.hasOwn(defs, key) && canonical(defs[key]) !== canonical(schema)) {
+          say(`${decl.id}: $defs already has "${key}" with another schema, so the schema of ${key} can not be added`)
+        } else {
+          defs[key] = schema
+        }
+      }
+      for (const [k, resolvedX] of slot.targets.entries()) {
+        const id = resolvedX.id
+        let schema: unknown
+        try {
+          const pick = picks[k]
+          const content = pick === undefined ? topLevelContent(resolvedX)?.content : factRows(resolvedX)[pick]?.content
+          schema = (content as { schema?: unknown } | undefined)?.schema
+        } catch {
+          // A `since` that is not a version: `check` reports that.
+        }
+        // A fact that is not a schema is reported by `check`, which tests every row of it.
+        if (!isObject(schema)) continue
+        const { $defs: inner, ...body } = structuredClone(schema)
+        const moved = [[id, body], ...(isObject(inner) ? Object.entries(inner) : [])] as [string, unknown][]
+        // A relative file `$ref` is relative to the entry the file is in, so it breaks in another entry.
+        let broken = false
+        for (const [, part] of moved) {
+          if (slot.foreign[k]) {
+            for (const { schema: sub } of subschemas(part)) {
+              if (typeof sub.$ref === 'string' && !sub.$ref.startsWith('#')) {
+                broken = true
+                say(
+                  `${decl.id}: ${id} has a $ref to "${sub.$ref}", a file of another entry, and the path breaks once the schema is embedded here`,
+                )
+              }
+            }
+          }
+          // A pointer to the root of the schema (`#/properties/x`) must point to where the schema is embedded.
+          const why = rewriteRootRefs(part, id)
+          if (why !== undefined) {
+            broken = true
+            say(`${decl.id}: ${why}`)
+          }
+        }
+        if (!broken) for (const [key, part] of moved) put(key, part)
+      }
+      return defs
+    }
+
     const walk: Walk = {
       text: (text) =>
         text.replace(TOKEN, (token) => {
@@ -440,55 +509,35 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
       done: (root, copy) => {
         const wanted = [...new Set(embeds.get(root) ?? [])]
         if (wanted.length === 0) return
-        const defs: Record<string, unknown> = isObject(copy.$defs) ? copy.$defs : {}
-        const put = (key: string, schema: unknown) => {
-          if (Object.hasOwn(defs, key) && canonical(defs[key]) !== canonical(schema)) {
-            report(
-              'ref',
-              `${decl.id}: $defs already has "${key}" with another schema, so the schema of ${key} can not be added`,
-            )
-          } else {
-            defs[key] = schema
-          }
+        const slot: BuildSlot = {
+          row: row ?? 0,
+          authored: isObject(copy.$defs) ? { ...copy.$defs } : {},
+          targets: [],
+          foreign: [],
+          root: copy,
         }
         for (const x of wanted) {
-          const id = String(registry.get(x)?.id)
           const resolvedX = embedded(x)
           if (!resolvedX) continue
-          let schema: unknown
-          try {
-            const content = topLevelContent(resolvedX)?.content
-            schema = (content as { schema?: unknown } | undefined)?.schema
-          } catch {
-            // A `since` that is not a version: `check` reports that.
-          }
-          // A fact that is not a schema is reported by `check`, which tests every row of it.
-          if (!isObject(schema)) continue
-          const { $defs: inner, ...body } = structuredClone(schema)
-          const moved = [[id, body], ...(isObject(inner) ? Object.entries(inner) : [])] as [string, unknown][]
-          // A relative file `$ref` is relative to the entry the file is in, so it breaks in another entry.
-          let broken = false
-          if (registry.get(x)?.entry !== e.entry) {
-            for (const [, part] of moved) {
-              for (const { schema: sub } of subschemas(part)) {
-                if (typeof sub.$ref === 'string' && !sub.$ref.startsWith('#')) {
-                  broken = true
-                  report(
-                    'ref',
-                    `${decl.id}: ${id} has a $ref to "${sub.$ref}", a file of another entry, and the path breaks once the schema is embedded here`,
-                  )
-                }
-              }
-            }
-          }
-          if (!broken) for (const [key, part] of moved) put(key, part)
+          slot.targets.push(resolvedX)
+          slot.foreign.push(registry.get(x)?.entry !== e.entry)
         }
-        copy.$defs = defs
+        slots.push(slot)
+        copy.$defs = defsFor(slot, [])
       },
     }
 
     const { relates: _relates, derivedFrom: _own, ...rest } = decl
-    const replaced = mapDoc(rest, walk) as Record<string, unknown>
+    let replaced = mapDoc(rest, walk) as Record<string, unknown>
+    // A schema that embeds a fact with several rows gets rows of its own, so each reader gets the schema of its row.
+    const aligned = alignFact({
+      id: decl.id,
+      fact: replaced,
+      slots,
+      defs: (slot, picks) => defsFor(slot as BuildSlot, picks),
+      say,
+    })
+    if (aligned) replaced = aligned.fact
     const refs = (out[entryIndex] as ResolvedEntry).refs
     for (const use of uses.values()) {
       refs.push({
@@ -496,7 +545,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
         target: use.target,
         ...(use.field !== undefined ? { field: use.field } : {}),
         asSchema: use.asSchema,
-        ...(use.rows ? { rows: [...use.rows].sort((a, b) => a - b) } : {}),
+        ...(use.rows ? { rows: [...use.rows].flatMap((r) => aligned?.rows.get(r) ?? [r]).sort((a, b) => a - b) } : {}),
         location: where,
       })
     }

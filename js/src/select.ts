@@ -352,6 +352,46 @@ const versionLabel = (reader: Reader): string =>
     ? `${reader.v.major}.${reader.v.minor}.${reader.v.patch}${reader.v.pre.length > 0 ? `-${reader.v.pre.join('.')}` : ''}`
     : reader.kind
 
+/** One reader under which several facts are read together, with the row of each that applies. */
+export interface ManyRows {
+  version: string
+  platform: string | undefined
+  os: string | undefined
+  include: readonly string[]
+  /** For each fact, in the order given, the row that applies or `undefined` when none does. */
+  picks: ({ content: FactContent; index: number } | undefined)[]
+}
+
+/**
+ * Like {@link pairRows} for any number of facts: the readers are those of {@link boundaryReaders} over the rows of
+ * all of them, and each reader gets the row of each fact that applies. `pairRows` is not changed.
+ */
+export function pickRows(facts: readonly Fact[]): ManyRows[] {
+  const all = facts.map(rowsOf)
+  const out: ManyRows[] = []
+  const seen = new Set<string>()
+  for (const { reader, ctx } of boundaryReaders(all.flat())) {
+    const label = versionLabel(reader)
+    const key = JSON.stringify([label, ctx.platform, ctx.os, ctx.include])
+    if (seen.has(key)) continue
+    seen.add(key)
+    let picks: (Candidate | undefined)[]
+    try {
+      picks = facts.map((f, i) => chooseCandidate(all[i] as Row[], reader, ctx, f.id))
+    } catch {
+      continue
+    }
+    out.push({
+      version: label,
+      platform: ctx.platform === OTHER ? 'other' : ctx.platform,
+      os: ctx.os === OTHER ? 'other' : ctx.os,
+      include: ctx.include,
+      picks: picks.map((c) => (c ? { content: c.row.content, index: c.index } : undefined)),
+    })
+  }
+  return out
+}
+
 /**
  * Reads two facts under the readers of {@link boundaryReaders} taken over the rows of both, and picks the row of
  * each that applies. Every check that compares one fact with another at each version boundary starts from this.
