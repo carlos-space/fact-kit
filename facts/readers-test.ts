@@ -42,7 +42,7 @@ async function installComponent(component: string): Promise<string> {
 
 export function readerSpec(
   component: string,
-  pending: { version: 'head'; include: string[] },
+  since: string,
   names: { read: string; select: string },
 ): void {
   const tool = `fact-kit-${component}`
@@ -51,15 +51,25 @@ export function readerSpec(
   let reader: FactReader
   beforeAll(async () => {
     hub = await installComponent(component)
-    reader = readFacts(spec, { root: hub, ...pending })
+    reader = readFacts(spec, { root: hub })
   })
   afterAll(() => cleanTmp())
 
   describe(spec, () => {
-    it('a reader on head with the pending label gets the four facts', () => {
+    it('a reader without options gets the four facts, all since the first release', () => {
       expect(reader.facts.map((f) => f.id).sort()).toEqual(
         ['package', 'read-errors', 'read-facts', 'select-facts'].map((n) => `${tool}.${n}`),
       )
+      expect(reader.facts.map((f) => f.since)).toEqual(Array(4).fill(since))
+    })
+
+    it('has no row left on next', () => {
+      const head = readFacts(spec, { root: hub, version: 'head' })
+      expect(head.facts.map((f) => f.id).sort()).toEqual(reader.facts.map((f) => f.id).sort())
+      expect(head.facts.map((f) => f.since)).not.toContain('next')
+      const index = readFileSync(join(hub, 'node_modules', aggregate.name, 'dist', component, 'index.json'), 'utf8')
+      expect(index).not.toContain('"next"')
+      expect(index).not.toContain('pending')
     })
 
     it('names the read and select functions', () => {
@@ -85,9 +95,8 @@ export function readerSpec(
       expect(errors.codes.map((c) => c.code)).toEqual(READ_ERROR_CODES)
     })
 
-    it('a reader without the label, or on the latest release, gets none of them', () => {
-      expect(readFacts(spec, { root: hub, version: 'head' }).facts).toEqual([])
-      expect(readFacts(spec, { root: hub }).facts).toEqual([])
+    it('a reader on a release before the first one gets none of them', () => {
+      expect(readFacts(spec, { root: hub, version: '0.2.0' }).facts).toEqual([])
     })
   })
 }

@@ -58,4 +58,4 @@ export default readerFacts({
       { code: 'invalid-version', variant: 'FactReadError.invalidVersion' },
     ],
   },
-})
+}, '0.3.0-alpha.1')

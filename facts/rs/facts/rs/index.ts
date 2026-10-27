@@ -66,4 +66,4 @@ export default readerFacts({
       { code: 'invalid-version', variant: 'FactReadError::InvalidVersion' },
     ],
   },
-})
+}, '0.3.0-alpha.1')

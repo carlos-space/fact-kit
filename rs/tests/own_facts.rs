@@ -10,8 +10,6 @@ fn read_errors_fact_lists_the_codes_of_the_crate() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../facts");
     let options = ReadFactsOptions {
         root: Some(root),
-        version: Some("head".into()),
-        include: vec!["readers".into()],
         ..ReadFactsOptions::default()
     };
     // Resolved through self-reference: `facts/package.json` is named `fact-kit-facts` and exports `./rs/index.json`.

@@ -13,9 +13,7 @@ import (
 // self-reference, because facts/package.json is named fact-kit-facts.
 func TestReadsItsOwnErrorCodes(t *testing.T) {
 	root := filepath.Join(filepath.Dir(conformanceDir(t)), "facts")
-	reader, err := factkit.ReadFacts("fact-kit-facts/go", factkit.ReadFactsOptions{
-		Root: root, Version: new("head"), Include: []string{"readers"},
-	})
+	reader, err := factkit.ReadFacts("fact-kit-facts/go", factkit.ReadFactsOptions{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,3 +1,3 @@
 import { readerSpec } from '../../readers-test.ts'
 
-readerSpec('swift', { version: 'head', include: ['readers'] }, { read: 'readFacts', select: 'selectFacts' })
+readerSpec('swift', '0.3.0-alpha.1', { read: 'readFacts', select: 'selectFacts' })
