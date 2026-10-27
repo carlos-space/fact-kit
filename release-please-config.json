@@ -8,39 +8,69 @@
   "bump-minor-pre-major": true,
   "initial-version": "0.1.0",
   "changelog-sections": [
-    { "type": "feat", "section": "Added" },
-    { "type": "fix", "section": "Fixed" },
-    { "type": "perf", "section": "Changed" },
-    { "type": "deps", "section": "Changed" },
-    { "type": "revert", "section": "Changed" }
+    {
+      "type": "feat",
+      "section": "Added"
+    },
+    {
+      "type": "fix",
+      "section": "Fixed"
+    },
+    {
+      "type": "perf",
+      "section": "Changed"
+    },
+    {
+      "type": "deps",
+      "section": "Changed"
+    },
+    {
+      "type": "revert",
+      "section": "Changed"
+    }
   ],
   "packages": {
-    "js": {
-      "component": "fact-kit",
-      "release-type": "node"
-    },
     "facts": {
       "component": "fact-kit-facts",
       "release-type": "node"
     },
     "py": {
       "component": "py",
-      "release-type": "python"
+      "release-type": "python",
+      "initial-version": "0.3.0-alpha.1"
     },
     "rs": {
       "component": "rs",
-      "release-type": "rust"
+      "release-type": "rust",
+      "initial-version": "0.3.0-alpha.1"
     },
     "go": {
       "component": "go",
-      "release-type": "go"
+      "release-type": "go",
+      "initial-version": "0.3.0-alpha.1"
     },
     ".": {
       "component": "swift",
       "release-type": "simple",
       "include-component-in-tag": false,
       "include-v-in-tag": false,
-      "exclude-paths": [".github", "conformance", "consumer", "facts", "go", "js", "py", "rs", "scripts"]
+      "exclude-paths": [
+        ".github",
+        "conformance",
+        "consumer",
+        "facts",
+        "go",
+        "js",
+        "py",
+        "rs",
+        "scripts"
+      ],
+      "initial-version": "0.3.0-alpha.1"
     }
-  }
+  },
+  "plugins": [],
+  "versioning": "prerelease",
+  "prerelease-type": "alpha.1",
+  "prerelease": true,
+  "last-release-sha": "35c1eb4da41fb94d84d45de3a96cab5138189a62"
 }
