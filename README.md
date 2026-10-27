@@ -65,7 +65,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 
 預發布版的 npm dist-tag 等於階段名（`alpha`、`beta`、`rc`），只有 GA 進 `latest`，所以 `npm install` 不會裝到預發布版。腳本需要 bash 4 以上（macOS 用 `brew install bash`）、`gh`、`jq`，並且在乾淨的工作區執行。所有腳本都可以加 `--dry-run` 先看會做什麼，不寫遠端也不推送。
 
-`publish.yml` 每個註冊中心一個 job。PyPI 與 crates.io 用 Trusted Publishing，所以不存任何 token，兩個 job 分別在 GitHub Environment `pypi` 與 `crates-io` 裡跑，Environment 的 required reviewer 在 repository 設定裡指定，job 要等核准才會開始。PyPI 的版號不在這裡轉換：release-please 照寫 SemVer（`0.3.0-alpha.1`），`uv build` 的後端正規化成 PEP 440（`0.3.0a1`），發布腳本從建出的 wheel 讀回實際版號。crates.io 只能對已存在的 crate 設 Trusted Publishing，所以 crate 第一版由使用者用環境變數 `CARGO_REGISTRY_TOKEN` 手動發，crate 還不存在時 `crates` job 只在 summary 說明並略過。`publish.yml` 的 `dry_run` 輸入會讓所有上傳變成 dry run。
+`publish.yml` 每個註冊中心一個 job。PyPI 與 crates.io 用 Trusted Publishing，所以不存任何 token，兩個 job 都不放在 GitHub Environment 裡，發布的核准在合併 Release PR 前給一次，之後各註冊中心不再等核准。Trusted Publishing 登記時 environment 留空。PyPI 的版號不在這裡轉換：release-please 照寫 SemVer（`0.3.0-alpha.1`），`uv build` 的後端正規化成 PEP 440（`0.3.0a1`），發布腳本從建出的 wheel 讀回實際版號。crates.io 只能對已存在的 crate 設 Trusted Publishing，所以 crate 第一版由使用者用環境變數 `CARGO_REGISTRY_TOKEN` 手動發，crate 還不存在時 `crates` job 只在 summary 說明並略過。`publish.yml` 的 `dry_run` 輸入會讓所有上傳變成 dry run。
 
 發布後用 `verify-install.yml` 驗證：手動派送，輸入各套件的版號。每個 job 在新的 runner 上只 sparse checkout `conformance/` 與該語言的 `consumer/<語言>/`，從註冊中心（Swift 是這個倉庫的 tag）裝指定版號，跑共用樣本並印出套件從哪裡載入。
 

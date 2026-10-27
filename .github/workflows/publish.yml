@@ -12,11 +12,10 @@ name: publish
 # belong to the stage. Its checks run for every unit in the plan job first, so one wrong version stops the run
 # before any registry is written.
 #
-# One job per registry, so each can fail and be re-run alone. The PyPI and crates.io jobs wait for a reviewer:
-# they run in the GitHub Environments `pypi` and `crates-io`, whose required reviewer is set in the repository
-# settings. Trusted Publishing is registered with this file name and that environment name (PyPI: owner
-# carlos-space, repository fact-kit, workflow publish.yml, environment pypi; crates.io: the same, environment
-# crates-io). npm and PyPI accept OIDC tokens only from GitHub-hosted runners. Every job is idempotent: a
+# One job per registry, so each can fail and be re-run alone. No job runs in a GitHub Environment: the approval
+# for a release is given once, before its Release PR merges, and every registry then publishes without waiting.
+# Trusted Publishing is registered with this file name and no environment (PyPI: owner carlos-space, repository
+# fact-kit, workflow publish.yml; crates.io: the same). npm and PyPI accept OIDC tokens only from GitHub-hosted runners. Every job is idempotent: a
 # version already in a registry is skipped, so re-running after a partial failure is safe.
 #
 # crates.io can set up Trusted Publishing only for a crate that exists, so the first version of the crate is
@@ -136,7 +135,6 @@ jobs:
     if: needs.plan.outputs.pypi == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: pypi
     permissions:
       contents: read
       id-token: write
@@ -163,7 +161,6 @@ jobs:
     if: needs.plan.outputs.crates == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: crates-io
     permissions:
       contents: read
       id-token: write
