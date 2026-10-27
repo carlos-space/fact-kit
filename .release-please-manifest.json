@@ -1,8 +1,8 @@
 {
-  "js": "0.8.0",
+  "packages/fact-kit-js": "0.8.0",
   "facts": "0.2.0",
-  "py": "0.0.0",
-  "rs": "0.0.0",
-  "go": "0.0.0",
-  ".": "0.0.0"
+  "packages/fact-kit-py": "0.0.0",
+  "packages/fact-kit-rs": "0.0.0",
+  "packages/fact-kit-go": "0.0.0",
+  "packages/fact-kit-swift": "0.0.0"
 }

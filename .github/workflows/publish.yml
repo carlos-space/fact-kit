@@ -1,7 +1,7 @@
 name: publish
 
-# Publishes the units a release created: npm (fact-kit, fact-kit-facts), PyPI (py), crates.io (rs), and the
-# Go module (go) and the Swift package (swift), which have no registry: their tag is the release.
+# Publishes the units a release created: npm (fact-kit-js, fact-kit-facts), PyPI (fact-kit-py), crates.io (fact-kit-rs), and the
+# Go module (fact-kit-go) and the Swift package (fact-kit-swift), which have no registry: their tag is the release record.
 # release-please.yml dispatches it (gh workflow run) after each release, on the release branch and with the
 # train's stage; it can also be run by hand. It is not a workflow_call target: npm, PyPI and crates.io trust this
 # workflow file as a Trusted Publisher, and a called workflow's OIDC token names the caller, which would not match.
@@ -28,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       paths:
-        description: 'JSON array of unit paths to publish, e.g. ["js","py"]; each must be a key of packages in release-please-config.json'
+        description: 'JSON array of unit paths to publish, e.g. ["packages/fact-kit-js","packages/fact-kit-py"]; each must be a key of packages in release-please-config.json'
         required: true
         type: string
       stage:
@@ -206,7 +206,7 @@ jobs:
           mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
           bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
 
-  # Go and Swift upload nothing. This job only confirms the tag release-please made (go/vX.Y.Z, bare X.Y.Z), so
+  # Go and Swift upload nothing. This job only confirms the tag release-please made (fact-kit-go/vX.Y.Z, fact-kit-swift/vX.Y.Z), so
   # the run shows what was released and a missing tag fails here.
   tag:
     needs: plan

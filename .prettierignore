@@ -8,11 +8,11 @@ CHANGELOG.md
 # Rewritten with jq by scripts/release/cut-release.sh on every release branch
 release-please-config.json
 # Generated test data, compared byte for byte with converter output
-js/test/fixtures
+packages/fact-kit-js/test/fixtures
 # Build output and lock files of the readers in other languages
-rs/target
-py/.venv
-py/.pytest_cache
+packages/fact-kit-rs/target
+packages/fact-kit-py/.venv
+packages/fact-kit-py/.pytest_cache
 .build
 .swiftpm
 Package.resolved

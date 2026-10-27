@@ -155,6 +155,6 @@ tmp/
 !conformance/resolve/**/node_modules/
 !conformance/resolve/**/dist/
 
-# Swift build output (Package.swift is at the repository root)
+# Swift build output (Package.swift is in packages/fact-kit-swift/)
 .build/
 .swiftpm/

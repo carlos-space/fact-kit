@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Scan an unpacked npm tarball for what must not ship: local absolute paths in any text file, and, for
 # every index.json inside, the same rules `fact-kit check` applies (local paths, unregistered domains).
-# The patterns mirror js/src/check.ts. The allowed domains come from the package's
+# The patterns mirror packages/fact-kit-js/src/check.ts. The allowed domains come from the package's
 # fact-kit.config.json, which does not ship; its other settings are paths in the source tree, so only
 # allowedDomains is passed on. An aggregate package ships the indexes of the component packages its
 # `aggregate` names, so their allowedDomains count too; each one is read from node_modules/<name>, where
@@ -37,7 +37,7 @@ if grep -rEnI "$re" "$dir"; then
 fi
 
 while IFS= read -r idx; do
-  node "$root/js/src/bin.ts" check --cwd "$(mktemp -d)" --index "$idx" ${allow[@]+"${allow[@]}"} || bad=1
+  node "$root/packages/fact-kit-js/src/bin.ts" check --cwd "$(mktemp -d)" --index "$idx" ${allow[@]+"${allow[@]}"} || bad=1
 done < <(find "$dir" -name index.json -not -path '*/node_modules/*')
 
 exit "$bad"

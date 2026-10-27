@@ -1,0 +1,17 @@
+{
+  "name": "@npm/fact-kit-facts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../../packages/fact-kit-js/src/bin.ts build",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "fact-kit": "workspace:*"
+  },
+  "exports": {
+    "./fact-kit/index.json": "./dist/fact-kit/index.json"
+  }
+}

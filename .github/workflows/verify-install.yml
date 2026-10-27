@@ -4,7 +4,7 @@ name: verify-install
 # Run by hand after a release, with the version of each package to check (SemVer style, e.g. 0.3.0-alpha.1);
 # leave a version empty to skip that package. A job checks out only conformance/ and its own harness under
 # consumer/, so the package under test can only come from the registry (npm, PyPI, crates.io, the Go proxy, or the
-# git tag of this repository for SwiftPM), never from the sources beside it. Each harness prints where the
+# git tag of the mirror repository carlos-space/fact-kit-swift for SwiftPM), never from the sources beside it. Each harness prints where the
 # package was loaded from; the log and the job summary keep that proof.
 on:
   workflow_dispatch:
@@ -22,11 +22,11 @@ on:
         required: false
         type: string
       go:
-        description: 'Go module github.com/carlos-space/fact-kit/go version without the v, e.g. 0.3.0-alpha.1'
+        description: 'Go module github.com/carlos-space/fact-kit-go version without the v, e.g. 0.3.0-alpha.1'
         required: false
         type: string
       swift:
-        description: 'Swift package version, the bare tag of the repository, e.g. 0.3.0-alpha.1'
+        description: 'Swift package version, a tag of the mirror repository carlos-space/fact-kit-swift, e.g. 0.3.0-alpha.1'
         required: false
         type: string
 
@@ -157,7 +157,7 @@ jobs:
         with:
           go-version: '1.26'
           cache: false
-      - name: Build against fact-kit/go from the Go proxy and run the samples
+      - name: Build against fact-kit-go from the Go proxy and run the samples
         env:
           VERSION: ${{ inputs.go }}
         run: |
@@ -166,7 +166,7 @@ jobs:
             if bash consumer/go/run.sh "$VERSION" 2>&1 | tee proof.txt; then ok=1; break; fi
             echo "attempt $attempt failed, waiting 60 seconds"; sleep 60
           done
-          { echo '### Go proxy fact-kit/go'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '### Go proxy fact-kit-go'; echo '```'; cat proof.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           [[ "${ok:-0}" == 1 ]]
 
   swift:
@@ -188,7 +188,7 @@ jobs:
           find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
           [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
       - run: xcodebuild -version && swift --version | head -1
-      - name: Build against FactKit at the tag of this repository on macOS and run the samples
+      - name: Build against FactKit at the tag of fact-kit-swift on macOS and run the samples
         env:
           VERSION: ${{ inputs.swift }}
         run: |
@@ -219,7 +219,7 @@ jobs:
           find . -mindepth 1 -maxdepth 2 -not -path './.git' -not -path './.git/*' | sort
           [[ "$(find . -mindepth 1 -maxdepth 1 -not -name .git | sort | paste -sd' ' -)" == "./conformance ./consumer" ]]
       - run: swift --version | head -1
-      - name: Build against FactKit at the tag of this repository on Linux and run the samples
+      - name: Build against FactKit at the tag of fact-kit-swift on Linux and run the samples
         env:
           VERSION: ${{ inputs.swift }}
         run: |

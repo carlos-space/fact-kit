@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 
@@ -11,15 +11,15 @@ const config = readJson('release-please-config.json')
 const manifest = readJson('.release-please-manifest.json')
 const policy = readJson('release-policy.json')
 
-// path → component → release-type. The Swift unit sits at "." because SwiftPM only reads Package.swift at the
-// repository root.
+// path → component → release-type. The component of a unit is its directory name. The Swift package is a
+// complete SwiftPM package in its own directory, which a later step mirrors into a repository of its own.
 const expected: Record<string, { component: string; type: string }> = {
-  js: { component: 'fact-kit', type: 'node' },
+  'packages/fact-kit-js': { component: 'fact-kit-js', type: 'node' },
   facts: { component: 'fact-kit-facts', type: 'node' },
-  py: { component: 'py', type: 'python' },
-  rs: { component: 'rs', type: 'rust' },
-  go: { component: 'go', type: 'go' },
-  '.': { component: 'swift', type: 'simple' },
+  'packages/fact-kit-py': { component: 'fact-kit-py', type: 'python' },
+  'packages/fact-kit-rs': { component: 'fact-kit-rs', type: 'rust' },
+  'packages/fact-kit-go': { component: 'fact-kit-go', type: 'go' },
+  'packages/fact-kit-swift': { component: 'fact-kit-swift', type: 'simple' },
 }
 
 // On main the config lists every unit. A release branch scopes it to the units of its train
@@ -40,12 +40,15 @@ test('every configured path has the component and release-type of its unit', () 
   }
 })
 
-test('every npm unit has a package.json whose name matches its component', () => {
+// The npm package name of a unit is its PublishName (fact-kit), or the MetaFactName (fact-kit-facts) for the
+// aggregate of the facts. It need not equal the component, which is the directory name.
+test('every npm unit has a package.json, and its component is the name of its directory', () => {
+  const publishNames: Record<string, string> = { 'packages/fact-kit-js': 'fact-kit', facts: 'fact-kit-facts' }
   for (const [path, entry] of Object.entries<any>(config.packages)) {
+    expect(entry.component, path).toBe(path.split('/').at(-1) === 'facts' ? 'fact-kit-facts' : path.split('/').at(-1))
     if (entry['release-type'] !== 'node') continue
     expect(existsSync(join(root, path, 'package.json')), path).toBe(true)
-    const pkgName = readJson(`${path}/package.json`).name as string
-    expect(pkgName.replace(/^@[^/]+\//, '')).toBe(entry.component)
+    expect(readJson(`${path}/package.json`).name, path).toBe(publishNames[path])
   }
 })
 
@@ -62,7 +65,7 @@ test('tags are <component>/v<version>, one version line per component, one Relea
 
 // unit_tag in scripts/lib/common.sh reads this rule; snapshot.sh, publish-units.sh and finalize-release.sh
 // all name tags through it.
-test('each unit gets its own tag shape: the Swift unit a bare version, the others <component>/v<version>', () => {
+test('every unit gets the tag <component>/v<version>', () => {
   const tag = (path: string, version: string) =>
     execFileSync(
       'jq',
@@ -73,13 +76,13 @@ test('each unit gets its own tag shape: the Swift unit a bare version, the other
       },
     ).trim()
   const cases: [string, string, string][] = [
-    ['js', '0.8.0', 'fact-kit/v0.8.0'],
+    ['packages/fact-kit-js', '0.8.0', 'fact-kit-js/v0.8.0'],
     ['facts', '0.2.0', 'fact-kit-facts/v0.2.0'],
-    ['py', '0.3.0-alpha.1', 'py/v0.3.0-alpha.1'],
-    ['rs', '0.3.0', 'rs/v0.3.0'],
-    ['go', '0.3.0', 'go/v0.3.0'],
-    ['.', '0.3.0', '0.3.0'],
-    ['.', '0.3.0-alpha.1', '0.3.0-alpha.1'],
+    ['packages/fact-kit-py', '0.3.0-alpha.1', 'fact-kit-py/v0.3.0-alpha.1'],
+    ['packages/fact-kit-rs', '0.3.0', 'fact-kit-rs/v0.3.0'],
+    ['packages/fact-kit-go', '0.3.0', 'fact-kit-go/v0.3.0'],
+    ['packages/fact-kit-swift', '0.3.0', 'fact-kit-swift/v0.3.0'],
+    ['packages/fact-kit-swift', '0.3.0-alpha.1', 'fact-kit-swift/v0.3.0-alpha.1'],
   ]
   // a release branch lists only the train's units, so check the ones this config has
   for (const [path, version, want] of cases) {
@@ -98,45 +101,36 @@ test('every package.json version equals its manifest version', () => {
 })
 
 test('the version file of the Python and Rust units equals the manifest version', () => {
-  const python = /^version = "([^"]+)"$/m.exec(readText('py/pyproject.toml'))?.[1]
-  const rust = /^version = "([^"]+)"$/m.exec(readText('rs/Cargo.toml'))?.[1]
-  expect(python).toBe(manifest.py)
-  expect(rust).toBe(manifest.rs)
+  const python = /^version = "([^"]+)"$/m.exec(readText('packages/fact-kit-py/pyproject.toml'))?.[1]
+  const rust = /^version = "([^"]+)"$/m.exec(readText('packages/fact-kit-rs/Cargo.toml'))?.[1]
+  expect(python).toBe(manifest['packages/fact-kit-py'])
+  expect(rust).toBe(manifest['packages/fact-kit-rs'])
   // Cargo.lock names the crate too, and publish uses --locked
-  expect(/name = "fact-kit"\nversion = "([^"]+)"/.exec(readText('rs/Cargo.lock'))?.[1]).toBe(manifest.rs)
+  expect(/name = "fact-kit"\nversion = "([^"]+)"/.exec(readText('packages/fact-kit-rs/Cargo.lock'))?.[1]).toBe(
+    manifest['packages/fact-kit-rs'],
+  )
 })
 
-// The Swift unit is registered at the repository root, so release-please would hand it every commit. Its
-// exclude-paths take away the commits that touch only other units. release-please matches directories, so
-// every top-level directory that is not Swift has to be listed, or a commit that touches only that directory
-// releases the Swift unit.
-test('every top-level directory that is not Swift is in the exclude-paths of the Swift unit', () => {
-  const swiftOwned = ['swift']
-  const tracked = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
-    cwd: root,
-    encoding: 'utf8',
-  })
-    .split('\0')
-    .filter((file) => file.includes('/'))
-    .map((file) => file.split('/')[0])
-  const directories = [...new Set(tracked)].sort()
-  const excluded: string[] = config.packages['.']['exclude-paths']
-  for (const dir of directories) {
-    if (swiftOwned.includes(dir)) expect(excluded, dir).not.toContain(dir)
-    else expect(excluded, `${dir} is a top-level directory, so it must be in exclude-paths of "."`).toContain(dir)
+// The Swift package carries its own Package.swift, so SwiftPM reads it from the directory of the unit and the unit
+// needs no exclude-paths or special tag shape. The mirror repository takes the directory as its root.
+test('the Swift unit is a complete SwiftPM package in its own directory and every unit has the same tag shape', () => {
+  for (const file of ['Package.swift', 'Package.resolved', 'Sources/FactKit/Read.swift', 'Tests/FactKitTests']) {
+    expect(existsSync(join(root, 'packages/fact-kit-swift', file)), file).toBe(true)
   }
-  for (const dir of excluded) expect(directories, `${dir} is in exclude-paths but is not a directory`).toContain(dir)
-})
-
-test('the Swift unit carries no component and no v in its tag, and the others keep both', () => {
-  const swift = config.packages['.']
-  expect(swift['include-component-in-tag']).toBe(false)
-  expect(swift['include-v-in-tag']).toBe(false)
+  expect(existsSync(join(root, 'Package.swift'))).toBe(false)
   for (const [path, entry] of Object.entries<any>(config.packages)) {
-    if (path === '.') continue
     expect(entry['include-component-in-tag'], path).toBeUndefined()
     expect(entry['include-v-in-tag'], path).toBeUndefined()
+    expect(entry['exclude-paths'], path).toBeUndefined()
   }
+})
+
+// Every directory under packages/ is a unit of its own.
+test('every directory under packages/ is a unit of the manifest', () => {
+  const dirs = readdirSync(join(root, 'packages'), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => `packages/${d.name}`)
+  for (const dir of dirs) expect(Object.keys(manifest), dir).toContain(dir)
 })
 
 // scripts/ci/check-release-policy.sh of git-flow-template compares the same two lists every day.
