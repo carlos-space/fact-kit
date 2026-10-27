@@ -94,7 +94,7 @@ export function subsetProblems(inputs: readonly SubsetIndex[]): Problem[] {
         const labels = [...at.keys()].sort(byLabel)
         const first = labels[0] as string
         const more =
-          labels.length > 1 ? `, and at ${labels.length - 1} other version${labels.length > 2 ? 's' : ''}` : ''
+          labels.length > 1 ? `, and at ${labels.length - 1} other reader${labels.length > 2 ? 's' : ''}` : ''
         problems.push({
           code: 'subset-of',
           message: `${subset.id}: at ${first}${at.get(first)}${more}, ${what}`,

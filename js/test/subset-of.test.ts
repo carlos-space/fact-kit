@@ -142,7 +142,7 @@ describe('c004 subset-of check at the version boundaries', () => {
     const { list } = await problems(dir)
     expect(list.map((p) => p.message.match(/"[XY]"/)?.[0]).sort()).toEqual(['"X"', '"Y"'])
     expect(list[0]?.message).toContain('at 2.1.200')
-    expect(list[0]?.message).toMatch(/and at \d+ other versions?/)
+    expect(list[0]?.message).toMatch(/and at \d+ other readers?/)
   })
 
   test('fails at a boundary where the parent has no row yet', async () => {
