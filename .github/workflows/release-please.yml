@@ -1,11 +1,12 @@
 name: release-please
 
 # Versioning engine, and it runs only on release branches: release/vX.Y, one per repository at a time,
-# carrying the units picked with cut-release.sh --units (fact-kit, fact-kit-facts, py, rs, go, swift). main never carries
+# carrying the units picked with cut-release.sh --units (fact-kit-js, fact-kit-facts, fact-kit-py, fact-kit-rs, fact-kit-go, fact-kit-swift). main never carries
 # a release-please commit. scripts/release/cut-release.sh scopes release-please-config.json to the
 # train's packages and puts it in prerelease mode; finalize-release.sh --phase ga takes it back out.
-# Merging the Release PR tags <component>/v<version> (the Swift unit at the repository root: the bare <version>) and
-# creates the GitHub Release; for the Go and Swift units that tag is the release. A tag created with
+# Merging the Release PR tags <component>/v<version>, where the component is the unit's directory name, and
+# creates the GitHub Release; for the Go and Swift units that tag is the release record, and a later step mirrors
+# the package into its own repository. A tag created with
 # GITHUB_TOKEN raises no events, so this workflow dispatches publish.yml itself after a release, with the
 # train's stage.
 #

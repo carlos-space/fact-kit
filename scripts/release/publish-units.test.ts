@@ -16,8 +16,7 @@ afterAll(() => {
 
 const identity = ['-c', 'user.name=t', '-c', 'user.email=t@example.com']
 
-// The tag shape of the real config, which the fixtures need because the script reads it: <component>/v<version>,
-// and for the Swift unit at "." the bare version.
+// The tag shape of the real config, which the fixtures need because the script reads it: <component>/v<version>.
 const tagShape = { 'include-component-in-tag': true, 'include-v-in-tag': true, 'tag-separator': '/' }
 
 function repo() {
@@ -42,11 +41,11 @@ function repo() {
 
 function fixture(version: string) {
   const { dir, git, json, commit } = repo()
-  json('js/package.json', { name: 'fact-kit', version })
-  json('.release-please-manifest.json', { js: version })
+  json('packages/fact-kit-js/package.json', { name: 'fact-kit', version })
+  json('.release-please-manifest.json', { 'packages/fact-kit-js': version })
   json('release-please-config.json', {
     ...tagShape,
-    packages: { js: { component: 'fact-kit', 'release-type': 'node' } },
+    packages: { 'packages/fact-kit-js': { component: 'fact-kit-js', 'release-type': 'node' } },
   })
   commit()
   return { dir, git }
@@ -64,35 +63,35 @@ function run(dir: string, ...args: string[]) {
 describe('publish-units.sh stage and dist-tag checks', () => {
   test('a prerelease version with stage ga is refused', () => {
     const { dir } = fixture('0.4.1-alpha.1')
-    const r = run(dir, 'ga', 'js')
+    const r = run(dir, 'ga', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/belongs to stage alpha, but this release's stage is ga/)
   })
 
   test('a prerelease version with stage latest is refused', () => {
     const { dir } = fixture('0.4.1-alpha.1')
-    const r = run(dir, 'latest', 'js')
+    const r = run(dir, 'latest', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/stage "latest" is not alpha, beta, rc or ga/)
   })
 
   test('a stable version with stage alpha is refused', () => {
     const { dir } = fixture('0.4.1')
-    const r = run(dir, 'alpha', 'js')
+    const r = run(dir, 'alpha', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/belongs to stage ga, but this release's stage is alpha/)
   })
 
   test('a prerelease version with a different prerelease stage is refused', () => {
     const { dir } = fixture('0.4.1-beta.2')
-    const r = run(dir, 'rc', 'js')
+    const r = run(dir, 'rc', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/belongs to stage beta, but this release's stage is rc/)
   })
 
   test('a version that is not X.Y.Z or X.Y.Z-<stage>.N is refused', () => {
     const { dir } = fixture('0.4.1-staging.1')
-    const r = run(dir, 'alpha', 'js')
+    const r = run(dir, 'alpha', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/release stage is unknown/)
   })
@@ -104,14 +103,14 @@ describe('publish-units.sh stage and dist-tag checks', () => {
     ['0.4.1', 'ga', 'latest'],
   ])('version %s with stage %s passes the checks and would publish under dist-tag %s', (version, stage, tag) => {
     const { dir } = fixture(version)
-    const r = run(dir, stage, 'js')
+    const r = run(dir, stage, 'packages/fact-kit-js')
     expect(r.out).toContain(`check only: fact-kit@${version} passed (stage ${stage}, dist-tag ${tag})`)
     expect(r.status).toBe(0)
   })
 
   test('the stage is required', () => {
     const { dir } = fixture('0.4.1-alpha.1')
-    const r = run(dir, 'js')
+    const r = run(dir, 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
     expect(r.out).toMatch(/usage: publish-units\.sh <alpha\|beta\|rc\|ga>/)
   })
@@ -120,19 +119,19 @@ describe('publish-units.sh stage and dist-tag checks', () => {
 describe('publish-units.sh same-content check against the tag', () => {
   test('the package equal to its tag passes', () => {
     const { dir, git } = fixture('0.4.1-alpha.1')
-    git('tag', 'fact-kit/v0.4.1-alpha.1')
-    expect(run(dir, 'alpha', 'js').status).toBe(0)
+    git('tag', 'fact-kit-js/v0.4.1-alpha.1')
+    expect(run(dir, 'alpha', 'packages/fact-kit-js').status).toBe(0)
   })
 
   test('the package changed since its tag is refused', () => {
     const { dir, git } = fixture('0.4.1-alpha.1')
-    git('tag', 'fact-kit/v0.4.1-alpha.1')
-    writeFileSync(join(dir, 'js/index.js'), 'export {}\n')
+    git('tag', 'fact-kit-js/v0.4.1-alpha.1')
+    writeFileSync(join(dir, 'packages/fact-kit-js/index.js'), 'export {}\n')
     git('add', '-A')
     git(...identity, 'commit', '-q', '-m', 'change after the tag')
-    const r = run(dir, 'alpha', 'js')
+    const r = run(dir, 'alpha', 'packages/fact-kit-js')
     expect(r.status).not.toBe(0)
-    expect(r.out).toMatch(/內容和 tag fact-kit\/v0\.4\.1-alpha\.1 不同/)
+    expect(r.out).toMatch(/內容和 tag fact-kit-js\/v0\.4\.1-alpha\.1 不同/)
   })
 })
 
@@ -140,29 +139,29 @@ describe('publish-units.sh same-content check against the tag', () => {
 // here: the checks read the manifest, the unit's own version file, the tag and the registry file.
 function allKinds(version: string) {
   const r = repo()
-  r.json('js/package.json', { name: 'fact-kit', version })
-  r.write('py/pyproject.toml', `[project]\nname = "fact-kit"\nversion = "${version}"\n`)
-  r.write('rs/Cargo.toml', `[package]\nname = "fact-kit"\nversion = "${version}"\n`)
-  r.write('go/go.mod', 'module github.com/carlos-space/fact-kit/go\n\ngo 1.26\n')
-  r.write('Package.swift', 'let package = Package(\n  name: "FactKit",\n  products: []\n)\n')
-  r.write('swift/Sources/FactKit/Read.swift', '// swift\n')
-  r.write('js/src/index.ts', 'export {}\n')
+  r.json('packages/fact-kit-js/package.json', { name: 'fact-kit', version })
+  r.write('packages/fact-kit-py/pyproject.toml', `[project]\nname = "fact-kit"\nversion = "${version}"\n`)
+  r.write('packages/fact-kit-rs/Cargo.toml', `[package]\nname = "fact-kit"\nversion = "${version}"\n`)
+  r.write('packages/fact-kit-go/go.mod', 'module github.com/carlos-space/fact-kit-go\n\ngo 1.26\n')
+  r.write('packages/fact-kit-swift/Package.swift', 'let package = Package(\n  name: "FactKit",\n  products: []\n)\n')
+  r.write('packages/fact-kit-swift/Sources/FactKit/Read.swift', '// swift\n')
+  r.write('packages/fact-kit-js/src/index.ts', 'export {}\n')
   r.json('package.json', { name: 'fact-kit-monorepo', version: '0.2.0', private: true })
-  r.json('.release-please-manifest.json', { js: version, py: version, rs: version, go: version, '.': version })
+  r.json('.release-please-manifest.json', {
+    'packages/fact-kit-js': version,
+    'packages/fact-kit-py': version,
+    'packages/fact-kit-rs': version,
+    'packages/fact-kit-go': version,
+    'packages/fact-kit-swift': version,
+  })
   r.json('release-please-config.json', {
     ...tagShape,
     packages: {
-      js: { component: 'fact-kit', 'release-type': 'node' },
-      py: { component: 'py', 'release-type': 'python' },
-      rs: { component: 'rs', 'release-type': 'rust' },
-      go: { component: 'go', 'release-type': 'go' },
-      '.': {
-        component: 'swift',
-        'release-type': 'simple',
-        'include-component-in-tag': false,
-        'include-v-in-tag': false,
-        'exclude-paths': ['js', 'py', 'rs', 'go'],
-      },
+      'packages/fact-kit-js': { component: 'fact-kit-js', 'release-type': 'node' },
+      'packages/fact-kit-py': { component: 'fact-kit-py', 'release-type': 'python' },
+      'packages/fact-kit-rs': { component: 'fact-kit-rs', 'release-type': 'rust' },
+      'packages/fact-kit-go': { component: 'fact-kit-go', 'release-type': 'go' },
+      'packages/fact-kit-swift': { component: 'fact-kit-swift', 'release-type': 'simple' },
     },
   })
   r.commit()
@@ -171,13 +170,16 @@ function allKinds(version: string) {
 
 describe('publish-units.sh with the reader units', () => {
   test.each([
-    ['py', /check only: fact-kit 0\.3\.0-alpha\.1 passed \(stage alpha, PyPI\)/],
-    ['rs', /check only: fact-kit 0\.3\.0-alpha\.1 passed \(stage alpha, crates\.io\)/],
+    ['packages/fact-kit-py', /check only: fact-kit 0\.3\.0-alpha\.1 passed \(stage alpha, PyPI\)/],
+    ['packages/fact-kit-rs', /check only: fact-kit 0\.3\.0-alpha\.1 passed \(stage alpha, crates\.io\)/],
     [
-      'go',
-      /check only: Go module github\.com\/carlos-space\/fact-kit\/go 0\.3\.0-alpha\.1 passed \(stage alpha, tag go\/v0\.3\.0-alpha\.1\)/,
+      'packages/fact-kit-go',
+      /check only: Go module github\.com\/carlos-space\/fact-kit-go 0\.3\.0-alpha\.1 passed \(stage alpha, tag fact-kit-go\/v0\.3\.0-alpha\.1\)/,
     ],
-    ['.', /check only: Swift package FactKit 0\.3\.0-alpha\.1 passed \(stage alpha, tag 0\.3\.0-alpha\.1\)/],
+    [
+      'packages/fact-kit-swift',
+      /check only: Swift package FactKit 0\.3\.0-alpha\.1 passed \(stage alpha, tag fact-kit-swift\/v0\.3\.0-alpha\.1\)/,
+    ],
   ])('%s passes the checks and names its registry and tag', (path, pattern) => {
     const { dir } = allKinds('0.3.0-alpha.1')
     const r = run(dir, 'alpha', path)
@@ -187,18 +189,26 @@ describe('publish-units.sh with the reader units', () => {
 
   test('a unit file that does not carry the manifest version is refused', () => {
     const { dir, write, commit } = allKinds('0.3.0-alpha.1')
-    write('py/pyproject.toml', '[project]\nname = "fact-kit"\nversion = "0.0.0"\n')
+    write('packages/fact-kit-py/pyproject.toml', '[project]\nname = "fact-kit"\nversion = "0.0.0"\n')
     commit()
-    const r = run(dir, 'alpha', 'py')
+    const r = run(dir, 'alpha', 'packages/fact-kit-py')
     expect(r.status).not.toBe(0)
-    expect(r.out).toMatch(/manifest says 0\.3\.0-alpha\.1 but py\/pyproject\.toml says 0\.0\.0/)
+    expect(r.out).toMatch(/manifest says 0\.3\.0-alpha\.1 but packages\/fact-kit-py\/pyproject\.toml says 0\.0\.0/)
   })
 
-  test('--registries names the registry of each unit, the Swift unit at the root included', () => {
+  test('--registries names the registry of each unit', () => {
     const { dir } = allKinds('0.3.0-alpha.1')
     const r = spawnSync(
       'bash',
-      [join(dir, 'scripts/release/publish-units.sh'), '--registries', 'js', 'py', 'rs', 'go', '.'],
+      [
+        join(dir, 'scripts/release/publish-units.sh'),
+        '--registries',
+        'packages/fact-kit-js',
+        'packages/fact-kit-py',
+        'packages/fact-kit-rs',
+        'packages/fact-kit-go',
+        'packages/fact-kit-swift',
+      ],
       {
         cwd: dir,
         encoding: 'utf8',
@@ -207,28 +217,28 @@ describe('publish-units.sh with the reader units', () => {
     expect(r.stdout.trim().split('\n')).toEqual(['crates=true', 'go=true', 'npm=true', 'pypi=true', 'swift=true'])
   })
 
-  test('the Swift unit is compared with its bare tag, and only on its own files', () => {
+  test('the Swift unit is compared with fact-kit-swift/v<version>, and only on its own files', () => {
     const { dir, git, write, commit } = allKinds('0.3.0-alpha.1')
-    git('tag', '0.3.0-alpha.1')
-    // js/ and the root files are not the Swift unit: changing them after the tag is fine
-    write('js/src/index.ts', 'export const changed = 1\n')
+    git('tag', 'fact-kit-swift/v0.3.0-alpha.1')
+    // the other units and the root files are not the Swift unit: changing them after the tag is fine
+    write('packages/fact-kit-js/src/index.ts', 'export const changed = 1\n')
     write('README.md', 'changed\n')
     commit('change outside the Swift unit')
-    expect(run(dir, 'alpha', '.').status).toBe(0)
-    write('swift/Sources/FactKit/Read.swift', '// changed after the tag\n')
+    expect(run(dir, 'alpha', 'packages/fact-kit-swift').status).toBe(0)
+    write('packages/fact-kit-swift/Sources/FactKit/Read.swift', '// changed after the tag\n')
     commit('change inside the Swift unit')
-    const r = run(dir, 'alpha', '.')
+    const r = run(dir, 'alpha', 'packages/fact-kit-swift')
     expect(r.status).not.toBe(0)
-    expect(r.out).toMatch(/內容和 tag 0\.3\.0-alpha\.1 不同/)
+    expect(r.out).toMatch(/內容和 tag fact-kit-swift\/v0\.3\.0-alpha\.1 不同/)
   })
 
-  test('the Go unit is compared with go/v<version>', () => {
+  test('the Go unit is compared with fact-kit-go/v<version>', () => {
     const { dir, git, write, commit } = allKinds('0.3.0-alpha.1')
-    git('tag', 'go/v0.3.0-alpha.1')
-    write('go/read.go', 'package factkit\n')
+    git('tag', 'fact-kit-go/v0.3.0-alpha.1')
+    write('packages/fact-kit-go/read.go', 'package factkit\n')
     commit('change after the tag')
-    const r = run(dir, 'alpha', 'go')
+    const r = run(dir, 'alpha', 'packages/fact-kit-go')
     expect(r.status).not.toBe(0)
-    expect(r.out).toMatch(/內容和 tag go\/v0\.3\.0-alpha\.1 不同/)
+    expect(r.out).toMatch(/內容和 tag fact-kit-go\/v0\.3\.0-alpha\.1 不同/)
   })
 })

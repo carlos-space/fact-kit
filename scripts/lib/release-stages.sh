@@ -55,9 +55,8 @@ mobile_channel() {
 
 # unit_registry <dir> → npm | pypi | crates | go | swift, from the file the unit directory carries; fails when none.
 # publish-units.sh picks the registry with this same function. go and swift have no registry to upload to: the
-# tag release-please creates is the release, because the Go proxy and SwiftPM both read it from the repository.
-# Package.swift is looked at first because the Swift unit sits at the repository root, which also carries
-# the monorepo's package.json.
+# tag release-please creates is the release record, and the package is mirrored into its own repository, whose
+# tag the Go proxy and SwiftPM read.
 unit_registry() {
   if [[ -f "$1/Package.swift" ]]; then printf '%s\n' swift
   elif [[ -f "$1/go.mod" ]]; then printf '%s\n' go
@@ -67,14 +66,9 @@ unit_registry() {
   else return 1; fi
 }
 
-# unit_content_paths <dir> → the paths that make up the unit, one per line: the directory itself, except for
-# the Swift unit. It sits at the repository root, where "the directory" would be the whole repository, so its
-# own files are named: the manifest, the lock file and the two source directories under swift/ that the targets name with path:.
-unit_content_paths() {
-  if [[ "$(unit_registry "$1" 2>/dev/null || true)" == swift ]]; then
-    printf '%s\n' "$1/Package.swift" "$1/Package.resolved" "$1/swift/Sources" "$1/swift/Tests"
-  else printf '%s\n' "$1"; fi
-}
+# unit_content_paths <dir> → the paths that make up the unit, one per line: the directory itself, because every
+# unit, the Swift package included, is a complete package in its own directory.
+unit_content_paths() { printf '%s\n' "$1"; }
 
 # has_publishable_units <root> → whether the repo at <root> has a package unit that publishes: an
 # entry of its release-please-config.json (the paths release-please.yml hands to
@@ -204,13 +198,13 @@ train_gates() { # train_gates <branch> <line> <stage>
     die "發布腳本落後 main：${branch} 的 scripts/ 與 origin/main 不同。先同步再${act}：git checkout origin/main -- scripts，commit 後推上 ${branch}"
   fi
   # Base gate: a line that already shipped takes patches only, and a patch must continue from the
-  # line's latest product tag. cut-release.sh refuses any other base. Here it catches a train opened
+  # line's latest product tag (vX.Y.Z, or product/vX.Y.Z before 0.3). cut-release.sh refuses any other base. Here it catches a train opened
   # by hand from main (merge-back is a squash, so the tag is never main's ancestor) or from an older
   # tag. It cannot reach a train that runs a finalize-release.sh from before this gate existed.
-  shipped="$(git tag --list "product/v${line}.*" | grep -E "^product/v${line//./\\.}\.[0-9]+$" | sort -t. -k3,3n | tail -1 || true)"
+  shipped="$(product_latest_tag "$line")"
   if [[ -n "$shipped" ]]; then
     git merge-base --is-ancestor "${shipped}^{commit}" HEAD \
-      || die "起點閘未通過：${branch} 不含產品線 product/v${line} 最後一個產品 tag ${shipped}。修補發布要從它重建：刪掉這條分支，用 cut-release.sh --line ${line} --from ${shipped} 重切，修正再 cherry-pick 進去"
+      || die "起點閘未通過：${branch} 不含產品線 ${line} 最後一個產品 tag ${shipped}。修補發布要從它重建：刪掉這條分支，用 cut-release.sh --line ${line} --from ${shipped} 重切，修正再 cherry-pick 進去"
     info "✓ 起點含 ${shipped}"
   fi
   # ci gate: the ci run of the train's tip (build, unit tests and the assembled-system e2e) must be

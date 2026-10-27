@@ -1,6 +1,6 @@
 # conformance
 
-五種語言的讀取實作共用的規格與測試資料。每種語言讀同一份 `cases/`、`resolve/` 與 `semver.json`，輸出必須和 `expected.json` 相同。五種語言的測試都在 `.github/workflows/conformance.yml` 各自一個 job：JS 是 `js/test/conformance.test.ts`，Python 是 `py/tests/test_conformance.py`，Rust 是 `rs/tests/conformance.rs`，Go 是 `go/conformance_test.go`，Swift 是 `swift/Tests/FactKitTests/ConformanceTests.swift`。各語言的測試先看環境變數 `FACT_KIT_CONFORMANCE` 找這個目錄，沒有時從測試檔的位置往上找，所以新增案例不用改程式。
+五種語言的讀取實作共用的規格與測試資料。每種語言讀同一份 `cases/`、`resolve/` 與 `semver.json`，輸出必須和 `expected.json` 相同。五種語言的測試都在 `.github/workflows/conformance.yml` 各自一個 job：JS 是 `packages/fact-kit-js/test/conformance.test.ts`，Python 是 `packages/fact-kit-py/tests/test_conformance.py`，Rust 是 `packages/fact-kit-rs/tests/conformance.rs`，Go 是 `packages/fact-kit-go/conformance_test.go`，Swift 是 `packages/fact-kit-swift/Tests/FactKitTests/ConformanceTests.swift`。各語言的測試先看環境變數 `FACT_KIT_CONFORMANCE` 找這個目錄，沒有時從測試檔的位置往上找，所以新增案例不用改程式。
 
 ## 目錄
 

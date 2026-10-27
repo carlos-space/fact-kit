@@ -1,4 +1,4 @@
 packages:
-  - 'js'
+  - 'packages/fact-kit-js'
   - 'facts'
   - 'facts/*'

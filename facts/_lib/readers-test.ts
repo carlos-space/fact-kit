@@ -1,14 +1,14 @@
-// Shared test of the reader components (facts/py, facts/rs, facts/go, facts/swift). It installs one component the
+// Shared test of the reader components (facts/fact-kit-py, facts/fact-kit-rs, facts/fact-kit-go, facts/fact-kit-swift). It installs one component the
 // way the aggregate publishes it, as fact-kit-facts/<component>, and reads it with the JS readFacts.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildIndex, readFacts } from '../../js/src/index.ts'
-import type { FactDecl, FactReader, ReadErrorCode } from '../../js/src/index.ts'
-import { loadEntries } from '../../js/src/load.ts'
-import { cleanTmp, makeTmp, writeTree } from '../../js/test/helpers.ts'
-import kit from '../fact-kit/facts/fact-kit/index.ts'
+import { buildIndex, readFacts } from '../../packages/fact-kit-js/src/index.ts'
+import type { FactDecl, FactReader, ReadErrorCode } from '../../packages/fact-kit-js/src/index.ts'
+import { loadEntries } from '../../packages/fact-kit-js/src/load.ts'
+import { cleanTmp, makeTmp, writeTree } from '../../packages/fact-kit-js/test/helpers.ts'
+import kit from '../fact-kit-js/facts/fact-kit/index.ts'
 import type { ReaderApi } from './readers-lib.ts'
 
 const factsDir = fileURLToPath(new URL('..', import.meta.url))
@@ -41,7 +41,7 @@ async function installComponent(component: string): Promise<string> {
 }
 
 export function readerSpec(component: string, since: string, names: { read: string; select: string }): void {
-  const tool = `fact-kit-${component}`
+  const tool = component
   const spec = `${aggregate.name}/${component}`
   let hub: string
   let reader: FactReader
