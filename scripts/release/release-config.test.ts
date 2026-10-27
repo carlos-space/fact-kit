@@ -72,13 +72,22 @@ test('each unit gets its own tag shape: the Swift unit a bare version, the other
         encoding: 'utf8',
       },
     ).trim()
-  expect(tag('js', '0.8.0')).toBe('fact-kit/v0.8.0')
-  expect(tag('facts', '0.2.0')).toBe('fact-kit-facts/v0.2.0')
-  expect(tag('py', '0.3.0-alpha.1')).toBe('py/v0.3.0-alpha.1')
-  expect(tag('rs', '0.3.0')).toBe('rs/v0.3.0')
-  expect(tag('go', '0.3.0')).toBe('go/v0.3.0')
-  expect(tag('.', '0.3.0')).toBe('0.3.0')
-  expect(tag('.', '0.3.0-alpha.1')).toBe('0.3.0-alpha.1')
+  const cases: [string, string, string][] = [
+    ['js', '0.8.0', 'fact-kit/v0.8.0'],
+    ['facts', '0.2.0', 'fact-kit-facts/v0.2.0'],
+    ['py', '0.3.0-alpha.1', 'py/v0.3.0-alpha.1'],
+    ['rs', '0.3.0', 'rs/v0.3.0'],
+    ['go', '0.3.0', 'go/v0.3.0'],
+    ['.', '0.3.0', '0.3.0'],
+    ['.', '0.3.0-alpha.1', '0.3.0-alpha.1'],
+  ]
+  // a release branch lists only the train's units, so check the ones this config has
+  for (const [path, version, want] of cases) {
+    if (path in config.packages) expect(tag(path, version), path).toBe(want)
+  }
+  for (const path of Object.keys(expected).filter((p) => !(p in config.packages))) {
+    expect(() => tag(path, '1.0.0'), `${path} is not in this config, so it has no tag shape here`).toThrow()
+  }
 })
 
 test('every package.json version equals its manifest version', () => {
@@ -131,11 +140,13 @@ test('the Swift unit carries no component and no v in its tag, and the others ke
 })
 
 // scripts/ci/check-release-policy.sh of git-flow-template compares the same two lists every day.
-test('release-policy.json lists exactly the components of the config, each with alpha and ga', () => {
-  const components = Object.values<any>(config.packages)
-    .map((entry) => entry.component)
+// The policy lists every unit, as main's config does; a release branch's config lists only the train's units.
+test('release-policy.json lists exactly the components of every unit, each with alpha and ga', () => {
+  const components = Object.values(expected)
+    .map((unit) => unit.component)
     .sort()
   expect(Object.keys(policy.units).sort()).toEqual(components)
+  for (const entry of Object.values<any>(config.packages)) expect(Object.keys(policy.units)).toContain(entry.component)
   for (const [unit, entry] of Object.entries<any>(policy.units)) {
     expect(entry.kind, unit).toBe('package')
     expect(entry.stages, unit).toEqual(['alpha', 'ga'])
