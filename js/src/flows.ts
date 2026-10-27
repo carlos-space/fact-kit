@@ -1,3 +1,5 @@
+import { useCaseProblem } from './ddd.ts'
+import type { UseCase } from './ddd.ts'
 import { keyed } from './history.ts'
 import type { FactRef } from './builders.ts'
 import { BUILDER, BuilderError, REF_TOKEN, isObject, refTarget, registerBuilderCheck, setMark } from './markers.ts'
@@ -146,9 +148,9 @@ function sequenceProblem(root: unknown): string | undefined {
   return undefined
 }
 
-registerBuilderCheck('stateMachine', stateMachineProblem)
-registerBuilderCheck('relations', relationsProblem)
-registerBuilderCheck('sequence', sequenceProblem)
+registerBuilderCheck('stateMachine', stateMachineProblem, { kind: 'value' })
+registerBuilderCheck('relations', relationsProblem, { kind: 'value' })
+registerBuilderCheck('sequence', sequenceProblem, { kind: 'value' })
 
 // --- builders ----------------------------------------------------------------------------------------------
 function made<T extends object>(name: string, value: T, problem: (root: unknown) => string | undefined): T {
@@ -277,9 +279,29 @@ export function relationsToMermaid(source: Renderable<Relations>): string {
   return lines.join('\n')
 }
 
-/** A `sequenceDiagram`, without a code fence. Participants get ids `p0`, `p1`, ... and keep their name as label. */
-export function sequenceToMermaid(source: Renderable<Sequence>): string {
-  const flow = ready('sequence', source, sequenceProblem) as Sequence
+/**
+ * A `sequenceDiagram`, without a code fence. Participants get ids `p0`, `p1`, ... and keep their name as label.
+ * A use case is drawn too: the participants are `caller` and then each `layer` in the order of first use, and
+ * each step is a message from the layer of the step before it (the caller for the first) to its own layer.
+ */
+export function sequenceToMermaid(source: Renderable<Sequence | UseCase>): string {
+  const value = valueOf(source, 'sequenceToMermaid')
+  // A sequence has participants. A use case has none, only steps that name a layer.
+  if (isObject(value) && !('participants' in value) && Array.isArray(value.steps)) {
+    const broken = useCaseProblem(value)
+    if (broken !== undefined) throw new BuilderError(`sequenceToMermaid: ${broken}`)
+    const steps = (value as unknown as UseCase).steps
+    const who = ['caller', ...new Set(steps.map((s) => s.layer as string))]
+    const lines = ['sequenceDiagram']
+    for (const [i, name] of who.entries()) lines.push(`    participant p${i} as ${label(name)}`)
+    let from = 'caller'
+    for (const s of steps) {
+      lines.push(`    p${who.indexOf(from)}->>p${who.indexOf(s.layer)}: ${label(s.action)}`)
+      from = s.layer
+    }
+    return lines.join('\n')
+  }
+  const flow = ready('sequence', value, sequenceProblem) as Sequence
   const id = (participant: string) => `p${flow.participants.indexOf(participant)}`
   const lines = ['sequenceDiagram']
   for (const [i, who] of flow.participants.entries()) lines.push(`    participant p${i} as ${label(who)}`)

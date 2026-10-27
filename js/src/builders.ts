@@ -1,8 +1,11 @@
 import { keyed } from './history.ts'
 import type { HistoryVariants } from './history.ts'
 import {
+  BUILDER,
+  BUILDERS,
   BuilderError,
   FROM,
+  builderAbout,
   HISTORY,
   RELATES,
   SUBSET,
@@ -10,6 +13,7 @@ import {
   copyMarks,
   isBuilt,
   isObject,
+  isText,
   makeBuilt,
   markOf,
   partsOf,
@@ -199,9 +203,6 @@ export function statementFrom<F extends FactLike>(
   return makeBuilt(text, [fact])
 }
 
-const isText = (value: unknown): value is Text =>
-  (typeof value === 'string' && value !== '') || (isObject(value) && Object.keys(value).length > 0)
-
 // --- sources -----------------------------------------------------------------------------------------------
 const nonEmpty = (what: string, value: unknown): string => {
   if (typeof value !== 'string' || value === '') throw new BuilderError(`${what} must be a non-empty string`)
@@ -329,6 +330,8 @@ export function factsOf(options: FactsOfOptions): FactsFactory {
       let content: FactDecl['content']
       let variants: FactVariant[] | undefined
       let roots: unknown[]
+      // The builders that made the content: they add their topic, and each makes one kind of content.
+      const builders: string[] = []
       if (isHistory(result)) {
         const first = result[0]?.content
         if (!first || !Object.hasOwn(first, kind)) {
@@ -347,13 +350,18 @@ export function factsOf(options: FactsOfOptions): FactsFactory {
         variants = [...result]
         carry((markOf(result, RELATES) as object[] | undefined) ?? [])
         roots = result.map((v) => (v.content as Record<string, unknown>)[kind])
+        builders.push(...((markOf(result, BUILDERS) as string[] | undefined) ?? []))
       } else if (kind === 'statement') {
         let text = result
         if (isBuilt(text)) {
           const parts = partsOf(text)
           carry(parts.relates)
+          const name = markOf(text, BUILDER)
+          if (typeof name === 'string') builders.push(name)
           text = parts.text
         }
+        const name = markOf(text, BUILDER)
+        if (typeof name === 'string') builders.push(name)
         if (!isText(text)) throw new BuilderError(`${where}: expected a text, got ${show(text)}`)
         content = { statement: text as Text }
         roots = []
@@ -361,6 +369,18 @@ export function factsOf(options: FactsOfOptions): FactsFactory {
         if (result === undefined) throw new BuilderError(`${where}: the content is undefined`)
         content = (kind === 'value' ? { value: result } : { schema: result as JsonSchema }) as FactDecl['content']
         roots = [result]
+        const name = markOf(result, BUILDER)
+        if (typeof name === 'string') builders.push(name)
+      }
+      const topicsOfBuilders: string[] = []
+      for (const name of new Set(builders)) {
+        const about = builderAbout(name)
+        if (about && about.kind !== kind) {
+          throw new BuilderError(
+            `${where}: ${name} makes a ${about.kind}, so give it to mf.${about.kind}, not mf.${kind}`,
+          )
+        }
+        if (about?.topic) topicsOfBuilders.push(about.topic)
       }
       for (const root of roots) {
         const parent = markOf(root, SUBSET)
@@ -368,7 +388,7 @@ export function factsOf(options: FactsOfOptions): FactsFactory {
       }
 
       const relates = [...new Set<object>([...(given.relates ?? []), ...carried, ...read.facts])]
-      const topics = [...new Set([...(options.topics ?? []), ...(given.topics ?? [])])]
+      const topics = [...new Set([...topicsOfBuilders, ...(options.topics ?? []), ...(given.topics ?? [])])]
       let source: FactSource = given.source ?? options.source
       if (given.note !== undefined) {
         if (source.kind !== 'observed') throw new BuilderError(`${where}: note goes with an observed source`)

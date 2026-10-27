@@ -50,6 +50,8 @@ export {
   stateMachineToMermaid,
 } from './flows.ts'
 export type { Relation, Relations, Sequence, SequenceStep, StateMachine, Transition } from './flows.ts'
+export { aggregate, domainEvent, entity, invariant, useCase, valueObject } from './ddd.ts'
+export type { Aggregate, AggregateMember, EntitySchema, ObjectSchema, UseCase, UseCaseStep } from './ddd.ts'
 export { derive, factLink } from './author.ts'
 export {
   EXAMPLE_GROUP_SCHEMA_ID,

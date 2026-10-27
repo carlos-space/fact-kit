@@ -1,4 +1,6 @@
 import {
+  BUILDER,
+  BUILDERS,
   BuilderError,
   HISTORY,
   RELATES,
@@ -6,6 +8,8 @@ import {
   copyMarks,
   isBuilt,
   isObject,
+  isText,
+  markOf,
   partsOf,
   setMark,
 } from './markers.ts'
@@ -177,11 +181,11 @@ export interface HistoryRow {
   schema?: JsonSchema
   /** The text, or what `invariant` and `statementFrom` return. */
   statement?: Text | BuiltStatement
-  /** Pointer to a keyed array -> the items to append. */
-  add?: Record<string, readonly unknown[]>
+  /** Pointer to a keyed array -> the items to append, or pointer to an object -> the properties to add by name. */
+  add?: Record<string, readonly unknown[] | { readonly [name: string]: unknown }>
   /** Pointer -> the new value. For a keyed array, the items to swap in by key. */
   replace?: Record<string, unknown>
-  /** Pointer to a keyed array -> the keys of the items to drop. */
+  /** Pointer to a keyed array -> the keys of the items to drop, or pointer to an object -> the names of the properties to drop. */
   remove?: Record<string, readonly unknown[]>
   /** Pointer -> the value to put there, which may be new. */
   set?: Record<string, unknown>
@@ -204,8 +208,23 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   for (const [pointer, keysToDrop] of Object.entries(row.remove ?? {})) {
     const at = `${where}: remove "${pointer}"`
     const target = resolve(current, parsePointer(pointer, at), pointer, at)
+    if (target.found && isObject(target.value)) {
+      if (!Array.isArray(keysToDrop)) throw new HistoryError(`${at}: expected a list of names, got ${show(keysToDrop)}`)
+      for (const name of keysToDrop) {
+        if (typeof name !== 'string')
+          throw new HistoryError(`${at}: a property is named by a string, got ${show(name)}`)
+        if (!Object.hasOwn(target.value, name)) {
+          throw new HistoryError(
+            `${at}: no property is named ${show(name)} (names there: ${Object.keys(target.value).map(show).join(', ')})`,
+          )
+        }
+        delete target.value[name]
+      }
+      continue
+    }
     const keys = keysOf(target.value)
-    if (!target.found || !Array.isArray(target.value)) throw new HistoryError(`${at}: there is no array there`)
+    if (!target.found || !Array.isArray(target.value))
+      throw new HistoryError(`${at}: there is no array or object there`)
     if (!keys)
       throw new HistoryError(
         `${at}: the array is not keyed, so items can not be removed by key. Declare it with keyed(items, keys), or replace the whole array`,
@@ -247,8 +266,21 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   for (const [pointer, items] of Object.entries(row.add ?? {})) {
     const at = `${where}: add "${pointer}"`
     const target = resolve(current, parsePointer(pointer, at), pointer, at)
+    if (target.found && isObject(target.value)) {
+      if (!isObject(items)) {
+        throw new HistoryError(`${at}: expected an object of properties to add by name, got ${show(items)}`)
+      }
+      for (const [name, property] of Object.entries(items)) {
+        if (Object.hasOwn(target.value, name)) {
+          throw new HistoryError(`${at}: a property named ${show(name)} is already there`)
+        }
+        target.value[name] = clone(property)
+      }
+      continue
+    }
     const keys = keysOf(target.value)
-    if (!target.found || !Array.isArray(target.value)) throw new HistoryError(`${at}: there is no array there`)
+    if (!target.found || !Array.isArray(target.value))
+      throw new HistoryError(`${at}: there is no array or object there`)
     if (!keys)
       throw new HistoryError(
         `${at}: the array is not keyed, so items can not be added by key. Declare it with keyed(items, keys), or replace the whole array`,
@@ -265,6 +297,11 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
   }
   for (const [pointer, next] of Object.entries(row.set ?? {})) {
     const at = `${where}: set "${pointer}"`
+    if (isBuilt(next)) {
+      throw new HistoryError(
+        `${at}: a built statement can not be set, because set would drop the facts it relates to. Write it as the statement of a row that rewrites the content`,
+      )
+    }
     current = assign(current, parsePointer(pointer, at), clone(next), pointer, at)
   }
   return current
@@ -280,6 +317,7 @@ export function history(...rows: HistoryRow[]): HistoryVariants {
   if (rows.length === 0) throw new HistoryError('history: needs at least one row')
   const variants: FactVariant[] = []
   const relates: object[] = []
+  const builders: string[] = []
   let kind: (typeof CONTENT_KEYS)[number] | undefined
   let payload: unknown
   for (const [i, row] of rows.entries()) {
@@ -303,6 +341,8 @@ export function history(...rows: HistoryRow[]): HistoryVariants {
       kind = written[0] as (typeof CONTENT_KEYS)[number]
       let given = row[kind]
       if (isBuilt(given)) {
+        const name = markOf(given, BUILDER)
+        if (typeof name === 'string' && !builders.includes(name)) builders.push(name)
         const parts = partsOf(given)
         for (const fact of parts.relates) if (!relates.includes(fact)) relates.push(fact)
         given = parts.text
@@ -310,6 +350,11 @@ export function history(...rows: HistoryRow[]): HistoryVariants {
       payload = clone(given)
     } else {
       payload = applyRow(payload, row, where)
+    }
+    const made = markOf(payload, BUILDER)
+    if (typeof made === 'string' && !builders.includes(made)) builders.push(made)
+    if (kind === 'statement' && !isText(payload)) {
+      throw new BuilderError(`${where}: a statement must be a text, got ${show(payload)}`)
     }
     // A builder checks its own output again at every row, so a later row can not make what it would not make.
     const broken = builderProblem(payload)
@@ -325,5 +370,6 @@ export function history(...rows: HistoryRow[]): HistoryVariants {
   }
   setMark(variants, HISTORY, true)
   setMark(variants, RELATES, relates)
+  setMark(variants, BUILDERS, builders)
   return variants as HistoryVariants
 }

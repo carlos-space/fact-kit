@@ -1013,15 +1013,51 @@ const newApi = [
   },
   {
     name: 'sequenceToMermaid',
-    signature: 'sequenceToMermaid(source: Sequence | Fact) => string',
+    signature: 'sequenceToMermaid(source: Sequence | UseCase | Fact) => string',
     summary:
-      'A `sequenceDiagram` of a sequence, without a code fence. Each participant is declared as `participant p<i> as <name>` and each step is `p<i>->>p<j>: <action>`. The ids are generated.',
+      'A `sequenceDiagram` of a sequence, without a code fence. Each participant is declared as `participant p<i> as <name>` and each step is `p<i>->>p<j>: <action>`. The ids are generated. A use case from `useCase` is drawn too: the participants are `caller` and then each `layer` in the order of first use, and each step is a message from the layer of the step before it (`caller` for the first) to its own layer.',
   },
   {
     name: 'ref',
     signature: 'ref(fact: Fact, field?: string) => FactRef',
     summary:
       "A reference to a fact of this package, or to a field of it written with dots such as `'limits.max'`, for the content of another fact. It returns a placeholder that the build replaces. When it is the whole value of a subschema, the build writes `{ $ref: '#/$defs/<id>' }`, or `{ $ref: '#/$defs/<id>/properties/a/properties/b' }` with a field, and puts the schema of the target into `$defs` of the root schema, flat and once per id. Anywhere else (a value, a statement, a longer string, a `const`) it writes the location of the fact, followed by `#a.b` with a field. A `$ref` inside the embedded schema that points to its own root (`#`, `#/properties/x`) is rewritten to `#/$defs/<id>` and `#/$defs/<id>/properties/x`; one into its own `$defs` or to an anchor stays. When the target has several rows, the build aligns them: the fact that writes the `ref` gets one row for each combination of its own row and the rows of the target that some reader gets together (the boundaries of `subset-of`), each with the `$defs` of that combination, so a reader reads a standard JSON Schema and changes nothing. A fact with one row becomes a fact with `variants`. The target goes into `derivedFrom`. A field the type checker knows is not in the target fails to compile. `check` reports `ref` when the field is missing from a row the two facts share, and `relates-foreign` when the target is no fact of any entry of the package. It also fits `guard` of a transition.",
+  },
+  {
+    name: 'entity',
+    signature: 'entity({ identity, fields, required? }) => EntitySchema',
+    summary:
+      "An entity as a JSON Schema for `mf.schema`: `{ type: 'object', 'x-identity', properties, required? }`, with the topic `ddd:entity`. `identity` is a field name, or a list of at least two different names (a list of one is written as the name), and `fields` maps a name to a schema or to `ref(fact)`. `required` is a keyed list of names. A `history` row drops a field with `remove: { '/properties': ['status'] }`, adds one with `add: { '/properties': { note: {...} } }` and swaps one with `replace: { '/properties/status': {...} }`, and must drop the name from `required` in the same row. Throws `BuilderError` when an identity name or a `required` name is not a field, and `history` checks it again after every row, so a row that leaves one behind fails and `check` reports `builder`.",
+  },
+  {
+    name: 'valueObject',
+    signature: 'valueObject(fields, options?: { required? }) => ObjectSchema',
+    summary:
+      "A value object as a JSON Schema for `mf.schema`: `{ type: 'object', properties, required? }`, with the topic `ddd:value-object`. A `history` row changes the fields by name in the same way as `entity`, and `required` follows them. Throws `BuilderError` when a `required` name is not a field.",
+  },
+  {
+    name: 'domainEvent',
+    signature: 'domainEvent(fields, options?: { required? }) => ObjectSchema',
+    summary:
+      'A domain event as a JSON Schema for `mf.schema`, in the shape and with the rules of `valueObject`, with the topic `ddd:domain-event`.',
+  },
+  {
+    name: 'aggregate',
+    signature: 'aggregate({ root, members }) => Aggregate',
+    summary:
+      "An aggregate as a value for `mf.value`: `{ root, members }`, each member `{ entity, cardinality }` where `cardinality` is `'one'` (the default) or `'many'`. The facts are written as `factLink` placeholders that the build replaces with their location and adds to `derivedFrom`. The topic is `ddd:aggregate`. `members` is keyed by `entity`, so a `history` row names a member by `factLink(entity)`: `remove: { '/members': [factLink(line)] }`. Throws `BuilderError` when `root` is not a fact object or a cardinality is not `'one'` or `'many'`, and `HistoryError` for two members of one entity.",
+  },
+  {
+    name: 'invariant',
+    signature: 'invariant(subject: Fact, text: Text) => BuiltStatement',
+    summary:
+      "A business rule about an entity or value, for `mf.statement` or the `statement` of a `history` row. It carries the text, and `subject` goes into `relates` so `derivedFrom` follows it. The topic is `ddd:invariant`. A later `history` row rewrites the sentence whole with `statement: invariant(...)`, which also carries the new subject. `set: { '': text }` replaces the sentence but not `relates`. Throws `BuilderError` when `subject` is not a fact object or `text` is empty.",
+  },
+  {
+    name: 'useCase',
+    signature: 'useCase({ input?, output?, steps, errors? }) => UseCase',
+    summary:
+      "An application use case as a value for `mf.value`: `{ input?, output?, steps, errors }`. `input` and `output` are `ref(fact)` or a schema. A step is `{ layer, action, rule?, emits?, calls? }` where `layer` is `'application'`, `'domain'` or `'infrastructure'` and the facts in `rule`, `emits` and `calls` become `factLink` placeholders. The topic is `ddd:use-case`. `steps` is keyed by `action`, which no two steps share, and a `history` row can `add` steps only at the end, so to insert in the middle replace the whole list. `errors` is a keyed list of codes. `sequenceToMermaid` draws it. Throws `BuilderError` for a layer that is not one of the three or an empty action, and `HistoryError` for a repeated action or code.",
   },
 ]
 
@@ -1057,7 +1093,7 @@ const facts: FactDecl[] = [
           '': [
             {
               code: 'builder',
-              rule: 'A builder, `mf.*`, `contentOf` or `subsetOf` got input that does not fit, such as a name with a leading dot, rows whose first row is not the kind of the method, a subset whose parent is not a fact object, or a state machine, relations or sequence with an end that is not declared. `history` also raises it when a row makes what a builder checked invalid. The message names the row and the key. Only `check` prints the code. `build` stops with the message.',
+              rule: 'A builder, `mf.*`, `contentOf` or `subsetOf` got input that does not fit, such as a name with a leading dot, rows whose first row is not the kind of the method, a subset whose parent is not a fact object, or a state machine, relations or sequence with an end that is not declared, or an entity, value object, aggregate or use case whose names do not match (an identity or `required` name that is not a field, a layer that is not one of three). `history` also raises it when a row makes what a builder checked invalid. The message names the row and the key. Only `check` prints the code. `build` stops with the message.',
               reads: 'sources',
             },
             {
@@ -1091,6 +1127,18 @@ const facts: FactDecl[] = [
         set: {
           '/description':
             'The first row gives the content with one of `value`, `schema` and `statement`. Each later row rewrites the content whole with one of those, or changes the content of the row before it with `remove`, `replace`, `add` and `set`, applied in that order. A row with none of them keeps the content and changes only the conditions. After each row, the check of the builder that made the content runs again, and a row that breaks it fails with `BuilderError`.',
+          '/properties/remove': {
+            description:
+              'JSON Pointer -> what to drop. For a keyed array, the keys of the items to drop. For an object, the names of the properties to drop, such as `{ "/properties": ["status"] }` for an entity. A key or name that is not there fails.',
+            type: 'object',
+            additionalProperties: { type: 'array' },
+          },
+          '/properties/add': {
+            description:
+              'JSON Pointer -> what to add. For a keyed array, the items to append, and an item whose key is already there fails. For an object, an object of properties to add by name, such as `{ "/properties": { "note": { "type": "string" } } }` for an entity, and a name that is already there fails.',
+            type: 'object',
+            additionalProperties: { type: ['array', 'object'] },
+          },
           '/properties/replace/description':
             'JSON Pointer -> the new value. For a keyed array and a list of items, the items are swapped in by key. Otherwise the value there is replaced, and it must exist. A pointer may not go into an array by index, so replace the whole array instead.',
           '/properties/set/description':
@@ -1181,7 +1229,7 @@ const facts: FactDecl[] = [
               name: 'history',
               signature: 'history(...rows: HistoryRow[]) => HistoryVariants',
               summary:
-                "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`. The result is still an array of variants, and `mf.value(name, history(...))` takes it. After each row, the check of the builder that made the content runs again, and a row that breaks it throws `BuilderError`, which `check` reports as `builder`.",
+                "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`. The result is still an array of variants, and `mf.value(name, history(...))` takes it. After each row, the check of the builder that made the content runs again, and a row that breaks it throws `BuilderError`, which `check` reports as `builder`. `remove` and `add` also work on an object by property name, such as the `properties` of an `entity`.",
             },
           ],
         },
