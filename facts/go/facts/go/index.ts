@@ -1,5 +1,5 @@
 // Facts about the Go reader in go/. They are the spec of its public API, and the reader does not import them.
-import { readerFacts } from '../../../readers-lib.ts'
+import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
   { name: 'opts.Version', js: 'options.version', type: '*string', required: false, default: 'nil' },

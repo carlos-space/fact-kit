@@ -4,14 +4,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { buildIndex, readFacts } from '../js/src/index.ts'
-import type { FactDecl, FactReader, ReadErrorCode } from '../js/src/index.ts'
-import { loadEntries } from '../js/src/load.ts'
-import { cleanTmp, makeTmp, writeTree } from '../js/test/helpers.ts'
-import kit from './fact-kit/facts/fact-kit/index.ts'
+import { buildIndex, readFacts } from '../../js/src/index.ts'
+import type { FactDecl, FactReader, ReadErrorCode } from '../../js/src/index.ts'
+import { loadEntries } from '../../js/src/load.ts'
+import { cleanTmp, makeTmp, writeTree } from '../../js/test/helpers.ts'
+import kit from '../fact-kit/facts/fact-kit/index.ts'
 import type { ReaderApi } from './readers-lib.ts'
 
-const factsDir = fileURLToPath(new URL('.', import.meta.url))
+const factsDir = fileURLToPath(new URL('..', import.meta.url))
 const aggregate = JSON.parse(readFileSync(join(factsDir, 'package.json'), 'utf8')) as { name: string; version: string }
 
 const READ_ERROR_CODES: ReadErrorCode[] = ['not-an-index', 'unsupported-index-format', 'not-found', 'invalid-version']
