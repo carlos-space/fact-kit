@@ -146,7 +146,7 @@ for u in "${units[@]}"; do
     else info "${u}：目前 $(manifest_version "$(unit_path "$u")")，第一個版本由 release-please 依 commit 計算為 X.Y.Z-$(stage_prerelease_type "$stage")"; fi
     continue
   fi
-  fresh+=("$(unit_path "$u")"); info "${u}：首次發布，起始版號 ${initial}"
+  fresh+=("$(unit_path "$u")"); info "${u}：首次發布，起始版號 ${initial}，tag $(unit_tag "$(unit_path "$u")" "$initial")"
 done
 freshj="[]"; (( ${#fresh[@]} )) && { freshj="$(printf '"%s",' "${fresh[@]}")"; freshj="[${freshj%,}]"; }
 

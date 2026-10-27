@@ -84,7 +84,8 @@ case "$phase" in
       p="$(unit_path "$u")"; paths+=("$p")
       v="$(manifest_version "$p")"
       [[ "$v" == *-* ]] && { missing+=("$u 仍是 prerelease $v"); continue; }
-      git rev-parse -q --verify "refs/tags/$u/v$v" >/dev/null || missing+=("$u/v$v")
+      t="$(unit_tag "$p" "$v")"
+      git rev-parse -q --verify "refs/tags/$t" >/dev/null || missing+=("$t")
     done
     (( ${#missing[@]} == 0 )) || die "GA 尚未完成：${missing[*]}（先合併 Release PR 並等 tag 建立）"
 
