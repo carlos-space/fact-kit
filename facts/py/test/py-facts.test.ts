@@ -1,3 +1,3 @@
 import { readerSpec } from '../../readers-test.ts'
 
-readerSpec('py', { version: 'head', include: ['readers'] }, { read: 'read_facts', select: 'select_facts' })
+readerSpec('py', '0.3.0-alpha.1', { read: 'read_facts', select: 'select_facts' })
