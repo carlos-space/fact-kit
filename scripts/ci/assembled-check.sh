@@ -20,13 +20,20 @@ printf '%s\n' '{"name":"assembled-check","private":true,"type":"module"}' > pack
 npm install --no-audit --no-fund --silent "$work"/packed/*.tgz
 
 for p in "${paths[@]}"; do
-  comp="$(jq -r --arg p "$p" '.packages[$p].component // empty' release-please-config.json)"
+  comp="$(jq -r --arg p "$p" '.packages[$p].component // empty' "$root/release-please-config.json")"
   case "${comp:-$p}" in
     fact-kit)
       node --input-type=module -e "
         import { defineFacts, checkFacts } from 'fact-kit'
         if (typeof defineFacts !== 'function' || typeof checkFacts !== 'function') throw new Error('fact-kit exports are missing')"
       ./node_modules/.bin/fact-kit --help | grep -q '^Commands' ;;
+    fact-kit-facts)
+      # Read through fact-kit, as a consumer does. A train without fact-kit reads with the published one.
+      [[ -d node_modules/fact-kit ]] || npm install --no-audit --no-fund --silent fact-kit
+      node --input-type=module -e "
+        import { readFacts } from 'fact-kit'
+        const r = readFacts('fact-kit-facts')
+        if (!r.has('fact-kit.fact') || r.facts.length === 0) throw new Error('fact-kit-facts has no fact-kit.fact')" ;;
     *) printf '%s\n' "no smoke test for $p (component ${comp:-none})" >&2; exit 1 ;;
   esac
   printf '%s\n' "✓ $p"
