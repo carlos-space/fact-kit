@@ -1,5 +1,5 @@
 // Facts about the Python reader in py/. They are the spec of its public API, and the reader does not import them.
-import { readerFacts } from '../../../readers-lib.ts'
+import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
   { name: 'version', js: 'options.version', type: 'str | None', required: false, default: 'None' },

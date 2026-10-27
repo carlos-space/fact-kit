@@ -1,7 +1,7 @@
 // Shared shape of the facts about the readers in other languages (facts/py, facts/rs, facts/go, facts/swift).
 // Each component describes one language with the same four facts, so a test can compare every language with the
 // JS reader the same way. Each component passes the version of its first release as `since`.
-import type { Fact, FactsModule, ReadErrorCode } from '../js/src/index.ts'
+import type { Fact, FactsModule, ReadErrorCode } from '../../js/src/index.ts'
 
 export interface ReaderParam {
   name: string
