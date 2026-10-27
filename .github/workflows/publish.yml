@@ -1,7 +1,9 @@
 name: publish
 
 # Publishes the units a release created: npm (fact-kit-js, fact-kit-facts), PyPI (fact-kit-py), crates.io (fact-kit-rs), and the
-# Go module (fact-kit-go) and the Swift package (fact-kit-swift), which have no registry: their tag is the release record.
+# Go module (fact-kit-go) and the Swift package (fact-kit-swift), which have no registry: their tag is the release record,
+# and the mirror job pushes each package to its own repository (carlos-space/fact-kit-go, carlos-space/fact-kit-swift),
+# where the Go proxy and SwiftPM read it.
 # release-please.yml dispatches it (gh workflow run) after each release, on the release branch and with the
 # train's stage; it can also be run by hand. It is not a workflow_call target: npm, PyPI and crates.io trust this
 # workflow file as a Trusted Publisher, and a called workflow's OIDC token names the caller, which would not match.
@@ -23,7 +25,8 @@ name: publish
 # crates job says so in its summary and publishes nothing.
 #
 # dry_run: every upload becomes a dry run (npm publish --dry-run, uv publish --dry-run, cargo publish
-# --dry-run), to rehearse the pipeline without writing a registry.
+# --dry-run), to rehearse the pipeline without writing a registry. The mirror job splits the packages and prints the
+# commit, tag and files it would push, and pushes nothing.
 on:
   workflow_dispatch:
     inputs:
@@ -226,3 +229,39 @@ jobs:
         run: |
           mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
           bash scripts/release/publish-units.sh "$STAGE" "${paths[@]}"
+
+  # Pushes packages/fact-kit-go and packages/fact-kit-swift, with the package as the repository root, to the main
+  # branch of their mirror repositories and tags the bare version there (Go v0.3.0-alpha.2, Swift 0.3.0-alpha.2).
+  # It runs from this workflow rather than on a tag push because a tag made with GITHUB_TOKEN raises no events.
+  # The mirror repositories take no pull requests; this job is their only writer. MIRROR_PUSH_TOKEN is a
+  # fine-grained token (or GitHub App token) with contents: write on those two repositories and nothing else.
+  # A dry run needs no token. Re-running is safe: see scripts/release/mirror-units.sh.
+  mirror:
+    needs: [plan, tag]
+    if: needs.plan.outputs.tag == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One writer at a time, so two releases cannot race for the same main.
+    concurrency:
+      group: mirror
+      cancel-in-progress: false
+    steps:
+      # Full history and tags: git subtree split reads every commit that touched the package.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - name: Mirror the Go and Swift packages
+        env:
+          PATHS: ${{ inputs.paths }}
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
+          flags=()
+          if [[ "$DRY_RUN" == 1 ]]; then flags=(--dry-run)
+          elif [[ -z "$MIRROR_PUSH_TOKEN" ]]; then
+            echo "::error::secret MIRROR_PUSH_TOKEN is not set, so nothing can be pushed to the mirror repositories"; exit 1
+          fi
+          bash scripts/release/mirror-units.sh ${flags[@]+"${flags[@]}"} "${paths[@]}"

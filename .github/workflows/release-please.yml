@@ -5,8 +5,8 @@ name: release-please
 # a release-please commit. scripts/release/cut-release.sh scopes release-please-config.json to the
 # train's packages and puts it in prerelease mode; finalize-release.sh --phase ga takes it back out.
 # Merging the Release PR tags <component>/v<version>, where the component is the unit's directory name, and
-# creates the GitHub Release; for the Go and Swift units that tag is the release record, and a later step mirrors
-# the package into its own repository. A tag created with
+# creates the GitHub Release; for the Go and Swift units that tag is the release record, and the mirror job of
+# publish.yml pushes the package into its own repository. A tag created with
 # GITHUB_TOKEN raises no events, so this workflow dispatches publish.yml itself after a release, with the
 # train's stage.
 #
