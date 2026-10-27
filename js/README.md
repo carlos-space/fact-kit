@@ -154,6 +154,11 @@ them in by key. Anywhere else it replaces the value at the pointer, which must e
 even when the last member is new. A row that does not fit fails the build and names the key. `check` reports it as
 `history`.
 
+`remove` and `add` also work on an object, by property name. `remove: { '/properties': ['status'] }` drops the
+property `status` and fails when there is none. `add: { '/properties': { note: { type: 'string' } } }` puts a new
+property at the end and fails when the name is already there. `replace: { '/properties/status': {...} }` swaps one.
+The `properties` of `entity`, `valueObject` and `domainEvent` are changed this way (see [DDD builders](#ddd-builders)).
+
 A pointer never goes into an array by index. `'/steps/2/action'`, `'/list/-'` and `'/plain/1'` fail with `history`,
 because a position changes when an item before it is added or removed. Name an item by its key (`remove`,
 `replace` and `add` on a keyed array), or replace the whole array: an array that is not keyed is changed only by
@@ -476,6 +481,164 @@ stateDiagram-v2
 
 `relationsToMermaid` draws a `flowchart LR` with `n0["mainline"]` and `n0 -->|has| n1`, and `sequenceToMermaid` a
 `sequenceDiagram` with `participant p0 as user` and `p0->>p1: close`. `cardinality` is not drawn.
+
+### DDD builders
+
+`entity`, `valueObject`, `domainEvent`, `aggregate`, `invariant` and `useCase` write the layers of a domain as the
+three kinds of content, and `mf.*` adds the `ddd:` topic and `derivedFrom` for you. The example is the domain of a
+mainline that can be closed once its criteria are done.
+
+```ts
+import { domainEvent, entity, factsOf, invariant, ref, stateMachine, useCase, valueObject } from 'fact-kit'
+import { published, tool } from '../_lib/product.ts'
+
+const mf = factsOf({ tool, source: published, prefix: 'domain' })
+
+export const criterion = mf.schema(
+  'criterion',
+  valueObject({ id: { type: 'string', pattern: '^r\\d{3}$' }, text: { type: 'string' }, done: { type: 'boolean' } }),
+)
+export const mainlineStatus = mf.value(
+  'mainline.status',
+  stateMachine({
+    initial: 'planning',
+    states: ['planning', 'active', 'blocked', 'done', 'dropped'],
+    transitions: [
+      { from: 'planning', to: 'active' },
+      { from: 'active', to: 'done', guard: 'mainline.close-requires-criteria' },
+    ],
+  }),
+)
+export const mainline = mf.schema(
+  'mainline',
+  entity({
+    identity: 'id',
+    fields: {
+      id: { type: 'string', pattern: '^m\\d{3}$' },
+      status: { enum: mainlineStatus.states },
+      criteria: { type: 'array', items: ref(criterion) },
+    },
+  }),
+)
+export const closeRequiresCriteria = mf.statement(
+  'mainline.close-requires-criteria',
+  invariant(mainline, { 'zh-TW': '解決條件全部勾選後，主脈絡才能標為 done' }),
+)
+export const mainlineClosed = mf.schema(
+  'mainline-closed',
+  domainEvent({ mainline: ref(mainline, 'id'), closedAt: { type: 'string', format: 'date-time' } }),
+)
+export const closeMainline = mf.value(
+  'close-mainline',
+  useCase({
+    input: ref(mainline, 'id'),
+    steps: [
+      { layer: 'application', action: '讀取主脈絡' },
+      { layer: 'domain', action: '檢查不變條件', rule: closeRequiresCriteria },
+      { layer: 'domain', action: '發出事件', emits: mainlineClosed },
+    ],
+    errors: ['criteria-not-done', 'mainline-not-found'],
+  }),
+)
+```
+
+| Builder       | Content   | Topic              | What it makes                                                                                           |
+| :------------ | :-------- | :----------------- | :------------------------------------------------------------------------------------------------------ |
+| `valueObject` | schema    | `ddd:value-object` | `{ type: 'object', properties, required? }`                                                             |
+| `entity`      | schema    | `ddd:entity`       | `{ type: 'object', 'x-identity', properties, required? }`. `identity` is a field name or two or more    |
+| `domainEvent` | schema    | `ddd:domain-event` | the same shape as `valueObject`                                                                         |
+| `aggregate`   | value     | `ddd:aggregate`    | `{ root, members }`, each member `{ entity, cardinality }`, `cardinality` `'one'` (default) or `'many'` |
+| `invariant`   | statement | `ddd:invariant`    | the text you give, with the subject in `relates`                                                        |
+| `useCase`     | value     | `ddd:use-case`     | `{ input?, output?, steps, errors }`, each step `{ layer, action, rule?, emits?, calls? }`              |
+
+The topics come first, then those of `factsOf`, then those of the call. Each builder is checked against the method
+it goes to, so `mf.value(name, entity(...))` fails with `BuilderError`. A fact given in `root`, `entity`, `rule`,
+`emits` or `calls` is written as the fact location after the build and goes into `derivedFrom`. A property that is
+a `ref(fact)` becomes a `$ref` into `$defs`, as in [Field references](#field-references). Reading a field of
+another fact (`mainlineStatus.states`) puts that fact into `derivedFrom`.
+
+A domain service, a repository and an infrastructure contract have no builder, because their content is already a
+schema or a statement. Write the input and output with `mf.schema` and the behaviour with `mf.statement`, and give
+them the same `ddd:` prefix by hand:
+
+```ts
+export const placeOrderInput = mf.schema(
+  'place-order.input',
+  { type: 'object', properties: { order: ref(order, 'id') } },
+  { topics: ['ddd:domain-service'] },
+)
+export const orderRules = mf.statement('order-pricing', 'A discount never takes the total below zero.', {
+  topics: ['ddd:domain-service'],
+})
+export const orderRepository = mf.schema(
+  'order-repository.find',
+  { type: 'object', properties: { id: { type: 'string' } } },
+  { topics: ['ddd:repository'] },
+)
+```
+
+Write only the operation names and their input and output schemas for a repository, and leave out the database and
+the query. Use `ddd:infrastructure` for the contract of a table, an environment variable or an API path.
+
+Write an entity as a schema, write a relation as a `relations` value, and let the side that uses them draw the diagram. fact-kit has no ER diagram. Use `relationsToMermaid` on a `relations` value for the flow of relations, and
+`sequenceToMermaid` takes a `useCase` (below).
+
+How a `history` row names an item of a DDD collection, together with the flow collections above:
+
+| Builder                 | Collection            | Key (how a `history` row names an item)                                                                                                                                                                                                                                                                               |
+| :---------------------- | :-------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stateMachine`          | `states`              | the name: `remove: { '/states': ['blocked'] }`                                                                                                                                                                                                                                                                        |
+| `stateMachine`          | `transitions`         | `from` and `to`: `remove: { '/transitions': [['active', 'done']] }`                                                                                                                                                                                                                                                   |
+| `relations`             | `nodes`               | the name: `remove: { '/nodes': ['b'] }`                                                                                                                                                                                                                                                                               |
+| `relations`             | `edges`               | `from`, `to` and `name`: `remove: { '/edges': [['a', 'b', 'has']] }`                                                                                                                                                                                                                                                  |
+| `sequence`              | `steps`               | `action`, which no two steps share: `remove: { '/steps': ['ask'] }`                                                                                                                                                                                                                                                   |
+| `entity`, `valueObject` | fields (`properties`) | the property name, not a keyed array: `remove: { '/properties': ['status'] }`, `add: { '/properties': { note: {...} } }`, `replace: { '/properties/status': {...} }`. `required` is a keyed list of names: drop the field and its name together with `remove: { '/properties': ['status'], '/required': ['status'] }` |
+| `aggregate`             | `members`             | the entity position, field `entity`: `remove: { '/members': [factLink(line)] }`                                                                                                                                                                                                                                       |
+| `useCase`               | `steps`               | `action`, which no two steps share: `remove: { '/steps': ['發出事件'] }`. `add` appends at the end                                                                                                                                                                                                                    |
+| `useCase`               | `errors`              | the code: `add: { '/errors': ['mainline-locked'] }`                                                                                                                                                                                                                                                                   |
+| `domainEvent`           | fields (`properties`) | the same as the fields of `entity`                                                                                                                                                                                                                                                                                    |
+| `invariant`             | no collection         | rewrite the whole sentence: `{ since: 'next', statement: invariant(mainline, {...}) }`. `set: { '': text }` works too, but only the rewrite row carries the new `relates`                                                                                                                                             |
+
+```ts
+import { entity, factLink, history, keyed } from 'fact-kit'
+
+const first = entity({
+  identity: 'id',
+  fields: { id: { type: 'string' }, status: { enum: ['open', 'closed'] } },
+  required: ['id', 'status'],
+})
+const person = mf.schema(
+  'person',
+  history(
+    { since: '1.0.0', schema: first },
+    {
+      since: '1.1.0',
+      remove: { '/properties': ['status'], '/required': ['status'] },
+      add: { '/properties': { note: { type: 'string' } } },
+    },
+  ),
+)
+```
+
+Every row is checked again by the builder that made the content. A row that drops a field but leaves its name in
+`required`, or in `x-identity`, fails with `BuilderError` and `check` reports `builder`. A row that adds a step
+whose `layer` is not `application`, `domain` or `infrastructure` fails the same way. A key that appears twice in a
+collection fails with `history`. To give an entity a `required` list in a later row, set it whole with
+`set: { '/required': keyed(['id']) }`.
+
+`sequenceToMermaid` also takes a `useCase`, or a fact whose value is one. The participants are `caller` and then each
+`layer` in the order of first use, and each step is a message from the layer of the step before it (`caller` for
+the first step) to its own layer.
+
+```text
+sequenceDiagram
+    participant p0 as caller
+    participant p1 as application
+    participant p2 as domain
+    p0->>p1: 讀取主脈絡
+    p1->>p2: 檢查不變條件
+    p2->>p2: 發出事件
+```
 
 ## Check rules
 
