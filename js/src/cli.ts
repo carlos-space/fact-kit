@@ -21,7 +21,7 @@ Commands
   build                 Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/, or in an
                         aggregate package ("aggregate" in the config) copy its components' indexes into dist/
   diff <old> <new>      List the fact ids added, removed and changed between two index.json files
-  diff --impact <id>    List the facts computed from a fact, and the docs and code that read it
+  diff --impact <id>    List the facts computed from a fact, and the docs, code and examples that read it
   pin --version <v>     Turn every "next" in the "since" of the rows (not the pending ones) into <v>
   merge-since           After "git merge", settle the conflicts that differ only in "since" and rewrite
                         the rows the merged-in side added
