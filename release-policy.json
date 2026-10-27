@@ -1,0 +1,7 @@
+{
+  "product": { "name": "fact-kit", "members": [] },
+  "units": {
+    "fact-kit": { "kind": "package", "stages": ["alpha", "ga"] },
+    "fact-kit-facts": { "kind": "package", "stages": ["ga"] }
+  }
+}
