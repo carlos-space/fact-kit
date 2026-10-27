@@ -5,8 +5,10 @@
 # separator to "/" at the top level. The Swift unit sets include-component-in-tag and include-v-in-tag to
 # false, so its tag is the bare version. A setting that is false must win, so presence is tested with has()
 # and never with //, which treats false as missing.
+# A path the config does not list is an error, not a guess: on a release branch the config holds only the
+# train's units, and a tag made up for another unit would name a tag release-please never creates.
 . as $c
-| .packages[$p] as $u
+| (.packages[$p] // error("\($p) is not a package of release-please-config.json")) as $u
 | def pick($k; $d): if ($u | has($k)) then $u[$k] elif ($c | has($k)) then $c[$k] else $d end;
   pick("include-component-in-tag"; true) as $withComponent
   | pick("include-v-in-tag"; true) as $withV
