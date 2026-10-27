@@ -10,6 +10,7 @@ import {
   history,
   keyed,
   observedDoc,
+  ref,
   relations,
   relationsToMermaid,
   sequence,
@@ -472,5 +473,56 @@ describe('c005 history rules for the keyed collections of the flows', () => {
     const fact = JSON.parse(readFileSync(join(dir, 'dist/flow/index.json'), 'utf8')).facts[0]
     expect(fact.variants).toHaveLength(2)
     expect(fact.variants[1].content.value.transitions[1]).toEqual({ from: 'b', to: 'c', event: ['x', 'y'] })
+  })
+})
+
+describe('c005 a guard that is a ref', () => {
+  const rule = mf.statement('rule', 'All criteria are met.')
+  const guarded = () =>
+    stateMachine({
+      initial: 'active',
+      states: ['active', 'done'],
+      transitions: [{ from: 'active', to: 'done', event: 'finish', guard: ref(rule) }],
+    })
+
+  test('the machine accepts it, and drawing it before the build names the fact', () => {
+    expect(guarded().transitions[0]?.guard).toMatch(/^⟦fact-ref:\d+⟧$/)
+    expect(stateMachineToMermaid(guarded())).toContain('s0 --> s1: finish [flow.rule]')
+  })
+
+  test('the build writes the location and derivedFrom, and the fact draws with that label', async () => {
+    const dir = makeTmp('flow-guard-ref')
+    writeTree(dir, {
+      'package.json': { name: 'demo-facts', version: '1.0.0', type: 'module', exports: {} },
+      'facts/flow/index.ts': [
+        `import { factsOf, observedDoc, stateMachine, ref } from '${src}'`,
+        "const mf = factsOf({ tool: 'flow', source: observedDoc({ url: 'https://example.com/x', fetched: '2026-10-01' }) })",
+        "const rule = mf.statement('rule', 'All criteria are met.')",
+        "const m = mf.value('m', stateMachine({ initial: 'a', states: ['a', 'b'], transitions: [{ from: 'a', to: 'b', event: 'go', guard: ref(rule) }] }))",
+        "export default { describes: { flow: '1.1.0' }, facts: [rule, m] }",
+      ].join('\n'),
+    })
+    const result = await buildFacts({ cwd: dir, writeExports: true })
+    expect(result.problems).toEqual([])
+    const fact = JSON.parse(readFileSync(join(dir, 'dist/flow/index.json'), 'utf8')).facts[1]
+    expect(fact.content.value.transitions[0].guard).toBe('flow.rule')
+    expect(fact.derivedFrom).toEqual(['flow.rule'])
+    expect(stateMachineToMermaid(fact)).toBe(
+      [
+        'stateDiagram-v2',
+        '    state "a" as s0',
+        '    state "b" as s1',
+        '    [*] --> s0',
+        '    s0 --> s1: go [flow.rule]',
+      ].join('\n'),
+    )
+  })
+
+  test('a guard that is neither a string nor a ref still fails', () => {
+    expect(
+      builderFailure(() =>
+        stateMachine({ initial: 'a', states: ['a'], transitions: [{ from: 'a', to: 'a', guard: 3 as never }] }),
+      ),
+    ).toContain('"guard" must be a string or a ref(fact)')
   })
 })

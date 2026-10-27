@@ -1,4 +1,6 @@
-import { FROM, SUBSET, isObject, markOf } from './markers.ts'
+import { FROM, REF_TOKEN, SUBSET, WHOLE_REF, isObject, markOf, refTarget } from './markers.ts'
+import { SUB_LIST, SUB_MAP, SUB_ONE, subschemas } from './schema-walk.ts'
+import { canonical, topLevelContent } from './select.ts'
 import { loadInstalledIndex } from './read.ts'
 import type { DerivedFact, Fact, FactDecl, FactLike, FactsModule, FactsSource, Problem } from './types.ts'
 
@@ -17,7 +19,8 @@ function links(): LinkRegistry {
   return (store[LINKS] ??= { byToken: new Map(), byFact: new WeakMap() })
 }
 
-const TOKEN = /⟦fact-link:(\d+)⟧/g
+/** A placeholder of `factLink` or of `ref`. */
+const TOKEN = /⟦fact-(?:link|ref):\d+⟧/g
 
 /**
  * The location of another fact of this package, to write into a sentence of `content`. It returns a
@@ -77,10 +80,27 @@ export interface SubsetDecl {
   location: string
 }
 
+/** A `ref` that a fact writes, for `check` to test against the rows of the fact it points at. */
+export interface RefDecl {
+  /** The id of the fact that writes the `ref`. */
+  id: string
+  /** The location of the target: `<id>` in the same entry, `<spec>:<id>` in another. */
+  target: string
+  /** The dotted field, or undefined for the whole fact. */
+  field?: string
+  /** Whether it is the whole value of a subschema, so the build wrote a `$ref` and put the schema of the target in `$defs`. */
+  asSchema: boolean
+  /** The rows of the fact that write it, as `check` counts rows. Undefined when it is outside the rows. */
+  rows?: number[]
+  /** Where the fact is declared. */
+  location: string
+}
+
 export interface ResolvedEntry {
   module: FactsModule
   problems: Problem[]
   subsets: SubsetDecl[]
+  refs: RefDecl[]
 }
 
 const at = (origin: string, pointer: string) => `${origin}#${pointer}`
@@ -104,19 +124,69 @@ function deriveFact(d: DerivedFact, ctx: ResolveContext): FactDecl {
   return derived
 }
 
-/**
- * Copy of `value` with every string passed through `text`. `from` is called, in document order, for each object
- * or array that a builder tagged with the fact it was read from. The copy has no tags.
- */
-function mapDoc(value: unknown, text: (text: string) => string, from: (fact: object) => void): unknown {
-  if (typeof value === 'string') return text(value)
-  if (typeof value === 'object' && value !== null) {
-    const origin = markOf(value, FROM)
-    if (typeof origin === 'object' && origin !== null) from(origin)
-    if (Array.isArray(value)) return value.map((v) => mapDoc(v, text, from))
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, mapDoc(v, text, from)]))
+/** What `mapDoc` calls back while it copies the content of a fact. */
+interface Walk {
+  /** Replaces the placeholders in a string. */
+  text(text: string): string
+  /** Called, in document order, for each object or array a builder tagged with the fact it was read from. */
+  from(fact: object): void
+  /** The `$ref` for a string that is the whole value of a subschema and is a `ref` placeholder, else undefined. */
+  subref(token: string): unknown
+  /** Called on entering an object. Returns what to call on leaving it, if anything. */
+  enter(node: object): (() => void) | undefined
+  /** The schemas the walk reads by the keywords of JSON Schema. */
+  schemaRoots: ReadonlySet<object>
+  /** Called with a schema root and its copy, when the copy is done. */
+  done(root: object, copy: Record<string, unknown>): void
+}
+
+/** A copy of a subschema. A string in a subschema position is a `ref` or it is left as it is. */
+function mapSub(value: unknown, w: Walk): unknown {
+  if (typeof value === 'string' && WHOLE_REF.test(value)) {
+    const replaced = w.subref(value)
+    if (replaced !== undefined) return replaced
   }
-  return value
+  return mapDoc(value, w, true)
+}
+
+/** A copy of the value of one keyword of a schema: the subschemas of it are read as schemas, the rest as plain data. */
+function mapKeyword(key: string, value: unknown, w: Walk): unknown {
+  const tag = (node: unknown) => {
+    const origin = markOf(node, FROM)
+    if (typeof origin === 'object' && origin !== null) w.from(origin)
+  }
+  if (SUB_MAP.has(key) && isObject(value)) {
+    tag(value)
+    return Object.fromEntries(Object.entries(value).map(([name, sub]) => [name, mapSub(sub, w)]))
+  }
+  if (SUB_ONE.has(key)) return mapSub(value, w)
+  if (SUB_LIST.has(key) && Array.isArray(value)) {
+    tag(value)
+    return value.map((sub) => mapSub(sub, w))
+  }
+  return mapDoc(value, w)
+}
+
+/**
+ * Copy of `value` with every string passed through `w.text`. The copy has no tags. Where a schema keyword says a
+ * value is a subschema (`schema` is true below a schema root), a `ref` that is the whole value becomes a `$ref`.
+ */
+function mapDoc(value: unknown, w: Walk, schema = false): unknown {
+  if (typeof value === 'string') return w.text(value)
+  if (typeof value !== 'object' || value === null) return value
+  const origin = markOf(value, FROM)
+  if (typeof origin === 'object' && origin !== null) w.from(origin)
+  const leave = w.enter(value)
+  try {
+    if (Array.isArray(value)) return value.map((v) => mapDoc(v, w))
+    const root = w.schemaRoots.has(value)
+    const copy: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value)) copy[k] = schema || root ? mapKeyword(k, v, w) : mapDoc(v, w)
+    if (root) w.done(value, copy)
+    return copy
+  } finally {
+    leave?.()
+  }
 }
 
 /** The roots of the contents of a fact, where `subsetOf` hides its mark. */
@@ -125,11 +195,22 @@ function contentRoots(decl: FactDecl): unknown[] {
   return rows.flatMap((c) => (isObject(c) && 'value' in c ? [c.value] : []))
 }
 
+const escapePointer = (name: string): string => name.replaceAll('~', '~0').replaceAll('/', '~1')
+
+/** One `ref` that a fact writes, before it becomes a {@link RefDecl}. */
+interface RefUse {
+  target: string
+  field: string | undefined
+  asSchema: boolean
+  /** `undefined` when it is written outside the rows of the fact. */
+  rows: Set<number> | undefined
+}
+
 /**
  * Turns the loaded sources of one package into plain facts: derives the facts that come from another package,
- * and replaces `relates` and `factLink` with `derivedFrom`. A related fact is matched by object identity, so
- * renaming or moving a fact does not break the link. A fact object that is not one of this package's facts
- * (one imported from another package) is reported as `relates-foreign`.
+ * and replaces `relates`, `factLink` and `ref` with `derivedFrom` and locations. A related fact is matched by
+ * object identity, so renaming or moving a fact does not break the link. A fact object that is not one of this
+ * package's facts is reported as `relates-foreign`: one that no entry lists, or one imported from another package.
  */
 export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveContext): ResolvedEntry[] {
   const out: ResolvedEntry[] = entries.map((e) => ({
@@ -140,10 +221,12 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
     },
     problems: [],
     subsets: [],
+    refs: [],
   }))
   // What each declared object ends up as, and where it lives.
   const registry = new Map<object, { entry: string; id: string }>()
   const decls: { entryIndex: number; at: string; decl: FactDecl }[] = []
+  const declOf = new Map<object, number>()
 
   for (const [ei, e] of entries.entries()) {
     const problems = (out[ei] as ResolvedEntry).problems
@@ -169,31 +252,50 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
         continue
       }
       if (typeof decl.id === 'string') registry.set(raw, { entry: e.entry, id: decl.id })
+      declOf.set(raw, decls.length)
       decls.push({ entryIndex: ei, at: where, decl })
     }
   }
+  const ownTools = new Set(decls.flatMap((d) => (typeof d.decl?.tool === 'string' ? [d.decl.tool] : [])))
 
-  for (const { entryIndex, at: where, decl } of decls) {
+  const resolved = new Map<number, unknown>()
+  const building: string[] = []
+  const resolveDecl = (di: number): unknown => {
+    if (resolved.has(di)) return resolved.get(di)
+    const { entryIndex, at: where, decl } = decls[di] as (typeof decls)[number]
+    if (typeof decl !== 'object' || decl === null) {
+      resolved.set(di, decl)
+      return decl
+    }
+    building.push(String(decl.id))
+    try {
+      const fact = resolveFact(entryIndex, where, decl)
+      resolved.set(di, fact)
+      return fact
+    } finally {
+      building.pop()
+    }
+  }
+
+  const resolveFact = (entryIndex: number, where: string, decl: FactDecl): Fact => {
     const e = entries[entryIndex] as SourceEntry
     const problems = (out[entryIndex] as ResolvedEntry).problems
-    const facts = out[entryIndex]?.module.facts as Fact[]
-    if (typeof decl !== 'object' || decl === null) {
-      facts.push(decl as unknown as Fact)
-      continue
-    }
     const locate = (target: object): string | undefined => {
       const found = registry.get(target)
       if (!found) return undefined
       return found.entry === e.entry ? found.id : `${ctx.packageName}/${found.entry}:${found.id}`
     }
+    const report = (code: Problem['code'], message: string) => problems.push({ code, message, location: where })
     // Reports the object and returns its id, which stands in for the location in the text. It is not a derivedFrom.
     const foreign = (target: object, how: string): string => {
-      const id = (target as { id?: unknown }).id
-      problems.push({
-        code: 'relates-foreign',
-        message: `${decl.id}: ${how} ${typeof id === 'string' ? `"${id}"` : 'a value'}, which is not a fact of this package. A fact object imported from another package can not be related. Use derive(upstreamSpec, id) to bring it in`,
-        location: where,
-      })
+      const { id, tool } = target as { id?: unknown; tool?: unknown }
+      const named = typeof id === 'string' ? `"${id}"` : 'a value'
+      report(
+        'relates-foreign',
+        typeof tool === 'string' && ownTools.has(tool)
+          ? `${decl.id}: ${how} ${named}, which is not listed in the \`facts\` of any entry. Add it to the \`facts\` of an entry of this package`
+          : `${decl.id}: ${how} ${named}, which is not a fact of this package. A fact object imported from another package can not be related. Use derive(upstreamSpec, id) to bring it in`,
+      )
       return typeof id === 'string' ? id : ''
     }
 
@@ -203,11 +305,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
     }
     for (const related of decl.relates ?? []) {
       if (typeof related !== 'object' || related === null) {
-        problems.push({
-          code: 'relates-foreign',
-          message: `${decl.id}: relates has ${JSON.stringify(related)}, which is not a fact object`,
-          location: where,
-        })
+        report('relates-foreign', `${decl.id}: relates has ${JSON.stringify(related)}, which is not a fact object`)
         continue
       }
       const location = locate(related)
@@ -229,28 +327,184 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
         subsets.push({ id: decl.id, parent: location, location: where })
       }
     }
-    const { relates: _relates, derivedFrom: _own, ...rest } = decl
+
+    // The rows of the fact, as `check` counts them, and the schemas among them.
+    const rowOf = new Map<object, number>()
+    if (Array.isArray(decl.variants)) {
+      for (const [i, v] of decl.variants.entries()) if (isObject(v?.content)) rowOf.set(v.content, i)
+    } else if (isObject(decl.content)) {
+      rowOf.set(decl.content, 0)
+    }
+    const schemaRoots = new Set<object>()
+    for (const content of rowOf.keys()) {
+      const schema = (content as { schema?: unknown }).schema
+      if (isObject(schema)) schemaRoots.add(schema)
+    }
+
+    const uses = new Map<string, RefUse>()
+    let row: number | undefined
+    let currentRoot: object | undefined
+    const embeds = new Map<object, object[]>()
+    const bad = new Set<string>()
     const readFrom = new Set<object>()
-    const replaced = mapDoc(
-      rest,
-      (text) =>
+
+    /** The location of the target of a placeholder and its field, or undefined after reporting why not. */
+    const target = (
+      token: string,
+      asSchema: boolean,
+    ): { fact: object; location: string; field?: string } | undefined => {
+      const t = refTarget(token)
+      if (!t) return undefined
+      const location = locate(t.fact)
+      if (location === undefined) {
+        foreign(t.fact, 'ref points at')
+        return undefined
+      }
+      const id = registry.get(t.fact)?.id
+      if (t.field !== undefined && t.field.split('.').includes('')) {
+        const key = `${location}#${t.field}`
+        if (!bad.has(key)) {
+          bad.add(key)
+          report(
+            'ref',
+            `${decl.id}: ref(${id}, "${t.field}"): the field path has an empty part. Write the parts with single dots, and note that a field whose name has a dot can not be referenced`,
+          )
+        }
+        return undefined
+      }
+      add(location)
+      const key = `${location}|${t.field ?? ''}|${asSchema}`
+      const use = uses.get(key) ?? { target: location, field: t.field, asSchema, rows: new Set<number>() }
+      uses.set(key, use)
+      if (row === undefined) use.rows = undefined
+      else use.rows?.add(row)
+      return { fact: t.fact, location, ...(t.field !== undefined ? { field: t.field } : {}) }
+    }
+
+    /** The resolved fact `x` points at, or undefined after reporting a loop. */
+    const embedded = (x: object): Fact | undefined => {
+      const xi = declOf.get(x)
+      if (xi === undefined) return undefined
+      const id = String(registry.get(x)?.id)
+      const start = building.indexOf(id)
+      if (start !== -1) {
+        report('ref', `${decl.id}: schemas embed each other in a loop: ${[...building.slice(start), id].join(' -> ')}`)
+        return undefined
+      }
+      return resolveDecl(xi) as Fact
+    }
+
+    const walk: Walk = {
+      text: (text) =>
         text.replace(TOKEN, (token) => {
-          const target = links().byToken.get(token)
-          if (!target) return token
-          const location = locate(target)
-          if (location === undefined) return foreign(target, 'factLink points at')
+          if (token.startsWith('⟦fact-ref:')) {
+            const t = target(token, false)
+            if (!t) return String((refTarget(token)?.fact as { id?: unknown } | undefined)?.id ?? token)
+            return t.field !== undefined ? `${t.location}#${t.field}` : t.location
+          }
+          const found = links().byToken.get(token)
+          if (!found) return token
+          const location = locate(found)
+          if (location === undefined) return foreign(found, 'factLink points at')
           add(location)
           return location
         }),
-      (origin) => {
+      from: (origin) => {
         if (readFrom.has(origin)) return
         readFrom.add(origin)
         const location = locate(origin)
         if (location !== undefined) add(location)
         else foreign(origin, 'a value read from')
       },
-    ) as Record<string, unknown>
-    facts.push({ ...replaced, ...(derivedFrom.length > 0 ? { derivedFrom } : {}) } as unknown as Fact)
+      subref: (token) => {
+        if (!refTarget(token)) return undefined
+        const t = target(token, true)
+        if (!t) return {}
+        const id = registry.get(t.fact)?.id
+        if (currentRoot) embeds.set(currentRoot, [...(embeds.get(currentRoot) ?? []), t.fact])
+        const path =
+          t.field === undefined ? '' : `/properties/${t.field.split('.').map(escapePointer).join('/properties/')}`
+        return { $ref: `#/$defs/${id}${path}` }
+      },
+      enter: (node) => {
+        const previous = { row, root: currentRoot }
+        if (rowOf.has(node)) row = rowOf.get(node)
+        if (schemaRoots.has(node)) currentRoot = node
+        if (row === previous.row && currentRoot === previous.root) return undefined
+        return () => {
+          row = previous.row
+          currentRoot = previous.root
+        }
+      },
+      schemaRoots,
+      done: (root, copy) => {
+        const wanted = [...new Set(embeds.get(root) ?? [])]
+        if (wanted.length === 0) return
+        const defs: Record<string, unknown> = isObject(copy.$defs) ? copy.$defs : {}
+        const put = (key: string, schema: unknown) => {
+          if (Object.hasOwn(defs, key) && canonical(defs[key]) !== canonical(schema)) {
+            report(
+              'ref',
+              `${decl.id}: $defs already has "${key}" with another schema, so the schema of ${key} can not be added`,
+            )
+          } else {
+            defs[key] = schema
+          }
+        }
+        for (const x of wanted) {
+          const id = String(registry.get(x)?.id)
+          const resolvedX = embedded(x)
+          if (!resolvedX) continue
+          let schema: unknown
+          try {
+            const content = topLevelContent(resolvedX)?.content
+            schema = (content as { schema?: unknown } | undefined)?.schema
+          } catch {
+            // A `since` that is not a version: `check` reports that.
+          }
+          // A fact that is not a schema is reported by `check`, which tests every row of it.
+          if (!isObject(schema)) continue
+          const { $defs: inner, ...body } = structuredClone(schema)
+          const moved = [[id, body], ...(isObject(inner) ? Object.entries(inner) : [])] as [string, unknown][]
+          // A relative file `$ref` is relative to the entry the file is in, so it breaks in another entry.
+          let broken = false
+          if (registry.get(x)?.entry !== e.entry) {
+            for (const [, part] of moved) {
+              for (const { schema: sub } of subschemas(part)) {
+                if (typeof sub.$ref === 'string' && !sub.$ref.startsWith('#')) {
+                  broken = true
+                  report(
+                    'ref',
+                    `${decl.id}: ${id} has a $ref to "${sub.$ref}", a file of another entry, and the path breaks once the schema is embedded here`,
+                  )
+                }
+              }
+            }
+          }
+          if (!broken) for (const [key, part] of moved) put(key, part)
+        }
+        copy.$defs = defs
+      },
+    }
+
+    const { relates: _relates, derivedFrom: _own, ...rest } = decl
+    const replaced = mapDoc(rest, walk) as Record<string, unknown>
+    const refs = (out[entryIndex] as ResolvedEntry).refs
+    for (const use of uses.values()) {
+      refs.push({
+        id: decl.id,
+        target: use.target,
+        ...(use.field !== undefined ? { field: use.field } : {}),
+        asSchema: use.asSchema,
+        ...(use.rows ? { rows: [...use.rows].sort((a, b) => a - b) } : {}),
+        location: where,
+      })
+    }
+    return { ...replaced, ...(derivedFrom.length > 0 ? { derivedFrom } : {}) } as unknown as Fact
+  }
+
+  for (const [di, { entryIndex }] of decls.entries()) {
+    ;((out[entryIndex] as ResolvedEntry).module.facts as unknown[]).push(resolveDecl(di))
   }
   return out
 }

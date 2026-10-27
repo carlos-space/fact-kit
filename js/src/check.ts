@@ -1,7 +1,10 @@
 import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
 import { ambiguousRows, topLevelContent } from './select.ts'
+import { refProblems } from './refs.ts'
+import { subschemas } from './schema-walk.ts'
 import { subsetProblems } from './subset.ts'
+import type { RefDecl } from './author.ts'
 import type { SubsetInput } from './subset.ts'
 import type { Fact, FactIndex, Problem } from './types.ts'
 import { compareVersions, parseVersion, sinceIssue } from './version.ts'
@@ -21,6 +24,8 @@ export interface IndexInput {
   source?: boolean
   /** Lists that `subsetOf` keeps inside the list of another fact. Only a source has them, because the index has no place for them. */
   subsets?: readonly SubsetInput[]
+  /** The `ref`s the facts write. Only a source has them, because the index has no place for them. */
+  refs?: readonly RefDecl[]
 }
 
 export interface ExampleInput {
@@ -297,6 +302,28 @@ function* walkRefs(value: unknown, pointer: string): Generator<{ ref: string; po
   }
 }
 
+/** The fields `x-identity` names that the same schema has no property for, one problem per subschema. */
+function identityProblems(schema: unknown, base: string, who: string, file: string): Problem[] {
+  const out: Problem[] = []
+  for (const { schema: sub, pointer } of subschemas(schema, base)) {
+    const named = sub['x-identity']
+    const names = (Array.isArray(named) ? named : [named]).filter((n): n is string => typeof n === 'string')
+    if (names.length === 0) continue
+    const properties = sub.properties
+    const known =
+      typeof properties === 'object' && properties !== null && !Array.isArray(properties) ? Object.keys(properties) : []
+    const missing = names.filter((n) => !known.includes(n))
+    if (missing.length > 0) {
+      out.push({
+        code: 'schema-property',
+        message: `${who}: x-identity names ${missing.map((n) => `"${n}"`).join(', ')}, which ${missing.length === 1 ? 'is' : 'are'} not in the properties of the same schema (${known.length > 0 ? known.join(', ') : 'it has none'})`,
+        location: `${file}#${pointer}/x-identity`,
+      })
+    }
+  }
+  return out
+}
+
 /** The `schemas/<file>` part of a relative `$ref`, or undefined when the ref points elsewhere. */
 export function schemaFileOfRef(ref: string): string | undefined {
   const m = /^(?:\.\/)?schemas\/([^#]+)(?:#.*)?$/.exec(ref)
@@ -384,6 +411,18 @@ export function checkFacts(options: CheckOptions): CheckResult {
         }
         edges.set(fact.id, dependsOn)
         checkRows(fact as Fact, at(file, `/facts/${i}`), problems, warnings)
+        const rowContents = [
+          // With rows, the top-level content only repeats one of them.
+          ...(Array.isArray(fact.variants) ? [] : [{ content: fact.content, pointer: `/facts/${i}/content` }]),
+          ...(Array.isArray(fact.variants) ? fact.variants : []).map((v, k) => ({
+            content: (v as { content?: unknown } | null)?.content,
+            pointer: `/facts/${i}/variants/${k}/content`,
+          })),
+        ]
+        for (const { content, pointer } of rowContents) {
+          const schema = (content as { schema?: unknown } | undefined)?.schema
+          if (schema !== undefined) problems.push(...identityProblems(schema, `${pointer}/schema`, fact.id, file))
+        }
         // Inline schemas may $ref a file under schemas/.
         const shipped = new Set((input.schemas ?? []).map((s) => s.file))
         const inline = (fact.content as { schema?: unknown } | undefined)?.schema
@@ -432,6 +471,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
       schemaCount++
       const label = `${file} schemas/${s.file}`
       problems.push(...formatProblems(validateSchemaDocument(s.schema), label))
+      problems.push(...identityProblems(s.schema, '', `schemas/${s.file}`, label))
       if (doScan) scan(s.schema, label, allowed, problems)
     }
   }
@@ -470,6 +510,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
   }
 
   problems.push(...subsetProblems(options.indexes))
+  problems.push(...refProblems(options.indexes))
 
   let exampleCount = 0
   for (const ex of options.examples ?? []) {

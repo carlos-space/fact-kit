@@ -99,6 +99,24 @@ describe('c001 meta-schema', () => {
     expect(validateSchemaDocument({ type: 'string', 'x-platforms': 'claude-code' })).not.toEqual([])
   })
 
+  test('x-identity takes a field name, or two or more distinct field names', () => {
+    const entity = (identity: unknown) => ({
+      type: 'object',
+      'x-identity': identity,
+      properties: { id: { type: 'string' }, mainline: { type: 'string' } },
+    })
+    expect(validateSchemaDocument(entity('id'))).toEqual([])
+    expect(validateSchemaDocument(entity(['mainline', 'id']))).toEqual([])
+    expect(validateFact(withSchema(entity('id')))).toEqual([])
+    // A single name is written as a string, so a list of one is not a second way to write it.
+    expect(validateSchemaDocument(entity(['id']))).not.toEqual([])
+    expect(validateSchemaDocument(entity(['id', 'id']))).not.toEqual([])
+    expect(validateSchemaDocument(entity(''))).not.toEqual([])
+    expect(validateSchemaDocument(entity(3))).not.toEqual([])
+    // A keyword that is not registered still fails.
+    expect(validateSchemaDocument({ type: 'object', 'x-foo': 'id' })[0]?.message).toContain('x-foo')
+  })
+
   test('structural mistakes are rejected', () => {
     // A field this version does not know is allowed at the top of a fact, so a later 1.x can add some.
     expect(validateFact({ ...valid, extra: 1 })).toEqual([])

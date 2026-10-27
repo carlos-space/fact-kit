@@ -69,12 +69,12 @@ describe('c002 relates and factLink', () => {
     expect(sibling.derivedFrom).toEqual(['demo.renamed'])
   })
 
-  test('a fact object that is not one of this package, such as one imported from another package, fails check and build', async () => {
+  test('a fact object of another package, imported from it, fails check and build and the message says to use derive', async () => {
     const dir = makeTmp('relates-foreign')
     writeTree(dir, {
       'package.json': pkg,
-      // Stands for a module of another package: its fact is not listed by any entry here.
-      'other/fact.ts': `export const outsider = ${factSrc('outsider')}\n`,
+      // Stands for a module of another package: its tool is not one this package uses.
+      'other/fact.ts': `export const outsider = ${factSrc('outsider').replace("id: 'demo.outsider', tool: 'demo'", "id: 'other.outsider', tool: 'other'")}\n`,
       'facts/a/index.ts': [
         `import { factLink } from '${src}'`,
         "import { outsider } from '../../other/fact.ts'",
@@ -88,12 +88,34 @@ describe('c002 relates and factLink', () => {
     expect(checked.code).toBe(1)
     const problems = JSON.parse(checked.stdout).problems
     expect(problems.map((p: any) => p.code)).toEqual(['relates-foreign', 'relates-foreign'])
-    expect(problems[0].message).toContain('"demo.outsider"')
+    expect(problems[0].message).toContain('"other.outsider"')
     expect(problems[0].message).toContain('derive(upstreamSpec, id)')
     const built = await cli(['build', '--cwd', dir])
     expect(built.code).toBe(1)
     expect(built.stderr).toContain('relates-foreign')
     expect(built.stderr).toContain('nothing was written')
+  })
+
+  test('a fact object of this package that no entry lists fails with a message that says to list it', async () => {
+    const dir = makeTmp('relates-unlisted')
+    writeTree(dir, {
+      'package.json': pkg,
+      'facts/_lib/lost.ts': `export const lost = ${factSrc('lost')}\n`,
+      'facts/a/index.ts': [
+        `import { factLink } from '${src}'`,
+        "import { lost } from '../_lib/lost.ts'",
+        'const mine = ' + factSrc('mine', ', relates: [lost]'),
+        'const text = { ' + factSrc('text').slice(2, -2) + ', content: { statement: `see ${factLink(lost)}` } }',
+        "export default { describes: { demo: '1.0.0' }, facts: [mine, text] }",
+        '',
+      ].join('\n'),
+    })
+    const checked = await cli(['check', '--cwd', dir, '--json'])
+    const problems = JSON.parse(checked.stdout).problems
+    expect(problems.map((p: any) => p.code)).toEqual(['relates-foreign', 'relates-foreign'])
+    expect(problems[0].message).toContain('"demo.lost"')
+    expect(problems[0].message).toContain('not listed in the `facts` of any entry')
+    expect(problems[0].message).not.toContain('derive(')
   })
 
   test('factLink returns one placeholder per fact and needs an object', () => {

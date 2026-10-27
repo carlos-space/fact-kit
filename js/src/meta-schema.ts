@@ -12,6 +12,13 @@ export const X_KEYWORDS = {
   'x-platforms': { type: 'array', items: { type: 'string' } },
   'x-diagnostic': { type: 'string' },
   'x-defaultRule': { type: 'string' },
+  /** The field that identifies an entity, or two or more fields that do together. `check` tests they are in `properties`. */
+  'x-identity': {
+    oneOf: [
+      { type: 'string', minLength: 1 },
+      { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 2, uniqueItems: true },
+    ],
+  },
 } as const
 
 export const SCHEMA_DIALECT_ID = 'urn:fact-kit:schema'

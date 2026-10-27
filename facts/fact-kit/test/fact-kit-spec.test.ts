@@ -114,6 +114,18 @@ describe('fact-kit.x-keywords', () => {
   it('lists the registered keywords with their value shapes', () => {
     expect(content('fact-kit.x-keywords')).toEqual(X_KEYWORDS)
   })
+
+  it('has x-identity on head and not for a reader of 0.7.0', () => {
+    const read = (version?: string) =>
+      (
+        selectFacts(specIndex, version === undefined ? {} : { version }).find(
+          (fact) => fact.id === 'fact-kit.x-keywords',
+        )?.content as { value: Record<string, unknown> }
+      ).value
+    expect(Object.keys(read('head'))).toContain('x-identity')
+    expect(Object.keys(read('0.7.0'))).not.toContain('x-identity')
+    expect(Object.keys(read('head')).filter((k) => k !== 'x-identity')).toEqual(Object.keys(read('0.7.0')))
+  })
 })
 
 const commands2 = content('fact-kit.cli')
@@ -372,6 +384,7 @@ describe('fact-kit.module-api', () => {
     'stateMachineToMermaid',
     'relationsToMermaid',
     'sequenceToMermaid',
+    'ref',
   ]
   const namesAt = (version?: string): string[] => {
     const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(
@@ -410,6 +423,7 @@ describe('fact-kit.module-api', () => {
       'fact-kit.history-row',
       'fact-kit.module-api',
       'fact-kit.problem-codes',
+      'fact-kit.x-keywords',
     ])
     for (const id of changed) expect(specIndex.facts.find((f) => f.id === id)?.variants?.[0]?.since).toBe('0.7.0')
   })

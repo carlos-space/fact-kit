@@ -2,7 +2,7 @@ import { access, readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { resolveEntries } from './author.ts'
-import type { SourceEntry, SubsetDecl } from './author.ts'
+import type { RefDecl, SourceEntry, SubsetDecl } from './author.ts'
 import type { FactsModule, FactsSource, Problem } from './types.ts'
 
 export interface LoadedEntry {
@@ -16,6 +16,8 @@ export interface LoadedEntry {
   problems: Problem[]
   /** The lists that `subsetOf` keeps inside the list of another fact. `check` tests them at every version boundary. */
   subsets: SubsetDecl[]
+  /** The `ref`s the facts write. `check` tests them against the rows of the facts they point at. */
+  refs: RefDecl[]
   /** JSON Schema files under `<entry>/schemas/`, keyed by path relative to that directory. */
   schemas: { file: string; schema: unknown }[]
 }
@@ -157,6 +159,7 @@ export async function loadEntries(factsDir: string, options: LoadEntriesOptions 
       module: (resolved[i] as (typeof resolved)[number]).module,
       problems: (resolved[i] as (typeof resolved)[number]).problems,
       subsets: (resolved[i] as (typeof resolved)[number]).subsets,
+      refs: (resolved[i] as (typeof resolved)[number]).refs,
       schemas: await readSchemas(e.dir),
     })
   }

@@ -19,12 +19,23 @@ export type {
 export { defineFacts } from './define.ts'
 export { HistoryError, history, keyed } from './history.ts'
 export type { HistoryRow, HistoryVariants } from './history.ts'
-export { BuilderError, contentOf, factsOf, observedDoc, observedSpike, statementFrom, subsetOf } from './builders.ts'
+export {
+  BuilderError,
+  contentOf,
+  factsOf,
+  observedDoc,
+  observedSpike,
+  ref,
+  statementFrom,
+  subsetOf,
+} from './builders.ts'
 export type {
   BuiltStatement,
+  FactRef,
   FactOptions,
   FactsFactory,
   FactsOfOptions,
+  FieldPath,
   SchemaFact,
   StatementFact,
   ValueFact,

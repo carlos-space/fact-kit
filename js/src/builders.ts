@@ -14,6 +14,7 @@ import {
   markOf,
   partsOf,
   recordRead,
+  refToken,
   setMark,
 } from './markers.ts'
 import type { BuiltStatement } from './markers.ts'
@@ -244,6 +245,55 @@ export function subsetOf<F extends FactLike, const E extends ElementOf<F>>(paren
   const out = keyed(items)
   setMark(out, SUBSET, parent)
   return out as E[]
+}
+
+// --- field references --------------------------------------------------------------------------------------
+declare const REF: unique symbol
+/** A reference placeholder. In a schema it becomes `{ $ref }`, elsewhere the text `<location>` or `<location>#<field>`. */
+export type FactRef = string & { readonly [REF]: true }
+
+type Depth = [0, 0, 0, 0]
+type SchemaPath<S, D extends 0[] = []> = D['length'] extends Depth['length']
+  ? never
+  : S extends { properties: infer P }
+    ? P extends object
+      ? { [K in keyof P & string]: K | `${K}.${SchemaPath<P[K], [...D, 0]>}` }[keyof P & string]
+      : never
+    : never
+type ValuePath<V, D extends 0[] = []> = D['length'] extends Depth['length']
+  ? never
+  : V extends readonly unknown[]
+    ? never
+    : V extends object
+      ? { [K in keyof V & string]: K | `${K}.${ValuePath<V[K], [...D, 0]>}` }[keyof V & string]
+      : never
+
+/** Field names `ref` takes for a fact: `properties` of a typed schema, keys of a typed value, any string when untyped. */
+export type FieldPath<F> = F extends { readonly [SCHEMA]: infer S }
+  ? unknown extends S
+    ? string
+    : SchemaPath<S>
+  : F extends { readonly [VALUE]: infer V }
+    ? unknown extends V
+      ? string
+      : ValuePath<V>
+    : F extends { readonly [STATEMENT]: true }
+      ? never
+      : string
+
+/**
+ * A reference to a fact of this package, or to a field of it written with dots (`'limits.max'`). It returns a
+ * placeholder that the build replaces. As the whole value of a subschema it becomes `{ $ref }` into the root
+ * `$defs`, where the build puts the schema of the fact. Anywhere else it becomes the fact location, followed by
+ * `#<field>` when there is a field. The fact goes into `derivedFrom`. A field name the type checker does not
+ * know fails to compile, and `check` tests that the field exists in every row the two facts share.
+ */
+export function ref<F extends FactLike>(fact: F, field?: FieldPath<F>): FactRef {
+  if (!isObject(fact)) throw new BuilderError(`ref: expected a fact object, got ${show(fact)}`)
+  if (field !== undefined && (typeof field !== 'string' || field === '')) {
+    throw new BuilderError(`ref: the field must be a non-empty string such as "limits.max", got ${show(field)}`)
+  }
+  return refToken(fact, field) as FactRef
 }
 
 // --- facts -------------------------------------------------------------------------------------------------
