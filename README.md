@@ -4,12 +4,13 @@
 
 ## 內容
 
-| 路徑                          | 內容                                                                                  | 發布到哪    |
-| :---------------------------- | :------------------------------------------------------------------------------------ | :---------- |
-| `js/`                         | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具 | npm（公開） |
-| `facts/fact-kit/`             | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                        | 不發布      |
-| `py/`、`rs/`、`go/`、`swift/` | 其他語言的實作，之後加入                                                              | 之後決定    |
-| `conformance/`                | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                | 不發布      |
+| 路徑                                                  | 內容                                                                                                                         | 發布到哪    |
+| :---------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------- | :---------- |
+| `js/`                                                 | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                        | npm（公開） |
+| `facts/fact-kit/`                                     | fact-kit 自己的 facts，是它的規格，測試拿它和 `js/` 的實作比對                                                               | 不發布      |
+| `facts/py/`、`facts/rs/`、`facts/go/`、`facts/swift/` | 其他語言讀取套件的公開 API，還沒發布前都帶 pending 標籤 `readers`，要用 `version: 'head'` 加 `include: ['readers']` 才讀得到 | 不發布      |
+| `py/`、`rs/`、`go/`、`swift/`                         | 其他語言的實作，之後加入                                                                                                     | 之後決定    |
+| `conformance/`                                        | 跨語言共用的 index 格式規格與測試資料，JS 套件的 `conformance:js` 跑它                                                       | 不發布      |
 
 ## 開發
 
@@ -22,7 +23,7 @@ pnpm build
 pnpm test
 ```
 
-`pnpm check` 依序跑型別檢查、prettier 與 `facts/fact-kit` 的 `fact-kit check`。`facts/fact-kit/fact-kit.config.json` 的 `allowedDomains` 列出 facts 可以引用的網域。
+`pnpm check` 依序跑型別檢查、prettier，以及 `facts/` 底下五個 component（`fact-kit`、`py`、`rs`、`go`、`swift`）各自的 `fact-kit check`。每個 component 的 `fact-kit.config.json` 的 `allowedDomains` 列出它的 facts 可以引用的網域。
 
 main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Commits，PR 內文就是 main 上的 commit 內文。本機不裝 git hook，規則都由 PR 的 workflow 檢查。內文不能帶 AI 平台署名。
 

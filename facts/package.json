@@ -16,10 +16,22 @@
     "build": "node ../js/src/bin.ts build"
   },
   "devDependencies": {
-    "@component/fact-kit": "workspace:*"
+    "@component/fact-kit": "workspace:*",
+    "@component/py": "workspace:*",
+    "@component/rs": "workspace:*",
+    "@component/go": "workspace:*",
+    "@component/swift": "workspace:*"
   },
   "exports": {
     "./index.json": "./dist/index.json",
-    "./schemas/*": "./dist/schemas/*"
+    "./schemas/*": "./dist/schemas/*",
+    "./py/index.json": "./dist/py/index.json",
+    "./py/schemas/*": "./dist/py/schemas/*",
+    "./rs/index.json": "./dist/rs/index.json",
+    "./rs/schemas/*": "./dist/rs/schemas/*",
+    "./go/index.json": "./dist/go/index.json",
+    "./go/schemas/*": "./dist/go/schemas/*",
+    "./swift/index.json": "./dist/swift/index.json",
+    "./swift/schemas/*": "./dist/swift/schemas/*"
   }
 }

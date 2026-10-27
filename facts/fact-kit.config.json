@@ -1,5 +1,9 @@
 {
   "aggregate": {
-    ".": "@component/fact-kit"
+    ".": "@component/fact-kit",
+    "py": "@component/py",
+    "rs": "@component/rs",
+    "go": "@component/go",
+    "swift": "@component/swift"
   }
 }

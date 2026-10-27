@@ -11,7 +11,7 @@
   },
   "scripts": {
     "check": "pnpm typecheck && pnpm format:check && pnpm facts:check",
-    "facts:check": "node js/src/bin.ts check --cwd facts/fact-kit",
+    "facts:check": "node js/src/bin.ts check --cwd facts/fact-kit && node js/src/bin.ts check --cwd facts/py && node js/src/bin.ts check --cwd facts/rs && node js/src/bin.ts check --cwd facts/go && node js/src/bin.ts check --cwd facts/swift",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
