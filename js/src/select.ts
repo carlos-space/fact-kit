@@ -26,7 +26,7 @@ export type SelectedFact = Fact & {
 /** What `since` reads as when a row does not have one. */
 export const NO_SINCE = '0.0.0'
 
-type Reader = { kind: 'head' } | { kind: 'latest' } | { kind: 'version'; v: Semver }
+export type Reader = { kind: 'head' } | { kind: 'latest' } | { kind: 'version'; v: Semver }
 
 /** The version a row starts at, seen from one reader: -inf, a version, or +inf (`next`). */
 type Bound = { kind: 'min' } | { kind: 'max' } | { kind: 'version'; v: Semver }
@@ -40,7 +40,7 @@ function compareBounds(a: Bound, b: Bound): number {
   return a.kind === 'version' && b.kind === 'version' ? compareSemver(a.v, b.v) : 0
 }
 
-interface Row {
+export interface Row {
   since: Since | undefined
   content: FactContent
   pending?: string
@@ -96,7 +96,7 @@ function boundOf(since: Since | undefined, reader: Reader, id: string): Bound | 
   return reader.kind === 'head' && hasNext ? MAX : { kind: 'version', v: newest }
 }
 
-interface Context {
+export interface Context {
   include: readonly string[]
   platform: string | undefined
   os: string | undefined
@@ -106,7 +106,7 @@ interface Context {
 
 const specificity = (row: Row) => (row.platforms ? 1 : 0) + (row.os ? 1 : 0)
 
-interface Candidate {
+export interface Candidate {
   row: Row
   index: number
   bound: Bound
@@ -132,17 +132,22 @@ const rank = (a: Candidate, b: Candidate): number =>
   compareBounds(a.bound, b.bound) || specificity(a.row) - specificity(b.row)
 
 /** The row that applies: the largest bound, then the more specific platform condition. */
-function chooseRow(rows: readonly Row[], reader: Reader, ctx: Context, id: string): Row | undefined {
+function chooseCandidate(rows: readonly Row[], reader: Reader, ctx: Context, id: string): Candidate | undefined {
   let best: Candidate | undefined
   for (const c of candidates(rows, reader, ctx, id)) {
     const order = best ? rank(c, best) : 1
     // Equal rows are an author mistake that `check` reports. The canonical text keeps the result stable.
     if (order > 0 || (order === 0 && best && canonical(c.row) < canonical(best.row))) best = c
   }
-  return best?.row
+  return best
 }
 
-function canonical(value: unknown): string {
+function chooseRow(rows: readonly Row[], reader: Reader, ctx: Context, id: string): Row | undefined {
+  return chooseCandidate(rows, reader, ctx, id)?.row
+}
+
+/** JSON with sorted object keys and no `undefined`, so equal values give equal strings. */
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
@@ -259,16 +264,22 @@ export function topLevelContent(fact: Fact): { content: FactContent; tier: 1 | 2
 /** The rows of a fact, for `check`. */
 export const factRows = rowsOf
 
+/** The platform and os a reader that matches no condition of the rows names. */
+const OTHER = '\0other'
+
+/** A reader and the conditions it names, one combination that a fact can be read under. */
+export interface BoundaryReader {
+  reader: Reader
+  ctx: Context
+}
+
 /**
- * Two rows of one fact that some reader can not tell apart: that reader gets both with the same bound and the
- * same number of conditions, and nothing ranks above them. The readers tried are `head`, the latest published,
- * and for every version a row names that version, the next patch and the first version of the next line, each
- * with every platform, os and pending label the rows name, and with none. Returns the positions of the two rows.
- * Returns undefined when the fact has no such pair, or when a `since` is not a version (`check` reports that).
+ * The readers to try against the rows of one or more facts, in the order `ambiguousRows` tries them. The versions
+ * are `head`, the latest published, and for every version a row names that version, the next patch and the first
+ * version of the next line. Each is combined with every platform, os and pending label the rows name, with none,
+ * and with a platform and an os that no row names.
  */
-export function ambiguousRows(fact: Fact): [number, number] | undefined {
-  const rows = rowsOf(fact)
-  if (rows.length < 2) return undefined
+export function boundaryReaders(rows: readonly Row[]): BoundaryReader[] {
   const readers: Reader[] = [{ kind: 'head' }, { kind: 'latest' }]
   for (const row of rows) {
     for (const s of Array.isArray(row.since) ? row.since : row.since === undefined ? [] : [row.since]) {
@@ -281,7 +292,7 @@ export function ambiguousRows(fact: Fact): [number, number] | undefined {
   }
   const mentioned = (pick: (r: Row) => readonly string[] | undefined): (string | undefined)[] => [
     undefined,
-    '\0other',
+    OTHER,
     ...new Set(rows.flatMap((r) => pick(r) ?? [])),
   ]
   const platforms = mentioned((r) => r.platforms)
@@ -290,20 +301,87 @@ export function ambiguousRows(fact: Fact): [number, number] | undefined {
     [],
     ...[...new Set(rows.flatMap((r) => (r.pending !== undefined ? [r.pending] : [])))].map((l) => [l]),
   ]
-  try {
-    for (const reader of readers) {
-      for (const platform of platforms) {
-        for (const os of systems) {
-          for (const include of labels) {
-            const found = candidates(rows, reader, { include, platform, os }, fact.id)
-            const top = found.filter((c) => found.every((o) => rank(c, o) >= 0))
-            if (top.length >= 2) return [(top[0] as Candidate).index, (top[1] as Candidate).index]
-          }
-        }
+  const out: BoundaryReader[] = []
+  for (const reader of readers) {
+    for (const platform of platforms) {
+      for (const os of systems) {
+        for (const include of labels) out.push({ reader, ctx: { include, platform, os } })
       }
+    }
+  }
+  return out
+}
+
+/**
+ * Two rows of one fact that some reader can not tell apart: that reader gets both with the same bound and the
+ * same number of conditions, and nothing ranks above them. The readers tried are those of {@link boundaryReaders}.
+ * Returns the positions of the two rows.
+ * Returns undefined when the fact has no such pair, or when a `since` is not a version (`check` reports that).
+ */
+export function ambiguousRows(fact: Fact): [number, number] | undefined {
+  const rows = rowsOf(fact)
+  if (rows.length < 2) return undefined
+  try {
+    for (const { reader, ctx } of boundaryReaders(rows)) {
+      const found = candidates(rows, reader, ctx, fact.id)
+      const top = found.filter((c) => found.every((o) => rank(c, o) >= 0))
+      if (top.length >= 2) return [(top[0] as Candidate).index, (top[1] as Candidate).index]
     }
   } catch {
     return undefined
   }
   return undefined
+}
+
+/** One reader under which two facts are read together, with the row of each that applies. */
+export interface PairedRows {
+  /** `head`, `latest`, or the version. */
+  version: string
+  /** The platform and os the reader names, or `undefined` for none. A platform or os no row names is `other`. */
+  platform: string | undefined
+  os: string | undefined
+  include: readonly string[]
+  /** The row of the first fact that applies, or `undefined` when none does. */
+  a: { content: FactContent; index: number } | undefined
+  /** The row of the second fact that applies. */
+  b: { content: FactContent; index: number } | undefined
+}
+
+const versionLabel = (reader: Reader): string =>
+  reader.kind === 'version'
+    ? `${reader.v.major}.${reader.v.minor}.${reader.v.patch}${reader.v.pre.length > 0 ? `-${reader.v.pre.join('.')}` : ''}`
+    : reader.kind
+
+/**
+ * Reads two facts under the readers of {@link boundaryReaders} taken over the rows of both, and picks the row of
+ * each that applies. Every check that compares one fact with another at each version boundary starts from this.
+ * A reader for which a `since` is not a version is skipped (`check` reports that).
+ */
+export function pairRows(a: Fact, b: Fact): PairedRows[] {
+  const rowsA = rowsOf(a)
+  const rowsB = rowsOf(b)
+  const out: PairedRows[] = []
+  const seen = new Set<string>()
+  for (const { reader, ctx } of boundaryReaders([...rowsA, ...rowsB])) {
+    const label = versionLabel(reader)
+    const key = JSON.stringify([label, ctx.platform, ctx.os, ctx.include])
+    if (seen.has(key)) continue
+    seen.add(key)
+    let pick: { a: Candidate | undefined; b: Candidate | undefined }
+    try {
+      pick = { a: chooseCandidate(rowsA, reader, ctx, a.id), b: chooseCandidate(rowsB, reader, ctx, b.id) }
+    } catch {
+      continue
+    }
+    const shape = (c: Candidate | undefined) => (c ? { content: c.row.content, index: c.index } : undefined)
+    out.push({
+      version: label,
+      platform: ctx.platform === OTHER ? 'other' : ctx.platform,
+      os: ctx.os === OTHER ? 'other' : ctx.os,
+      include: ctx.include,
+      a: shape(pick.a),
+      b: shape(pick.b),
+    })
+  }
+  return out
 }
