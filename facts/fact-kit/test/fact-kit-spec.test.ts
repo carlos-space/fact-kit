@@ -264,10 +264,18 @@ describe('fact-kit.history-row', () => {
     const good = [
       { since: '1.0.0', value: { a: 1 } },
       { since: '1.1.0', add: { '/a': [1] }, remove: { '/a': [2] }, replace: { '/b': 1 }, set: { '/c': 1 } },
+      { since: '1.2.0', add: { '/properties': { note: { type: 'string' } } }, remove: { '/properties': ['status'] } },
       { since: ['1.0.1', 'next'], pending: 'x', stability: 'experimental', platforms: ['codex'], os: ['macos'] },
     ]
     for (const r of good) expect(validate(r), JSON.stringify(r)).toBe(true)
-    const bad = [{ value: 1 }, { since: '1', nope: 1 }, { since: '1', add: [1] }, { since: '1', os: ['beos'] }]
+    const bad = [
+      { value: 1 },
+      { since: '1', nope: 1 },
+      { since: '1', add: [1] },
+      { since: '1', add: { '/a': 'x' } },
+      { since: '1', remove: { '/a': { b: 1 } } },
+      { since: '1', os: ['beos'] },
+    ]
     for (const r of bad) {
       expect(validate(r), JSON.stringify(r)).toBe(false)
       expect(() => history(r as never, ...[])).toThrow()
@@ -385,6 +393,12 @@ describe('fact-kit.module-api', () => {
     'relationsToMermaid',
     'sequenceToMermaid',
     'ref',
+    'entity',
+    'valueObject',
+    'aggregate',
+    'invariant',
+    'domainEvent',
+    'useCase',
   ]
   const namesAt = (version?: string): string[] => {
     const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(

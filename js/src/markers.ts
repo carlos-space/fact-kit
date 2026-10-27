@@ -20,6 +20,8 @@ export const SUBSET = Symbol.for('fact-kit.subset-of')
 export const HISTORY = Symbol.for('fact-kit.history')
 /** On the array `history` returns: the facts the statements of its rows relate to. */
 export const RELATES = Symbol.for('fact-kit.relates')
+/** On the array `history` returns: the names of the builders that made the content of its rows. */
+export const BUILDERS = Symbol.for('fact-kit.builders')
 /** On the object `invariant` and `statementFrom` return. */
 export const BUILT = Symbol.for('fact-kit.built-statement')
 
@@ -55,9 +57,10 @@ interface BuiltParts {
   relates: readonly object[]
 }
 
-export function makeBuilt(text: unknown, relates: readonly object[]): BuiltStatement {
+export function makeBuilt(text: unknown, relates: readonly object[], builder?: string): BuiltStatement {
   const built = { text, relates } as BuiltParts
   setMark(built, BUILT, true)
+  if (builder !== undefined) setMark(built, BUILDER, builder)
   return built as unknown as BuiltStatement
 }
 
@@ -68,12 +71,29 @@ export const partsOf = (built: BuiltStatement): BuiltParts => built as unknown a
 
 // --- what each builder checks of its own output ------------------------------------------------------
 type BuilderCheck = (root: unknown) => string | undefined
+export type ContentKind = 'value' | 'schema' | 'statement'
+interface BuilderAbout {
+  /** The content a builder makes, so `mf.*` can refuse it in another method. */
+  kind: ContentKind
+  /** The topic `mf.*` adds to the fact. */
+  topic?: string
+}
 const checks = new Map<string, BuilderCheck>()
+const abouts = new Map<string, BuilderAbout>()
 
 /** Registers the check of a builder. It returns a message that names the key at fault, or undefined. */
-export function registerBuilderCheck(name: string, check: BuilderCheck): void {
+export function registerBuilderCheck(name: string, check: BuilderCheck, about?: BuilderAbout): void {
   checks.set(name, check)
+  if (about) abouts.set(name, about)
 }
+
+/** What is known of the builder of that name: the kind of content it makes and the topic it adds. */
+export const builderAbout = (name: unknown): BuilderAbout | undefined =>
+  typeof name === 'string' ? abouts.get(name) : undefined
+
+/** True for a non-empty string, or an object with at least one language. */
+export const isText = (value: unknown): boolean =>
+  (typeof value === 'string' && value !== '') || (isObject(value) && Object.keys(value).length > 0)
 
 /** What is wrong with `root` for the builder that made it, or undefined. Without a tag nothing is checked. */
 export function builderProblem(root: unknown): string | undefined {
