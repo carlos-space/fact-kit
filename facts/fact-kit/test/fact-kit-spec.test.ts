@@ -17,6 +17,7 @@ import {
   history,
   indexSchema as implIndexSchema,
   readFacts,
+  selectFacts,
   validateExampleGroup,
   validateFact,
 } from '../../../js/src/index.ts'
@@ -29,13 +30,16 @@ const kitSrc = join(fileURLToPath(new URL('../../../js', import.meta.url)), 'src
 const entries = await loadEntries(join(root, 'facts'))
 const spec = entries.find((e) => e.entry === 'fact-kit')
 if (!spec) throw new Error('facts/fact-kit is missing')
-const byId = new Map(spec.module.facts.map((f) => [f.id, f]))
+// The facts are the spec of the unreleased code, so they are read as `head` of the built index. A fact with
+// several rows has no content of its own before the build.
+const specIndex = buildIndex('fact-kit-facts', spec)
+const byId = new Map(selectFacts(specIndex, { version: 'head' }).map((f) => [f.id, f]))
 const content = (id: string): any => {
   const f = byId.get(id)
   if (!f) throw new Error(`no fact ${id}`)
   return 'schema' in f.content ? f.content.schema : (f.content as { value: unknown }).value
 }
-const allFacts: Fact[] = entries.flatMap((e) => e.module.facts)
+const allFacts: Fact[] = entries.flatMap((e) => buildIndex('fact-kit-facts', e).facts)
 
 afterAll(() => cleanTmp())
 
@@ -352,6 +356,49 @@ describe('fact-kit.module-api', () => {
       .map((e: { name: string }) => e.name)
       .filter((name: string) => typeof (kitModule as Record<string, unknown>)[name] !== 'function')
     expect(missing).toEqual([])
+  })
+
+  // What the unreleased code adds to the exports. Each stays out of the list a reader of 0.7.0 gets.
+  const added = ['factsOf', 'observedDoc', 'observedSpike', 'contentOf', 'statementFrom', 'subsetOf']
+  const namesAt = (version?: string): string[] => {
+    const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(
+      (fact) => fact.id === 'fact-kit.module-api',
+    )
+    return ((f?.content as { value: { exports: { name: string }[] } }).value.exports ?? []).map((e) => e.name)
+  }
+
+  it('lists every function of the builders on head and none of them for a reader of 0.7.0', () => {
+    const head = api.exports.map((e: { name: string }) => e.name)
+    for (const name of added) {
+      expect(head, name).toContain(name)
+      expect(typeof (kitModule as Record<string, unknown>)[name], name).toBe('function')
+    }
+    const old = namesAt('0.7.0')
+    expect(old.filter((name) => added.includes(name))).toEqual([])
+    expect(head.filter((name: string) => !added.includes(name))).toEqual(old)
+    // A reader that names no version gets the latest published rows, which are those of 0.7.0.
+    expect(namesAt()).toEqual(old)
+  })
+
+  it('names each export once and writes the new history signature', () => {
+    const head: string[] = api.exports.map((e: { name: string }) => e.name)
+    expect(new Set(head).size).toBe(head.length)
+    expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
+  })
+
+  it('keeps one next row for each fact that changed', () => {
+    for (const fact of specIndex.facts) {
+      const rows = (fact.variants ?? []).filter((v) => v.since === 'next')
+      expect(rows.length, fact.id).toBeLessThanOrEqual(1)
+    }
+    const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === 'next')).map((f) => f.id)
+    expect(changed.sort()).toEqual([
+      'fact-kit.check-rules',
+      'fact-kit.history-row',
+      'fact-kit.module-api',
+      'fact-kit.problem-codes',
+    ])
+    for (const id of changed) expect(specIndex.facts.find((f) => f.id === id)?.variants?.[0]?.since).toBe('0.7.0')
   })
 
   it('lists the fields of SchemaRow', () => {

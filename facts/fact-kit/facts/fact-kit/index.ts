@@ -1,6 +1,7 @@
 // Facts about fact-kit itself. They are the spec, and fact-kit's code does not import them. The tests in
 // test/fact-kit-spec.test.ts compare each one with the implementation, so a change on either side fails there.
-import type { Fact, FactsModule } from '../../../../js/src/index.ts'
+import { history, keyed } from '../../../../js/src/index.ts'
+import type { FactDecl, FactsSource } from '../../../../js/src/index.ts'
 import kit from '../../../../js/package.json' with { type: 'json' }
 
 const published = { kind: 'published' } as const
@@ -548,82 +549,85 @@ const readFactsSpec = {
 
 const moduleApi = {
   module: 'fact-kit',
-  exports: [
-    {
-      name: 'defineFacts',
-      signature: 'defineFacts(module: FactsModule) => FactsModule',
-      summary: 'Identity helper that types the default export of `facts/<entry>/index.ts`.',
-    },
-    {
-      name: 'history',
-      signature: 'history(...rows: HistoryRow[]) => FactVariant[]',
-      summary:
-        "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`.",
-    },
-    {
-      name: 'keyed',
-      signature: 'keyed<T>(items: T[], keys?: string[]) => T[]',
-      summary:
-        'Declares the fields that identify an item of an array, so `history` can `add`, `remove` and `replace` items by key. Several fields make a key written as an array in that order. Without `keys` the items are scalars and identify themselves. An array that is not keyed can only be replaced whole.',
-    },
-    {
-      name: 'factLink',
-      signature: 'factLink(fact: Fact) => string',
-      summary:
-        'The location of another fact of this package, to write inside a sentence of `content`: `<id>` in the same entry, `<spec>:<id>` in another. The build adds the fact to `derivedFrom`. `relates: [fact]` adds it without text. A fact object that is not one of this package fails `check` with `relates-foreign`.',
-    },
-    {
-      name: 'derive',
-      signature: 'derive(upstreamSpec: string, id: string, map?: (upstream: Fact) => Partial<Fact>) => DerivedFact',
-      summary:
-        "A fact computed from a fact of another package, listed in `facts`. The build reads the installed index of `upstreamSpec`, copies the fact `id`, lets `map` change the copy, and sets `source` to `{ kind: 'derived', from: upstreamSpec, version }` with the upstream version installed, and `derivedFrom` to `<upstreamSpec>:<id>`. The build records each upstream spec and version in `derived.lock.json`, which goes into version control. Building with another upstream version installed fails with `derive-version` until `--accept-upstream` rewrites the lock.",
-    },
-    {
-      name: 'defineExamples',
-      signature: 'defineExamples(examples: ExampleGroup | ExampleGroup[]) => typeof examples',
-      summary: 'Identity helper that types an example file. Each group follows `fact-kit.example-group`.',
-    },
-    {
-      name: 'exampleFactRefs',
-      signature: 'exampleFactRefs(group: ExampleGroup) => { id: string; location: string }[]',
-      summary: 'Every fact id an example group references, with the JSON pointer where it is referenced.',
-    },
-    {
-      name: 'flattenSchema',
-      signature: 'flattenSchema(schema: JsonSchema) => SchemaRow[]',
-      summary:
-        'One row per field of a JSON Schema, for rendering field tables in docs and prompts. Fields of `anyOf` / `oneOf` branches are merged by name: values are the union, required when every branch requires it.',
-    },
-    {
-      name: 'schemaRowsToMarkdown',
-      signature: 'schemaRowsToMarkdown(rows: SchemaRow[]) => string',
-      summary: 'A Markdown table of the rows, with Field, Type, Required, Description and Extensions columns.',
-    },
-    {
-      name: 'valueListToMarkdown',
-      signature: 'valueListToMarkdown(fact: Fact, options?: { columns?: string[] }) => string',
-      summary:
-        'Renders a fact whose `content.value` is an array: one `- item` line per string, or a table for objects (columns default to the keys). Throws an error naming the fact id when the value is not an array.',
-    },
-    {
-      name: 'replaceFactBlocks',
-      signature:
-        'replaceFactBlocks(text: string, blocks: Record<string, string>) => { text: string; changed: boolean }',
-      summary:
-        'Replaces the text between `<!-- facts:begin NAME -->` and `<!-- facts:end NAME -->` with `blocks[NAME]`. `changed` is false when the document is already current, which is what a `--check` exits on. Throws an error naming the block on a missing end, a repeated name, or a name the document lacks.',
-    },
-    {
-      name: 'readFacts',
-      signature: 'readFacts(spec, options?) => FactReader',
-      summary: 'Reads an installed fact package. Parameters and members are in `fact-kit.read-facts`.',
-    },
-    {
-      name: 'selectFacts',
-      signature: 'selectFacts(index, { version?, include?, platform?, os? }) => SelectedFact[]',
-      summary:
-        'The facts one reader sees in a parsed index of format 1.0 or 1.1. A pure function; `readFacts` is built on it.',
-    },
-  ],
+  exports: keyed(
+    [
+      {
+        name: 'defineFacts',
+        signature: 'defineFacts(module: FactsModule) => FactsModule',
+        summary: 'Identity helper that types the default export of `facts/<entry>/index.ts`.',
+      },
+      {
+        name: 'history',
+        signature: 'history(...rows: HistoryRow[]) => FactVariant[]',
+        summary:
+          "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`.",
+      },
+      {
+        name: 'keyed',
+        signature: 'keyed<T>(items: T[], keys?: string[]) => T[]',
+        summary:
+          'Declares the fields that identify an item of an array, so `history` can `add`, `remove` and `replace` items by key. Several fields make a key written as an array in that order. Without `keys` the items are scalars and identify themselves. An array that is not keyed can only be replaced whole.',
+      },
+      {
+        name: 'factLink',
+        signature: 'factLink(fact: Fact) => string',
+        summary:
+          'The location of another fact of this package, to write inside a sentence of `content`: `<id>` in the same entry, `<spec>:<id>` in another. The build adds the fact to `derivedFrom`. `relates: [fact]` adds it without text. A fact object that is not one of this package fails `check` with `relates-foreign`.',
+      },
+      {
+        name: 'derive',
+        signature: 'derive(upstreamSpec: string, id: string, map?: (upstream: Fact) => Partial<Fact>) => DerivedFact',
+        summary:
+          "A fact computed from a fact of another package, listed in `facts`. The build reads the installed index of `upstreamSpec`, copies the fact `id`, lets `map` change the copy, and sets `source` to `{ kind: 'derived', from: upstreamSpec, version }` with the upstream version installed, and `derivedFrom` to `<upstreamSpec>:<id>`. The build records each upstream spec and version in `derived.lock.json`, which goes into version control. Building with another upstream version installed fails with `derive-version` until `--accept-upstream` rewrites the lock.",
+      },
+      {
+        name: 'defineExamples',
+        signature: 'defineExamples(examples: ExampleGroup | ExampleGroup[]) => typeof examples',
+        summary: 'Identity helper that types an example file. Each group follows `fact-kit.example-group`.',
+      },
+      {
+        name: 'exampleFactRefs',
+        signature: 'exampleFactRefs(group: ExampleGroup) => { id: string; location: string }[]',
+        summary: 'Every fact id an example group references, with the JSON pointer where it is referenced.',
+      },
+      {
+        name: 'flattenSchema',
+        signature: 'flattenSchema(schema: JsonSchema) => SchemaRow[]',
+        summary:
+          'One row per field of a JSON Schema, for rendering field tables in docs and prompts. Fields of `anyOf` / `oneOf` branches are merged by name: values are the union, required when every branch requires it.',
+      },
+      {
+        name: 'schemaRowsToMarkdown',
+        signature: 'schemaRowsToMarkdown(rows: SchemaRow[]) => string',
+        summary: 'A Markdown table of the rows, with Field, Type, Required, Description and Extensions columns.',
+      },
+      {
+        name: 'valueListToMarkdown',
+        signature: 'valueListToMarkdown(fact: Fact, options?: { columns?: string[] }) => string',
+        summary:
+          'Renders a fact whose `content.value` is an array: one `- item` line per string, or a table for objects (columns default to the keys). Throws an error naming the fact id when the value is not an array.',
+      },
+      {
+        name: 'replaceFactBlocks',
+        signature:
+          'replaceFactBlocks(text: string, blocks: Record<string, string>) => { text: string; changed: boolean }',
+        summary:
+          'Replaces the text between `<!-- facts:begin NAME -->` and `<!-- facts:end NAME -->` with `blocks[NAME]`. `changed` is false when the document is already current, which is what a `--check` exits on. Throws an error naming the block on a missing end, a repeated name, or a name the document lacks.',
+      },
+      {
+        name: 'readFacts',
+        signature: 'readFacts(spec, options?) => FactReader',
+        summary: 'Reads an installed fact package. Parameters and members are in `fact-kit.read-facts`.',
+      },
+      {
+        name: 'selectFacts',
+        signature: 'selectFacts(index, { version?, include?, platform?, os? }) => SelectedFact[]',
+        summary:
+          'The facts one reader sees in a parsed index of format 1.0 or 1.1. A pure function; `readFacts` is built on it.',
+      },
+    ],
+    ['name'],
+  ),
   schemaRow: [
     {
       name: 'path',
@@ -766,7 +770,7 @@ const exampleGroupSchema = {
   },
 }
 
-const problemCodes = [
+const problemCodes = keyed([
   'format',
   'duplicate-id',
   'id-prefix',
@@ -793,129 +797,182 @@ const problemCodes = [
   'impl-imports-facts',
   'impl-reads-facts-dist',
   'impl-depends-on-facts',
-]
+])
 
 /** What each problem code stands for, and what the rule reads. `check` runs all of them, `build` the first group. */
-const checkRules = [
+const checkRules = keyed(
+  [
+    {
+      code: 'format',
+      rule: 'A fact, index, schema file or example does not fit its meta-schema.',
+      reads: 'sources and built indexes',
+    },
+    { code: 'duplicate-id', rule: 'Two facts have one id.', reads: 'sources and built indexes' },
+    {
+      code: 'id-prefix',
+      rule: 'A fact id does not start with its tool and a dot.',
+      reads: 'sources and built indexes',
+    },
+    { code: 'local-path', rule: 'A fact holds a local absolute path.', reads: 'sources and built indexes' },
+    {
+      code: 'unregistered-domain',
+      rule: 'A fact holds a URL whose host is not in `allowedDomains`.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'unknown-fact-id',
+      rule: '`replacement`, `derivedFrom` or an example names a fact that does not exist.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'missing-schema-file',
+      rule: 'A `$ref` points at a file under `schemas/` that is not there.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'describes',
+      rule: '`describes` names more than one component, or the entries of one package disagree (different components, or `{}` mixed with one).',
+      reads: 'sources',
+    },
+    {
+      code: 'since-format',
+      rule: 'A `since` is not a version, `next`, or an array of versions that may end in `next`.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'same-line',
+      rule: 'A `since` array has two versions on one release line.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'ambiguous-rows',
+      rule: 'Two rows apply to the same readers with the same bound, so a reader can not choose.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'relation-cycle',
+      rule: 'Facts are derived from each other in a loop through `derivedFrom`.',
+      reads: 'sources and built indexes',
+    },
+    {
+      code: 'relates-foreign',
+      rule: '`relates` or `factLink` holds a fact object that is not a fact of this package, such as one imported from another package.',
+      reads: 'sources',
+    },
+    {
+      code: 'history',
+      rule: 'A `history` row does not fit: a key that matches no item, a key that is already there, an array that is not keyed, a bad pointer.',
+      reads: 'sources',
+    },
+    {
+      code: 'derive',
+      rule: '`derive` finds no installed upstream package, no such fact in it, or `map` returns something that is not an object.',
+      reads: 'the installed upstream package',
+    },
+    {
+      code: 'derive-version',
+      rule: '`derived.lock.json`, or a built index passed with `--index`, records another upstream version than the one installed.',
+      reads: 'the installed upstream package, `derived.lock.json`',
+    },
+    {
+      code: 'lib-rows',
+      rule: 'A row with `since` in `facts/_lib`, which holds only functions and constants.',
+      reads: 'source code, parsed with oxc',
+    },
+    {
+      code: 'since-ahead',
+      rule: 'A `since` is newer than `describes`, or than the `--train` version of its component when one is given.',
+      reads: 'sources, `--train`',
+    },
+    {
+      code: 'train-next',
+      rule: 'A component named by `--train` still has a row that says `next` and is not pending.',
+      reads: 'sources, `--train`',
+    },
+    {
+      code: 'pending-untested',
+      rule: 'A `pending` label is not passed as `include` by any test in `testDirs`.',
+      reads: '`testDirs`, parsed with oxc',
+    },
+    {
+      code: 'doc-unknown-id',
+      rule: 'A `fact:<id>` or `fact:<spec>:<id>` in `docsDirs` names a fact that does not exist.',
+      reads: '`docsDirs`',
+    },
+    {
+      code: 'impl-imports-facts',
+      rule: 'Code in `implDirs` imports a `-facts` package.',
+      reads: '`implDirs`, parsed with oxc',
+    },
+    {
+      code: 'impl-reads-facts-dist',
+      rule: "A string in `implDirs` code, or a fixed part of a template, holds `facts/dist` as a path part (bounded by the start, the end, `/` or `\\`). It covers an import, `require`, `readFileSync` and `new URL`. It matches the literal text, so a path built as `join('facts', 'dist')` is not found, and implementations in other languages are out of scope.",
+      reads: '`implDirs`, parsed with oxc',
+    },
+    {
+      code: 'impl-depends-on-facts',
+      rule: 'A package that is not a facts package lists a `-facts` package in `dependencies`.',
+      reads: 'every package.json under `repoRoot`',
+    },
+    {
+      code: 'top-level-content',
+      rule: 'A warning. No row applies to a reader that names no platform, so the top-level content is a guess.',
+      reads: 'sources and built indexes',
+    },
+    { code: 'load', rule: 'A source module, example or index file can not be run or parsed.', reads: 'sources' },
+  ],
+  ['code'],
+)
+
+const fact = (f: Omit<FactDecl, 'tool' | 'source'>): FactDecl => ({ ...f, tool: 'fact-kit', source: published })
+
+/**
+ * The first row of a fact that changed after 0.7.0: the content that was checked against 0.7.0. A fact has at most
+ * one \`next\` row and a later change goes into it, because two rows with the same bound leave a reader on \`head\`
+ * nothing to choose between (\`ambiguous-rows\`).
+ */
+const since070 = '0.7.0'
+
+const newApi = [
   {
-    code: 'format',
-    rule: 'A fact, index, schema file or example does not fit its meta-schema.',
-    reads: 'sources and built indexes',
-  },
-  { code: 'duplicate-id', rule: 'Two facts have one id.', reads: 'sources and built indexes' },
-  { code: 'id-prefix', rule: 'A fact id does not start with its tool and a dot.', reads: 'sources and built indexes' },
-  { code: 'local-path', rule: 'A fact holds a local absolute path.', reads: 'sources and built indexes' },
-  {
-    code: 'unregistered-domain',
-    rule: 'A fact holds a URL whose host is not in `allowedDomains`.',
-    reads: 'sources and built indexes',
+    name: 'factsOf',
+    signature: 'factsOf({ tool, source, prefix?, topics? }) => FactsFactory',
+    summary:
+      'Writes facts with the repeated fields filled in: `const mf = factsOf({ tool, source })`, then `mf.value(name, value)`, `mf.schema(name, schema)` and `mf.statement(name, text)` return a fact whose id is `<tool>.<prefix>.<name>` (`<tool>.<name>` without a prefix) and whose title is `name`. Each takes a value, a function that returns it, or the rows of `history(...)` as the second argument, and `{ title?, topics?, description?, when?, relates?, verify?, source?, note? }` as the third. The topics are those of `factsOf` and then those of the call. A fact written with one content exposes the fields of an object value as read-only getters that give a tagged copy, so the build adds the fact read to `derivedFrom`. A scalar, or a value built from scalars, carries no tag, so write it as a function (`mf.value(name, () => ...)`): every read of another fact while the function runs goes into `relates`. A fact written with `history(...)` has no getters, so read it with `contentOf`. Throws `BuilderError` for a name that is empty or starts or ends with a dot, and for rows whose first row is not the kind of the method.',
   },
   {
-    code: 'unknown-fact-id',
-    rule: '`replacement`, `derivedFrom` or an example names a fact that does not exist.',
-    reads: 'sources and built indexes',
+    name: 'observedDoc',
+    signature: 'observedDoc({ url: string, fetched: string }) => FactSource',
+    summary:
+      "The source `{ kind: 'observed', basis: 'doc', url, fetched }` of a fact read from a page of the documentation.",
   },
   {
-    code: 'missing-schema-file',
-    rule: 'A `$ref` points at a file under `schemas/` that is not there.',
-    reads: 'sources and built indexes',
+    name: 'observedSpike',
+    signature: 'observedSpike({ fetched: string, url?: string }) => FactSource',
+    summary:
+      "The source `{ kind: 'observed', basis: 'spike', fetched }` of a fact seen in a trial run, with `url` when a page led to it.",
   },
   {
-    code: 'describes',
-    rule: '`describes` names more than one component, or the entries of one package disagree (different components, or `{}` mixed with one).',
-    reads: 'sources',
+    name: 'contentOf',
+    signature: 'contentOf(fact: Fact, since?: string) => unknown',
+    summary:
+      'A copy of the value or the schema of one row of a fact, tagged so the build adds the fact to `derivedFrom` where the copy is embedded. A fact with several rows needs `since`, the `since` of the row to read (any one version of a row written as an array). Throws `BuilderError` when there is no such row or no content.',
   },
   {
-    code: 'since-format',
-    rule: 'A `since` is not a version, `next`, or an array of versions that may end in `next`.',
-    reads: 'sources and built indexes',
+    name: 'statementFrom',
+    signature: 'statementFrom(fact: Fact, render: (value) => Text, options?: { since?: string }) => BuiltStatement',
+    summary:
+      'A statement written from the content of another fact: `render` gets the copy that `contentOf` makes and returns the text. Give the result to `mf.statement` or to the `statement` of a `history` row. The fact goes into `relates`, so `derivedFrom` follows it.',
   },
   {
-    code: 'same-line',
-    rule: 'A `since` array has two versions on one release line.',
-    reads: 'sources and built indexes',
+    name: 'subsetOf',
+    signature: 'subsetOf(parent: Fact, items: T[]) => T[]',
+    summary:
+      "A list that must stay inside the list of `parent`, a fact object. When the parent is a typed list (`mf.value('x', ['A', 'B'])`) the type checker rejects an item it does not have. A parent that comes from a conversion has no type, so `check` and `build` test the list again at every version boundary of the two facts and report `subset-of` with the version. The parent goes into `derivedFrom`. Throws `BuilderError` when `parent` is not a fact object.",
   },
-  {
-    code: 'ambiguous-rows',
-    rule: 'Two rows apply to the same readers with the same bound, so a reader can not choose.',
-    reads: 'sources and built indexes',
-  },
-  {
-    code: 'relation-cycle',
-    rule: 'Facts are derived from each other in a loop through `derivedFrom`.',
-    reads: 'sources and built indexes',
-  },
-  {
-    code: 'relates-foreign',
-    rule: '`relates` or `factLink` holds a fact object that is not a fact of this package, such as one imported from another package.',
-    reads: 'sources',
-  },
-  {
-    code: 'history',
-    rule: 'A `history` row does not fit: a key that matches no item, a key that is already there, an array that is not keyed, a bad pointer.',
-    reads: 'sources',
-  },
-  {
-    code: 'derive',
-    rule: '`derive` finds no installed upstream package, no such fact in it, or `map` returns something that is not an object.',
-    reads: 'the installed upstream package',
-  },
-  {
-    code: 'derive-version',
-    rule: '`derived.lock.json`, or a built index passed with `--index`, records another upstream version than the one installed.',
-    reads: 'the installed upstream package, `derived.lock.json`',
-  },
-  {
-    code: 'lib-rows',
-    rule: 'A row with `since` in `facts/_lib`, which holds only functions and constants.',
-    reads: 'source code, parsed with oxc',
-  },
-  {
-    code: 'since-ahead',
-    rule: 'A `since` is newer than `describes`, or than the `--train` version of its component when one is given.',
-    reads: 'sources, `--train`',
-  },
-  {
-    code: 'train-next',
-    rule: 'A component named by `--train` still has a row that says `next` and is not pending.',
-    reads: 'sources, `--train`',
-  },
-  {
-    code: 'pending-untested',
-    rule: 'A `pending` label is not passed as `include` by any test in `testDirs`.',
-    reads: '`testDirs`, parsed with oxc',
-  },
-  {
-    code: 'doc-unknown-id',
-    rule: 'A `fact:<id>` or `fact:<spec>:<id>` in `docsDirs` names a fact that does not exist.',
-    reads: '`docsDirs`',
-  },
-  {
-    code: 'impl-imports-facts',
-    rule: 'Code in `implDirs` imports a `-facts` package.',
-    reads: '`implDirs`, parsed with oxc',
-  },
-  {
-    code: 'impl-reads-facts-dist',
-    rule: "A string in `implDirs` code, or a fixed part of a template, holds `facts/dist` as a path part (bounded by the start, the end, `/` or `\\`). It covers an import, `require`, `readFileSync` and `new URL`. It matches the literal text, so a path built as `join('facts', 'dist')` is not found, and implementations in other languages are out of scope.",
-    reads: '`implDirs`, parsed with oxc',
-  },
-  {
-    code: 'impl-depends-on-facts',
-    rule: 'A package that is not a facts package lists a `-facts` package in `dependencies`.',
-    reads: 'every package.json under `repoRoot`',
-  },
-  {
-    code: 'top-level-content',
-    rule: 'A warning. No row applies to a reader that names no platform, so the top-level content is a guess.',
-    reads: 'sources and built indexes',
-  },
-  { code: 'load', rule: 'A source module, example or index file can not be run or parsed.', reads: 'sources' },
 ]
 
-const fact = (f: Omit<Fact, 'tool' | 'source'>): Fact => ({ ...f, tool: 'fact-kit', source: published })
-
-const facts: Fact[] = [
+const facts: FactDecl[] = [
   fact({
     id: 'fact-kit.fact',
     topics: ['fact', 'schema'],
@@ -930,13 +987,46 @@ const facts: Fact[] = [
     description: {
       en: 'One entry per code of `fact-kit.problem-codes`, with the rule and the input it reads. `check` exits with 0 when it finds no problem, 1 when it finds one, and 2 when it can not run because of bad settings or input.',
     },
-    content: { value: checkRules },
+    variants: history(
+      { since: since070, value: checkRules },
+      {
+        since: 'next',
+        add: {
+          '': [
+            {
+              code: 'builder',
+              rule: 'A builder, `mf.*`, `contentOf` or `subsetOf` got input that does not fit, such as a name with a leading dot, rows whose first row is not the kind of the method, or a subset whose parent is not a fact object. `history` also raises it when a row makes what a builder checked invalid. The message names the row and the key. Only `check` prints the code. `build` stops with the message.',
+              reads: 'sources',
+            },
+            {
+              code: 'subset-of',
+              rule: 'A list declared with `subsetOf` has, at some version boundary, a value that the list of its parent lacks, or the parent has no row that applies there. The boundaries are those of `ambiguous-rows`, taken over the rows of both facts. The message names the oldest version where it happens and the value. `build` runs this rule too.',
+              reads: 'sources',
+            },
+          ],
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.history-row',
     topics: ['authoring'],
     title: { en: 'Fields of a row of history(...)' },
-    content: { schema: historyRowSchema },
+    variants: history(
+      { since: since070, schema: historyRowSchema },
+      {
+        since: 'next',
+        set: {
+          '/description':
+            'The first row gives the content with one of `value`, `schema` and `statement`. Each later row rewrites the content whole with one of those, or changes the content of the row before it with `remove`, `replace`, `add` and `set`, applied in that order. A row with none of them keeps the content and changes only the conditions. After each row, the check of the builder that made the content runs again, and a row that breaks it fails with `BuilderError`.',
+          '/properties/statement': {
+            description:
+              'The text, or what `statementFrom` returns. The facts a built statement relates to go into `relates` of the fact.',
+            oneOf: defs.Text.oneOf,
+          },
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.index',
@@ -980,7 +1070,10 @@ const facts: Fact[] = [
     topics: ['check'],
     title: { en: 'Problem codes of check and build' },
     description: { en: 'The stable `code` of each problem. The message is for people and can change.' },
-    content: { value: problemCodes },
+    variants: history(
+      { since: since070, value: problemCodes },
+      { since: 'next', add: { '': ['builder', 'subset-of'] } },
+    ),
   }),
   fact({
     id: 'fact-kit.aggregate-layout',
@@ -1002,7 +1095,23 @@ const facts: Fact[] = [
     topics: ['authoring', 'read', 'docs'],
     title: { en: 'Functions fact-kit exports for authoring and rendering' },
     description: { en: 'The exports a facts package, its docs and its examples call, and the fields of `SchemaRow`.' },
-    content: { value: moduleApi },
+    variants: history(
+      { since: since070, value: moduleApi },
+      {
+        since: 'next',
+        replace: {
+          '/exports': [
+            {
+              name: 'history',
+              signature: 'history(...rows: HistoryRow[]) => HistoryVariants',
+              summary:
+                "Expands the rows of a fact into `variants`: `variants: history(...)`. Row fields are in `fact-kit.history-row`. Targets are JSON Pointers (RFC 6901) into the content, and `''` is the root. A row that does not fit throws an error that names the key, and `check` reports it as `history`. The result is still an array of variants, and `mf.value(name, history(...))` takes it. After each row, the check of the builder that made the content runs again, and a row that breaks it throws `BuilderError`, which `check` reports as `builder`.",
+            },
+          ],
+        },
+        add: { '/exports': newApi },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.converters',
@@ -1022,6 +1131,6 @@ const facts: Fact[] = [
   }),
 ]
 
-const entry: FactsModule = { describes: { 'fact-kit': kit.version }, facts }
+const entry: FactsSource = { describes: { 'fact-kit': kit.version }, facts }
 
 export default entry
