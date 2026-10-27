@@ -1082,7 +1082,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: checkRules },
       {
-        since: 'next',
+        since: '0.8.0',
         replace: {
           '': [
             {
@@ -1126,7 +1126,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, schema: historyRowSchema },
       {
-        since: 'next',
+        since: '0.8.0',
         set: {
           '/description':
             'The first row gives the content with one of `value`, `schema` and `statement`. Each later row rewrites the content whole with one of those, or changes the content of the row before it with `remove`, `replace`, `add` and `set`, applied in that order. A row with none of them keeps the content and changes only the conditions. After each row, the check of the builder that made the content runs again, and a row that breaks it fails with `BuilderError`.',
@@ -1178,7 +1178,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, schema: configSchema },
       {
-        since: 'next',
+        since: '0.8.0',
         set: {
           '/properties/examplesDir/description':
             'Directory of example files, relative to the package. `check` reads them, and `build` writes them to `dist/examples.json` when the package has facts.',
@@ -1195,7 +1195,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The only `x-` keywords a schema in a fact may use, each with the shape of its value. Any other `x-` keyword fails `check`.',
     },
-    variants: history({ since: since070, value: xKeywords }, { since: 'next', set: { '/x-identity': xIdentity } }),
+    variants: history({ since: since070, value: xKeywords }, { since: '0.8.0', set: { '/x-identity': xIdentity } }),
   }),
   fact({
     id: 'fact-kit.cli',
@@ -1204,7 +1204,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: commands },
       {
-        since: 'next',
+        since: '0.8.0',
         set: {
           '/build/summary':
             'Build facts/<entry>/index.ts into dist/<entry>/index.json and schemas/, and the example groups of the examples directory into dist/examples.json (nothing is written when there are none). The snippets in the groups are not run. In an aggregate package (`aggregate` in the config) copy the built indexes and examples.json of its component packages into dist/ instead.',
@@ -1228,7 +1228,7 @@ const facts: FactDecl[] = [
     description: { en: 'The stable `code` of each problem. The message is for people and can change.' },
     variants: history(
       { since: since070, value: problemCodes },
-      { since: 'next', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
+      { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
     ),
   }),
   fact({
@@ -1241,7 +1241,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: aggregateLayout },
       {
-        since: 'next',
+        since: '0.8.0',
         set: {
           '/exports': [
             './<dir>/index.json',
@@ -1273,7 +1273,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: moduleApi },
       {
-        since: 'next',
+        since: '0.8.0',
         replace: {
           '/exports': [
             {
@@ -1318,7 +1318,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, schema: exampleGroupSchema },
       {
-        since: 'next',
+        since: '0.8.0',
         set: {
           '/properties/scenarios/items/properties/outcome': {
             description:
