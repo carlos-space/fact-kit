@@ -5,6 +5,8 @@ pnpm-lock.yaml
 # Written by release-please
 CHANGELOG.md
 .release-please-manifest.json
+# Rewritten with jq by scripts/release/cut-release.sh on every release branch
+release-please-config.json
 # Generated test data, compared byte for byte with converter output
 js/test/fixtures
 # Build output and lock files of the readers in other languages
