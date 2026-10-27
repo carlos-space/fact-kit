@@ -103,12 +103,17 @@ sub-path. `schemas/` is copied along, and each index gets `./<dir>/index.json` a
 In the copied index, `package` is the aggregate name, `entry` is the path of the index in the aggregate (`.` for the
 root), `component` is the component package, and `derivedFrom` and `movedTo` that name a component package become the published spec.
 `readFacts('<aggregate>')`, `readFacts('<aggregate>/<sub-path>')` and `readFacts('<aggregate>/<sub-path>/<entry>')`
-read them.
+read them. Each component's `dist/examples.json` (see [Examples](#examples)) is copied to `dist/<sub-path>/examples.json`
+(`dist/examples.json` for the root) with `package` set to the aggregate name, and `./<sub-path>/examples.json`
+(`./examples.json`) is added to `exports`.
 
 ### Impact of a change
 
 `fact-kit diff --impact <id>` runs in an aggregate package. It reads the built indexes of the components, follows
-`derivedFrom` downstream and prints `{ id, facts: [{ id, depth, via }], docs: [{ file, line, id }] }` with `--json`.
+`derivedFrom` downstream and prints `{ id, facts: [{ id, depth, via }], docs: [{ file, line, id }], examples: [{ spec, group, scenario, id, in }] }` with `--json`.
+`examples` lists the scenarios of the `examples.json` files that name the fact or a fact computed from it: `spec` is
+the aggregate spec the file is published under, `group` the id of the example group, `scenario` its title, `id` the
+fact named, and `in` is `facts` for `facts` of the scenario or its group, `outcome` for a reference in the outcome.
 `docs` come from `docsDirs` (relative to the config file): markdown lines with `fact:<id>` or `fact:<spec>:<id>`, and
 in TypeScript the string argument of `get`, `value` and `has` calls and imports of a fact object. An import counts when its relative module, loaded the way `build` loads fact sources,
 exports a fact object with the id, whatever name it is imported under; a module that fails to load is skipped. Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
@@ -763,10 +768,13 @@ console.log(changed ? 'wrote README.md' : 'up to date')
 
 ## Examples
 
-An example group shows how several facts are used together. `defineExamples` types one group or an array of them:
+An example group shows how several facts are used together. `defineExamples` types one group or an array of them.
+The `outcome` of a scenario is a list of strings and references to facts, so the text next to the code follows the
+facts instead of being copied from them:
 
 ```ts
-import { defineExamples } from 'fact-kit'
+import { defineExamples, ref, statementFrom } from 'fact-kit'
+import { limits } from '../facts/demo/index.ts'
 
 export default defineExamples({
   id: 'first-build',
@@ -778,13 +786,25 @@ export default defineExamples({
       title: 'One skill',
       situation: 'I only want a single skill',
       code: [{ caption: 'config', lang: 'ts', source: '...' }],
-      outcome: ['One skill file is written'],
+      outcome: [
+        'One skill file is written',
+        ref(limits, 'max'), // { fact: 'demo.limits', field: 'max' }
+        statementFrom(limits, (v) => `At most ${v.max} skills`), // { fact: 'demo.limits', text: 'At most 3 skills' }
+        { fact: 'demo.limits' }, // the same as ref(limits), for a .json file
+      ],
       points: ['No other declaration is needed'],
-      facts: ['tool.some-fact'],
+      facts: ['demo.limits'],
     },
   ],
 })
 ```
 
-`check` loads groups from the examples directory (`.ts` or `.json`) and rejects a group or scenario that
-names a fact id not in the indexes it checks. `exampleFactRefs(group)` lists the ids a group names.
+The code in `code` is text. fact-kit never runs it, so a snippet may be code that throws. `check` loads groups from the
+examples directory (`.ts` or `.json`) and rejects a group or scenario that names a fact id not in the indexes it checks,
+in `facts` or in an `outcome` item (`unknown-fact-id`, naming the id), and an outcome `field` that no row of the fact has
+(`ref`). `build` runs the same check and writes the groups to `dist/examples.json` as `{ package, examples }`, where
+`ref(fact)` and `statementFrom(fact, render)` have become `{ fact, field? }` and `{ fact, text }` (`text` is a
+`Text`, so it can have one string per language). Rebuild after a fact changes and the `text` follows. It adds
+`./examples.json` to `exports`, and `index.json` does not change. `fact-kit diff --impact` lists the scenarios that name a
+fact. `exampleFactRefs(group)` lists the ids a group names, each with its JSON pointer, `in` (`facts` or `outcome`) and
+`field`.
