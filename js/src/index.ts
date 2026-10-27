@@ -18,7 +18,18 @@ export type {
 } from './types.ts'
 export { defineFacts } from './define.ts'
 export { HistoryError, history, keyed } from './history.ts'
-export type { HistoryRow } from './history.ts'
+export type { HistoryRow, HistoryVariants } from './history.ts'
+export { BuilderError, contentOf, factsOf, observedDoc, observedSpike, statementFrom, subsetOf } from './builders.ts'
+export type {
+  BuiltStatement,
+  FactOptions,
+  FactsFactory,
+  FactsOfOptions,
+  SchemaFact,
+  StatementFact,
+  ValueFact,
+  VersionedFact,
+} from './builders.ts'
 export { derive, factLink } from './author.ts'
 export {
   EXAMPLE_GROUP_SCHEMA_ID,

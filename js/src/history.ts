@@ -1,3 +1,15 @@
+import {
+  BuilderError,
+  HISTORY,
+  RELATES,
+  builderProblem,
+  copyMarks,
+  isBuilt,
+  isObject,
+  partsOf,
+  setMark,
+} from './markers.ts'
+import type { BuiltStatement } from './markers.ts'
 import type { FactContent, FactVariant, JsonSchema, Os, Since, Text } from './types.ts'
 
 /** Raised by `keyed` and `history` when what the author wrote does not fit. The message names the key. */
@@ -15,9 +27,6 @@ const keysOf = (value: unknown): readonly string[] | undefined =>
   Array.isArray(value)
     ? ((value as unknown as Record<symbol, readonly string[] | undefined>)[KEYS] ?? undefined)
     : undefined
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const show = (value: unknown): string => JSON.stringify(value) ?? String(value)
 
@@ -72,6 +81,7 @@ export function keyed<T>(items: readonly T[], keys: readonly string[] = []): T[]
     throw new HistoryError(`keyed: the keys must be a list of field names, got ${show(keys)}`)
   }
   const out = items.map(clone)
+  copyMarks(items, out, [KEYS])
   const seen = new Map<string, unknown>()
   for (const item of out) {
     const key = keyOf(item, keys, 'keyed')
@@ -83,17 +93,17 @@ export function keyed<T>(items: readonly T[], keys: readonly string[] = []): T[]
   return out
 }
 
-/** A deep copy that keeps the key declarations of `keyed` arrays. */
+/** A deep copy that keeps the tags of fact-kit: the key declarations of `keyed` arrays and the marks of builders. */
 function clone<T>(value: T): T {
   if (Array.isArray(value)) {
     const out = value.map(clone)
-    const keys = keysOf(value)
-    if (keys) Object.defineProperty(out, KEYS, { value: keys, enumerable: false })
+    copyMarks(value, out)
     return out as T
   }
   if (isObject(value)) {
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(value)) out[k] = clone(v)
+    copyMarks(value, out)
     return out as T
   }
   return value
@@ -158,7 +168,8 @@ export interface HistoryRow {
   /** A full rewrite, or the first row. Exactly one of `value`, `schema` and `statement`. */
   value?: unknown
   schema?: JsonSchema
-  statement?: Text
+  /** The text, or what `invariant` and `statementFrom` return. */
+  statement?: Text | BuiltStatement
   /** Pointer to a keyed array -> the items to append. */
   add?: Record<string, readonly unknown[]>
   /** Pointer -> the new value. For a keyed array, the items to swap in by key. */
@@ -172,6 +183,10 @@ export interface HistoryRow {
   platforms?: string[]
   os?: Os[]
 }
+
+declare const HISTORY_BRAND: unique symbol
+/** What `history(...)` returns: still `FactVariant[]`, branded so `mf.value(name, history(...))` can tell it from a value. */
+export type HistoryVariants = FactVariant[] & { readonly [HISTORY_BRAND]: true }
 
 const CONTENT_KEYS = ['value', 'schema', 'statement'] as const
 const DIFF_KEYS = ['remove', 'replace', 'add', 'set'] as const
@@ -254,9 +269,10 @@ function applyRow(root: unknown, row: HistoryRow, where: string): unknown {
  * `add` and `set`, applied in that order. The targets are JSON Pointers into the content, `''` for the root.
  * `since`, `pending`, `stability`, `platforms` and `os` go to the variant as written.
  */
-export function history(...rows: HistoryRow[]): FactVariant[] {
+export function history(...rows: HistoryRow[]): HistoryVariants {
   if (rows.length === 0) throw new HistoryError('history: needs at least one row')
   const variants: FactVariant[] = []
+  const relates: object[] = []
   let kind: (typeof CONTENT_KEYS)[number] | undefined
   let payload: unknown
   for (const [i, row] of rows.entries()) {
@@ -278,10 +294,19 @@ export function history(...rows: HistoryRow[]): FactVariant[] {
     }
     if (written.length === 1) {
       kind = written[0] as (typeof CONTENT_KEYS)[number]
-      payload = clone(row[kind])
+      let given = row[kind]
+      if (isBuilt(given)) {
+        const parts = partsOf(given)
+        for (const fact of parts.relates) if (!relates.includes(fact)) relates.push(fact)
+        given = parts.text
+      }
+      payload = clone(given)
     } else {
       payload = applyRow(payload, row, where)
     }
+    // A builder checks its own output again at every row, so a later row can not make what it would not make.
+    const broken = builderProblem(payload)
+    if (broken !== undefined) throw new BuilderError(`${where}: ${broken}`)
     variants.push({
       since: row.since,
       content: { [kind as string]: clone(payload) } as FactContent,
@@ -291,5 +316,7 @@ export function history(...rows: HistoryRow[]): FactVariant[] {
       ...(row.os !== undefined ? { os: row.os } : {}),
     })
   }
-  return variants
+  setMark(variants, HISTORY, true)
+  setMark(variants, RELATES, relates)
+  return variants as HistoryVariants
 }
