@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.2.0...fact-kit-facts/v0.3.0-alpha.1) (2026-10-27)
+
+
+### Added
+
+* **facts:** 讀取套件的 facts 從 pending 釘成 0.3.0-alpha.1 ([#40](https://github.com/carlos-space/fact-kit/issues/40)) ([b818289](https://github.com/carlos-space/fact-kit/commit/b818289280a46ce71735354e992a9b9768e5d456))
+
 ## [0.2.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.1.0...fact-kit-facts/v0.2.0) (2026-10-27)
 
 
