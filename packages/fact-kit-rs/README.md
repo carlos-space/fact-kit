@@ -72,4 +72,4 @@ if let Some(value) = reader.value("demo.limit") {
 cargo test -- --nocapture
 ```
 
-測試讀 `conformance/` 的樣本。環境變數 `FACT_KIT_CONFORMANCE` 可以指定它的位置，沒設時從 `rs/` 往上找。`tests/own_facts.rs` 讀本倉庫建好的 `facts/dist`，所以要先在 `facts/` 建置。
+測試讀 `conformance/` 的樣本。環境變數 `FACT_KIT_CONFORMANCE` 可以指定它的位置，沒設時從 `packages/fact-kit-rs/` 往上找。`tests/own_facts.rs` 讀本倉庫建好的 `facts/dist`，所以要先在 `facts/` 建置。

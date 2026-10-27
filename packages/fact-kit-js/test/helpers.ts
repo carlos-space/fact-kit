@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
-export const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+export const repoRoot = fileURLToPath(new URL('../../../', import.meta.url))
 export const binPath = fileURLToPath(new URL('../src/bin.ts', import.meta.url))
 
 const created: string[] = []

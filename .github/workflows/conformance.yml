@@ -3,7 +3,7 @@ name: conformance
 # Every language reads the same samples in conformance/ and must produce the expected output. One job per
 # language, named after it, that installs its toolchain and runs its conformance test against the same
 # directory (conformance/README.md, last section). Each job also builds facts/dist, because every reader has a
-# test that reads its own facts (fact-kit-facts/<language>) and checks the error codes against them.
+# test that reads its own facts (fact-kit-facts/fact-kit-<language>) and checks the error codes against them.
 on:
   pull_request:
   workflow_dispatch:
@@ -51,7 +51,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       # The lowest Python the package supports (requires-python).
       - run: uv run --python 3.11 pytest -v
-        working-directory: py
+        working-directory: packages/fact-kit-py
 
   rs:
     if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
@@ -72,7 +72,7 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
       - run: cargo test --locked -- --nocapture
-        working-directory: rs
+        working-directory: packages/fact-kit-rs
 
   go:
     if: github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--')
@@ -92,12 +92,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: packages/fact-kit-go/go.sum
       # -count=1: the test cache does not see conformance/, which is outside the module, so a new sample
       # would otherwise be skipped by a cached result. FACT_KIT_CONFORMANCE makes a missing conformance/ fail;
       # without it the test skips (conformance_test.go).
       - run: go test -count=1 -v ./...
-        working-directory: go
+        working-directory: packages/fact-kit-go
         env:
           FACT_KIT_CONFORMANCE: ${{ github.workspace }}/conformance
 
@@ -113,6 +113,7 @@ jobs:
       - run: pnpm build
       - run: xcodebuild -version && swift --version | head -1
       - run: swift test
+        working-directory: packages/fact-kit-swift
 
   # SwiftPM builds on Linux as well, and the ubuntu runner image ships a Swift toolchain.
   swift-linux:
@@ -127,3 +128,4 @@ jobs:
       - run: pnpm build
       - run: swift --version | head -1
       - run: swift test
+        working-directory: packages/fact-kit-swift

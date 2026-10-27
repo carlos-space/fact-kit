@@ -7,13 +7,13 @@ use fact_kit::{FactReadError, ReadFactsOptions, read_facts};
 
 #[test]
 fn read_errors_fact_lists_the_codes_of_the_crate() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../facts");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../facts");
     let options = ReadFactsOptions {
         root: Some(root),
         ..ReadFactsOptions::default()
     };
-    // Resolved through self-reference: `facts/package.json` is named `fact-kit-facts` and exports `./rs/index.json`.
-    let reader = read_facts("fact-kit-facts/rs", &options).expect("read fact-kit-facts/rs");
+    // Resolved through self-reference: `facts/package.json` is named `fact-kit-facts` and exports `./fact-kit-rs/index.json`.
+    let reader = read_facts("fact-kit-facts/fact-kit-rs", &options).expect("read fact-kit-facts/fact-kit-rs");
     assert_eq!(reader.package, "fact-kit-facts");
 
     let value = reader

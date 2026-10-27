@@ -24,7 +24,7 @@ targets: [
 import FactKit
 
 let reader = try readFacts(
-  "fact-kit-facts/swift",
+  "fact-kit-facts/fact-kit-swift",
   root: URL(fileURLWithPath: "/path/to/project"),
   version: "0.3.0"  // 省略時讀最新已發布，"head" 讀還沒發布的狀態
 )

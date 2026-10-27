@@ -87,12 +87,12 @@ settled, 1 conflicts left, 2 no merge to read, or bad input. A second run change
 
 ### Two-layer packages
 
-A repository can keep its facts in private component packages (named `@component/<directory>`, `"private": true`)
+A repository can keep its facts in private component packages (named `@<publish target>/<publish name>-facts`, for example `@npm/git-facts`, `"private": true`)
 and publish one aggregate package that holds all their indexes. The aggregate lists the components in
 `devDependencies` (`"workspace:*"`) and in `fact-kit.config.json`:
 
 ```json
-{ "aggregate": { ".": "@component/fact-kit", "git": "@component/git" } }
+{ "aggregate": { ".": "@npm/fact-kit-facts", "fact-kit-py": "@pypi/fact-kit-facts" } }
 ```
 
 `fact-kit build` in the aggregate package copies the built indexes of the components (build them first; with pnpm,

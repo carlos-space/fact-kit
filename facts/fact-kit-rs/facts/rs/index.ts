@@ -1,4 +1,4 @@
-// Facts about the Rust reader in rs/. They are the spec of its public API, and the reader does not import them.
+// Facts about the Rust reader in packages/fact-kit-rs/. They are the spec of its public API, and the reader does not import them.
 import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
@@ -16,7 +16,7 @@ export default readerFacts(
       registry: 'crates.io',
       name: 'fact-kit',
       import: 'fact_kit',
-      tagPrefix: 'rs/v',
+      tagPrefix: 'fact-kit-rs/v',
       requires: 'rust>=1.95, edition 2024',
     },
     read: {

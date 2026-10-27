@@ -6,7 +6,7 @@ import type { Fact, FactIndex, Problem } from './types.ts'
 
 /** One index of a component package, placed in the aggregate package. */
 export interface PlacedIndex {
-  /** The component package name, e.g. `@component/fact-kit`. */
+  /** The component package name, e.g. `@npm/fact-kit-facts`. */
   component: string
   /** The aggregate sub-path the component hangs on, `.` for the root. */
   subpath: string

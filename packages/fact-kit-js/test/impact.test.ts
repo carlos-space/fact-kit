@@ -11,10 +11,10 @@ async function sample() {
   const prefix = (dir: string, tree: Record<string, unknown>) =>
     Object.fromEntries(Object.entries(tree).map(([k, v]) => [`${dir}/${k}`, v]))
   writeTree(repo, {
-    ...prefix('up', componentTree('@component/up', { up: [{ id: 'demo.base' }, { id: 'demo.other' }] })),
+    ...prefix('up', componentTree('@npm/up', { up: [{ id: 'demo.base' }, { id: 'demo.other' }] })),
     ...prefix(
       'down',
-      componentTree('@component/down', {
+      componentTree('@npm/down', {
         down: [
           { id: 'demo.derived', derivedFrom: ['demo-facts:demo.base'] },
           { id: 'demo.leaf', derivedFrom: ['demo.derived'] },
@@ -24,7 +24,7 @@ async function sample() {
     ),
     'agg/package.json': { name: 'demo-facts', version: '1.0.0', type: 'module' },
     'agg/fact-kit.config.json': {
-      aggregate: { '.': '@component/up', down: '@component/down' },
+      aggregate: { '.': '@npm/up', down: '@npm/down' },
       docsDirs: ['docs', 'src'],
     },
     'agg/docs/guide.md': [
@@ -54,7 +54,7 @@ async function sample() {
   })
   for (const dir of ['up', 'down']) {
     expect((await buildFacts({ cwd: join(repo, dir) })).problems).toEqual([])
-    linkPackage(join(repo, 'agg'), `@component/${dir}`, join(repo, dir))
+    linkPackage(join(repo, 'agg'), `@npm/${dir}`, join(repo, dir))
   }
   return join(repo, 'agg')
 }

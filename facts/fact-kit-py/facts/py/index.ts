@@ -1,4 +1,4 @@
-// Facts about the Python reader in py/. They are the spec of its public API, and the reader does not import them.
+// Facts about the Python reader in packages/fact-kit-py/. They are the spec of its public API, and the reader does not import them.
 import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
@@ -16,7 +16,7 @@ export default readerFacts(
       registry: 'pypi',
       name: 'fact-kit',
       import: 'fact_kit',
-      tagPrefix: 'py/v',
+      tagPrefix: 'fact-kit-py/v',
       requires: 'python>=3.11',
     },
     read: {

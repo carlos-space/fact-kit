@@ -1,8 +1,8 @@
 // Facts about fact-kit itself. They are the spec, and fact-kit's code does not import them. The tests in
 // test/fact-kit-spec.test.ts compare each one with the implementation, so a change on either side fails there.
-import { history, keyed } from '../../../../js/src/index.ts'
-import type { FactDecl, FactsSource } from '../../../../js/src/index.ts'
-import kit from '../../../../js/package.json' with { type: 'json' }
+import { history, keyed } from '../../../../packages/fact-kit-js/src/index.ts'
+import type { FactDecl, FactsSource } from '../../../../packages/fact-kit-js/src/index.ts'
+import kit from '../../../../packages/fact-kit-js/package.json' with { type: 'json' }
 
 const published = { kind: 'published' } as const
 const nonEmpty = { type: 'string', minLength: 1 }
@@ -458,7 +458,7 @@ const commands = {
 const aggregateLayout = {
   config: { aggregate: { '.': '<component package>', '<sub-path>': '<component package>' } },
   componentPackage: {
-    name: '@component/<directory name>',
+    name: '@<publish target>/<publish name>-facts',
     private: true,
     dependedOnBy: 'devDependencies of the aggregate, "workspace:*"',
   },

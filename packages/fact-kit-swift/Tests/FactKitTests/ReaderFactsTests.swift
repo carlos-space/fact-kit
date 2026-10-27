@@ -10,7 +10,7 @@ struct ReaderFactsTests {
   func readErrorsMatchEnum() throws {
     let repository = try #require(Conformance.repositoryRoot, "conformance/ not found")
     let reader = try readFacts(
-      "fact-kit-facts/swift",
+      "fact-kit-facts/fact-kit-swift",
       root: repository.appendingPathComponent("facts", isDirectory: true)
     )
     let value = try reader.value("fact-kit-swift.read-errors")

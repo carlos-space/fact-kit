@@ -1,15 +1,15 @@
 name: release-line-finalize
 
-# product/vX.Y.Z tag = release train closed. Verifies every unit tag, publishes the Snapshot as a
+# vX.Y.Z tag = release train closed. (Versions up to 0.2.0 were tagged product/vX.Y.Z, and a manual run can still verify one.) Verifies every unit tag, publishes the Snapshot as a
 # GitHub Release, and simulates the governance sync (Release Issue close / Project Status=Done).
 on:
   push:
-    tags: ['product/v[0-9]*']
+    tags: ['v[0-9]*']
   # Manual entry point so a finalize can be re-verified after a fix without re-tagging.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'product tag, e.g. product/v1.1.1'
+        description: 'product tag, e.g. v1.1.1 (or product/v0.2.0 for a version up to 0.2.0)'
         required: true
         type: string
 
@@ -44,8 +44,9 @@ jobs:
         id: snap
         run: |
           ref="${{ inputs.tag || github.ref_name }}"
-          v="${ref#product/v}"
-          prev="$(git tag --list 'product/v[0-9]*' --sort=-v:refname | awk -v c="$ref" 'f{print;exit} $0==c{f=1}')"
+          source scripts/lib/product-tags.sh
+          v="$(product_tag_version "$ref")"
+          prev="$(product_tags | awk -v c="$ref" 'f{print;exit} $0==c{f=1}')"
           echo "comparing against ${prev:-（無前一個產品版）}"
           bash scripts/release/snapshot.sh --product "$v" --check-tags ${prev:+--since "$prev"} > snapshot.md
           cat snapshot.md >> "$GITHUB_STEP_SUMMARY"

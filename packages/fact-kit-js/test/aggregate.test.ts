@@ -16,24 +16,22 @@ async function sample(rootEntries?: Record<string, { id: string }[]>) {
     tool: { tool: [{ id: 'tool.one', derivedFrom: ['demo-facts:core.one'] }] },
     multi: {
       'multi/a': [{ id: 'multi.a' }],
-      'multi/b': [{ id: 'multi.b', derivedFrom: ['@component/multi/multi/a:multi.a'] }],
+      'multi/b': [{ id: 'multi.b', derivedFrom: ['@npm/multi/multi/a:multi.a'] }],
     },
   }
   for (const [dir, entries] of Object.entries(components)) {
     writeTree(repo, {
-      ...Object.fromEntries(
-        Object.entries(componentTree(`@component/${dir}`, entries)).map(([k, v]) => [`${dir}/${k}`, v]),
-      ),
+      ...Object.fromEntries(Object.entries(componentTree(`@npm/${dir}`, entries)).map(([k, v]) => [`${dir}/${k}`, v])),
     })
     expect((await buildFacts({ cwd: join(repo, dir) })).problems).toEqual([])
   }
   writeTree(repo, {
     'agg/package.json': { name: 'demo-facts', version: '1.0.0', type: 'module', files: ['dist'] },
     'agg/fact-kit.config.json': {
-      aggregate: { '.': '@component/core', tool: '@component/tool', multi: '@component/multi' },
+      aggregate: { '.': '@npm/core', tool: '@npm/tool', multi: '@npm/multi' },
     },
   })
-  for (const dir of Object.keys(components)) linkPackage(join(repo, 'agg'), `@component/${dir}`, join(repo, dir))
+  for (const dir of Object.keys(components)) linkPackage(join(repo, 'agg'), `@npm/${dir}`, join(repo, dir))
   return { repo, agg: join(repo, 'agg') }
 }
 
@@ -49,12 +47,12 @@ describe('c002 aggregate build', () => {
       'dist/multi/multi/b/index.json',
     ])
     const root = readJson(join(agg, 'dist/index.json'))
-    expect(root).toMatchObject({ package: 'demo-facts', entry: '.', component: '@component/core' })
+    expect(root).toMatchObject({ package: 'demo-facts', entry: '.', component: '@npm/core' })
     expect(validateIndex(root)).toEqual([])
     expect(readJson(join(agg, 'dist/tool/index.json'))).toMatchObject({
       package: 'demo-facts',
       entry: 'tool',
-      component: '@component/tool',
+      component: '@npm/tool',
     })
     const b = readJson(join(agg, 'dist/multi/multi/b/index.json'))
     expect(b.entry).toBe('multi/multi/b')
@@ -90,18 +88,14 @@ describe('c002 aggregate build', () => {
     writeTree(repo, {
       ...Object.fromEntries(
         Object.entries(
-          componentTree(
-            '@component/c',
-            { c: [{ id: 'c.one' }] },
-            { 'facts/c/schemas/s.schema.json': { type: 'object' } },
-          ),
+          componentTree('@npm/c', { c: [{ id: 'c.one' }] }, { 'facts/c/schemas/s.schema.json': { type: 'object' } }),
         ).map(([k, v]) => [`c/${k}`, v]),
       ),
       'agg/package.json': { name: 'agg-facts', version: '1.0.0', type: 'module' },
-      'agg/fact-kit.config.json': { aggregate: { '.': '@component/c' } },
+      'agg/fact-kit.config.json': { aggregate: { '.': '@npm/c' } },
     })
     await buildFacts({ cwd: join(repo, 'c') })
-    linkPackage(join(repo, 'agg'), '@component/c', join(repo, 'c'))
+    linkPackage(join(repo, 'agg'), '@npm/c', join(repo, 'c'))
     const result = await buildFacts({ cwd: join(repo, 'agg') })
     expect(result.problems).toEqual([])
     expect(readJson(join(repo, 'agg/dist/schemas/s.schema.json'))).toEqual({ type: 'object' })
@@ -112,23 +106,20 @@ describe('c002 aggregate build', () => {
     const repo = makeTmp('aggregate-clash')
     const root = { tool: [{ id: 'core.a' }], other: [{ id: 'core.b' }] }
     writeTree(repo, {
-      ...Object.fromEntries(Object.entries(componentTree('@component/core', root)).map(([k, v]) => [`core/${k}`, v])),
+      ...Object.fromEntries(Object.entries(componentTree('@npm/core', root)).map(([k, v]) => [`core/${k}`, v])),
       ...Object.fromEntries(
-        Object.entries(componentTree('@component/tool', { tool: [{ id: 'tool.one' }] })).map(([k, v]) => [
-          `tool/${k}`,
-          v,
-        ]),
+        Object.entries(componentTree('@npm/tool', { tool: [{ id: 'tool.one' }] })).map(([k, v]) => [`tool/${k}`, v]),
       ),
       'agg/package.json': { name: 'demo-facts', version: '1.0.0', type: 'module' },
-      'agg/fact-kit.config.json': { aggregate: { '.': '@component/core', tool: '@component/tool' } },
+      'agg/fact-kit.config.json': { aggregate: { '.': '@npm/core', tool: '@npm/tool' } },
     })
     await buildFacts({ cwd: join(repo, 'core') })
     await buildFacts({ cwd: join(repo, 'tool') })
-    linkPackage(join(repo, 'agg'), '@component/core', join(repo, 'core'))
-    linkPackage(join(repo, 'agg'), '@component/tool', join(repo, 'tool'))
+    linkPackage(join(repo, 'agg'), '@npm/core', join(repo, 'core'))
+    linkPackage(join(repo, 'agg'), '@npm/tool', join(repo, 'tool'))
     const result = await buildFacts({ cwd: join(repo, 'agg') })
     expect(result.problems.map((p) => p.message)).toEqual([
-      'aggregate: the name "tool" is taken by both "@component/core" (sub-path ".", entry "tool") and "@component/tool" (sub-path "tool", entry "tool")',
+      'aggregate: the name "tool" is taken by both "@npm/core" (sub-path ".", entry "tool") and "@npm/tool" (sub-path "tool", entry "tool")',
     ])
     expect(existsSync(join(repo, 'agg/dist'))).toBe(false)
     const run = await cli(['build', '--cwd', join(repo, 'agg')])
@@ -140,13 +131,13 @@ describe('c002 aggregate build', () => {
     const repo = makeTmp('aggregate-unbuilt')
     writeTree(repo, {
       ...Object.fromEntries(
-        Object.entries(componentTree('@component/c', { c: [{ id: 'c.one' }] })).map(([k, v]) => [`c/${k}`, v]),
+        Object.entries(componentTree('@npm/c', { c: [{ id: 'c.one' }] })).map(([k, v]) => [`c/${k}`, v]),
       ),
       'agg/package.json': { name: 'agg-facts', version: '1.0.0', type: 'module' },
-      'agg/fact-kit.config.json': { aggregate: { '.': '@component/c' } },
+      'agg/fact-kit.config.json': { aggregate: { '.': '@npm/c' } },
     })
-    linkPackage(join(repo, 'agg'), '@component/c', join(repo, 'c'))
+    linkPackage(join(repo, 'agg'), '@npm/c', join(repo, 'c'))
     const result = await buildFacts({ cwd: join(repo, 'agg') })
-    expect(result.problems[0]?.message).toContain('"@component/c" has no built index under dist/. Build it first.')
+    expect(result.problems[0]?.message).toContain('"@npm/c" has no built index under dist/. Build it first.')
   })
 })

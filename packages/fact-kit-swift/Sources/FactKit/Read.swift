@@ -54,7 +54,7 @@ public struct FactReader: Sendable {
 /// `describes` is not compared with an installed product, and there is no `onRead`.
 ///
 /// - Parameters:
-///   - spec: `<package>` or `<package>/<path>`, for example `fact-kit-facts/swift`.
+///   - spec: `<package>` or `<package>/<path>`, for example `fact-kit-facts/fact-kit-swift`.
 ///   - root: the directory the package is resolved from.
 ///   - version: the version of the described component the reader runs, `"head"`, or nil for the latest published.
 ///   - include: labels of `pending` rows a `head` reader also gets.

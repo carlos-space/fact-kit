@@ -84,12 +84,12 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
       # The facts of fact-kit are pinned to the next version before the Release PR merges, while describes still
-      # reads js/package.json. facts:check passes the version of the open Release PR to `check --train`, so
+      # reads packages/fact-kit-js/package.json. facts:check passes the version of the open Release PR to `check --train`, so
       # the pinned rows are not ahead of describes. A push to a release branch and a pull request into one both
       # read the Release PR of that release branch. Other branches have no Release PR and set nothing.
       - name: Train of the open Release PR
         if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.base_ref, 'release/')
-        run: bash scripts/ci/release-train.sh >> "$GITHUB_ENV"
+        run: bash scripts/ci/release-train.sh fact-kit-js fact-kit >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.base_ref || github.ref_name }}
@@ -134,7 +134,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm vitest run js/test/convert.test.ts js/test/convert-agent-sdk.test.ts
+      - run: pnpm vitest run packages/fact-kit-js/test/convert.test.ts packages/fact-kit-js/test/convert-agent-sdk.test.ts
 
   convert-macos:
     needs: scope
@@ -146,7 +146,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-workspace
-      - run: pnpm vitest run js/test/convert.test.ts js/test/convert-agent-sdk.test.ts
+      - run: pnpm vitest run packages/fact-kit-js/test/convert.test.ts packages/fact-kit-js/test/convert-agent-sdk.test.ts
 
   # Assembled-system check against the packed packages (tarballs, wheel, crate, Go module, Swift package). Only on a release branch: this is the stabilisation
   # window, and finalize-release.sh --phase ga refuses to proceed until this run is green.

@@ -1,12 +1,12 @@
-// Compares the facts in facts/fact-kit with the fact-kit implementation. The facts are the spec, so a change to
+// Compares the facts in facts/fact-kit-js with the fact-kit implementation. The facts are the spec, so a change to
 // one side without the other fails here.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import { afterAll, describe, expect, it } from 'vitest'
-import { cli, cleanTmp, makeTmp, writeTree } from '../../../js/test/helpers.ts'
-import * as kitModule from '../../../js/src/index.ts'
+import { cli, cleanTmp, makeTmp, writeTree } from '../../../packages/fact-kit-js/test/helpers.ts'
+import * as kitModule from '../../../packages/fact-kit-js/src/index.ts'
 import {
   aggregateExports,
   X_KEYWORDS,
@@ -20,16 +20,16 @@ import {
   selectFacts,
   validateExampleGroup,
   validateFact,
-} from '../../../js/src/index.ts'
-import { loadEntries } from '../../../js/src/load.ts'
-import type { Fact } from '../../../js/src/index.ts'
+} from '../../../packages/fact-kit-js/src/index.ts'
+import { loadEntries } from '../../../packages/fact-kit-js/src/load.ts'
+import type { Fact } from '../../../packages/fact-kit-js/src/index.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const kitSrc = join(fileURLToPath(new URL('../../../js', import.meta.url)), 'src')
+const kitSrc = join(fileURLToPath(new URL('../../../packages/fact-kit-js', import.meta.url)), 'src')
 
 const entries = await loadEntries(join(root, 'facts'))
 const spec = entries.find((e) => e.entry === 'fact-kit')
-if (!spec) throw new Error('facts/fact-kit is missing')
+if (!spec) throw new Error('facts/fact-kit-js is missing')
 // The facts are the spec of the unreleased code, so they are read as `head` of the built index. A fact with
 // several rows has no content of its own before the build.
 const specIndex = buildIndex('fact-kit-facts', spec)
@@ -563,15 +563,14 @@ describe('fact-kit.aggregate-layout', () => {
     const layout = content('fact-kit.aggregate-layout')
     const place = (component: string, subpath: string, dir: string) =>
       ({ component, subpath, dir }) as unknown as Parameters<typeof aggregateExports>[0][number]
-    const exports = aggregateExports([place('@component/a', '.', ''), place('@component/b', 'sub', 'sub')], 'dist')
+    const exports = aggregateExports([place('@npm/a', '.', ''), place('@npm/b', 'sub', 'sub')], 'dist')
     expect(Object.keys(exports)).toEqual(['./index.json', './schemas/*', './sub/index.json', './sub/schemas/*'])
     expect(layout.exports.slice(0, 2)).toEqual(['./<dir>/index.json', './<dir>/schemas/*'])
     expect(layout.exports[2]).toContain('examples.json')
-    const withExamples = aggregateExports(
-      [place('@component/a', '.', ''), place('@component/b', 'sub', 'sub')],
-      'dist',
-      [{ dir: '' }, { dir: 'sub' }],
-    )
+    const withExamples = aggregateExports([place('@npm/a', '.', ''), place('@npm/b', 'sub', 'sub')], 'dist', [
+      { dir: '' },
+      { dir: 'sub' },
+    ])
     expect(Object.keys(withExamples).filter((k) => k.endsWith('examples.json'))).toEqual([
       './examples.json',
       './sub/examples.json',

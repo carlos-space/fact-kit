@@ -1,11 +1,11 @@
 {
   "product": { "name": "fact-kit", "members": [] },
   "units": {
-    "fact-kit": { "kind": "package", "stages": ["alpha", "ga"] },
+    "fact-kit-js": { "kind": "package", "stages": ["alpha", "ga"] },
     "fact-kit-facts": { "kind": "package", "stages": ["alpha", "ga"] },
-    "py": { "kind": "package", "stages": ["alpha", "ga"] },
-    "rs": { "kind": "package", "stages": ["alpha", "ga"] },
-    "go": { "kind": "package", "stages": ["alpha", "ga"] },
-    "swift": { "kind": "package", "stages": ["alpha", "ga"] }
+    "fact-kit-py": { "kind": "package", "stages": ["alpha", "ga"] },
+    "fact-kit-rs": { "kind": "package", "stages": ["alpha", "ga"] },
+    "fact-kit-go": { "kind": "package", "stages": ["alpha", "ga"] },
+    "fact-kit-swift": { "kind": "package", "stages": ["alpha", "ga"] }
   }
 }

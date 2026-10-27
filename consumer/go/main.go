@@ -14,10 +14,10 @@ import (
 	"slices"
 	"unicode/utf16"
 
-	factkit "github.com/carlos-space/fact-kit/go"
+	factkit "github.com/carlos-space/fact-kit-go"
 )
 
-const modulePath = "github.com/carlos-space/fact-kit/go"
+const modulePath = "github.com/carlos-space/fact-kit-go"
 
 func readJSON(path string) any {
 	data, err := os.ReadFile(path)

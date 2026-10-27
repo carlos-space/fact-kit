@@ -1,4 +1,4 @@
-// Facts about the Go reader in go/. They are the spec of its public API, and the reader does not import them.
+// Facts about the Go reader in packages/fact-kit-go/. They are the spec of its public API, and the reader does not import them.
 import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
@@ -14,9 +14,9 @@ export default readerFacts(
     language: 'Go',
     package: {
       registry: 'go module proxy',
-      name: 'github.com/carlos-space/fact-kit/go',
+      name: 'github.com/carlos-space/fact-kit-go',
       import: 'factkit',
-      tagPrefix: 'go/v',
+      tagPrefix: 'fact-kit-go/v',
       requires: 'go>=1.26',
     },
     read: {

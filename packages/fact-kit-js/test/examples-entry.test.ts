@@ -190,7 +190,7 @@ async function aggregateSample() {
   const mk = (name: string, ex: string, facts: string) => {
     const dir = join(repo, name)
     writeTree(dir, {
-      'package.json': { name: `@component/${name}`, version: '1.0.0', type: 'module', exports: {} },
+      'package.json': { name: `@npm/${name}`, version: '1.0.0', type: 'module', exports: {} },
       'facts/f/index.ts': facts,
       'examples/g.ts': [`import { defineExamples } from '${src}'`, ex].join('\n'),
     })
@@ -206,14 +206,14 @@ async function aggregateSample() {
   const downDir = mk('down', group("'only text'", "['dwn.limits']"), FACTS.replaceAll('demo', 'dwn'))
   writeTree(repo, {
     'agg/package.json': { name: 'demo-facts', version: '1.0.0', type: 'module', exports: {} },
-    'agg/fact-kit.config.json': { aggregate: { '.': '@component/up', down: '@component/down' } },
+    'agg/fact-kit.config.json': { aggregate: { '.': '@npm/up', down: '@npm/down' } },
   })
   for (const [dir, name] of [
     [upDir, 'up'],
     [downDir, 'down'],
   ] as const) {
     expect((await buildFacts({ cwd: dir, writeExports: true })).problems).toEqual([])
-    linkPackage(join(repo, 'agg'), `@component/${name}`, dir)
+    linkPackage(join(repo, 'agg'), `@npm/${name}`, dir)
   }
   return join(repo, 'agg')
 }

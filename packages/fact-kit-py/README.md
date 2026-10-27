@@ -74,7 +74,7 @@ for item in reader.facts:  # 這個讀者看得到的所有 fact，順序同 ind
 ## 開發
 
 ```sh
-cd py
+cd packages/fact-kit-py
 uv run pytest
 ```
 

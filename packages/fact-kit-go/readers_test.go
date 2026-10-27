@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	factkit "github.com/carlos-space/fact-kit/go"
+	factkit "github.com/carlos-space/fact-kit-go"
 )
 
 // c009: the Go reader reads the facts about itself, which fact-kit-facts ships in this repository. They name the
@@ -13,7 +13,7 @@ import (
 // self-reference, because facts/package.json is named fact-kit-facts.
 func TestReadsItsOwnErrorCodes(t *testing.T) {
 	root := filepath.Join(filepath.Dir(conformanceDir(t)), "facts")
-	reader, err := factkit.ReadFacts("fact-kit-facts/go", factkit.ReadFactsOptions{Root: root})
+	reader, err := factkit.ReadFacts("fact-kit-facts/fact-kit-go", factkit.ReadFactsOptions{Root: root})
 	if err != nil {
 		t.Fatal(err)
 	}

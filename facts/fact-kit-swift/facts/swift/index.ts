@@ -1,4 +1,4 @@
-// Facts about the Swift reader in swift/Sources/. They are the spec of its public API, and the reader does not import them.
+// Facts about the Swift reader in packages/fact-kit-swift/Sources/. They are the spec of its public API, and the reader does not import them.
 import { readerFacts } from '../../../_lib/readers-lib.ts'
 
 const options = [
@@ -16,7 +16,7 @@ export default readerFacts(
       registry: 'swiftpm',
       name: 'https://github.com/carlos-space/fact-kit',
       import: 'FactKit',
-      tagPrefix: '',
+      tagPrefix: 'fact-kit-swift/v',
       requires: 'swift-tools-version 6.0',
     },
     read: {

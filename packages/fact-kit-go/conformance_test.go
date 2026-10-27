@@ -15,7 +15,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	factkit "github.com/carlos-space/fact-kit/go"
+	factkit "github.com/carlos-space/fact-kit-go"
 )
 
 // conformanceDir finds conformance/ from FACT_KIT_CONFORMANCE, else by walking up from this file. The module zip

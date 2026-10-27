@@ -14,8 +14,8 @@ const fact = (name: string, more = '') =>
 test('relates, factLink and derive come out with the published identity in the aggregate package', async () => {
   const repo = makeTmp('relations-aggregate')
   writeTree(repo, {
-    // @component/a: entry y points at a fact of entry x, by relates and by factLink.
-    'a/package.json': { name: '@component/a', version: '2.0.0', private: true, type: 'module' },
+    // @npm/a: entry y points at a fact of entry x, by relates and by factLink.
+    'a/package.json': { name: '@npm/a', version: '2.0.0', private: true, type: 'module' },
     'a/facts/x/base.ts': `export const base = ${fact('base')}\n`,
     'a/facts/x/index.ts': "import { base } from './base.ts'\nexport default { describes: {}, facts: [base] }\n",
     'a/facts/y/index.ts': [
@@ -26,15 +26,15 @@ test('relates, factLink and derive come out with the published identity in the a
       'export default { describes: {}, facts: [related, linked] }',
       '',
     ].join('\n'),
-    // @component/b derives from @component/a/x.
-    'b/package.json': { name: '@component/b', version: '0.0.0', private: true, type: 'module' },
-    'b/facts/d/index.ts': `import { derive } from '${src}'\nexport default { describes: {}, facts: [derive('@component/a/x', 'a.base', () => ({ id: 'b.base', tool: 'b' }))] }\n`,
+    // @npm/b derives from @npm/a/x.
+    'b/package.json': { name: '@npm/b', version: '0.0.0', private: true, type: 'module' },
+    'b/facts/d/index.ts': `import { derive } from '${src}'\nexport default { describes: {}, facts: [derive('@npm/a/x', 'a.base', () => ({ id: 'b.base', tool: 'b' }))] }\n`,
     'agg/package.json': { name: 'demo-facts', version: '1.0.0', type: 'module', files: ['dist'] },
-    'agg/fact-kit.config.json': { aggregate: { a: '@component/a', b: '@component/b' } },
+    'agg/fact-kit.config.json': { aggregate: { a: '@npm/a', b: '@npm/b' } },
   })
-  linkPackage(join(repo, 'b'), '@component/a', join(repo, 'a'))
-  linkPackage(join(repo, 'agg'), '@component/a', join(repo, 'a'))
-  linkPackage(join(repo, 'agg'), '@component/b', join(repo, 'b'))
+  linkPackage(join(repo, 'b'), '@npm/a', join(repo, 'a'))
+  linkPackage(join(repo, 'agg'), '@npm/a', join(repo, 'a'))
+  linkPackage(join(repo, 'agg'), '@npm/b', join(repo, 'b'))
   for (const dir of ['a', 'b', 'agg']) {
     const built = await cli(['build', '--cwd', join(repo, dir), '--write-exports'])
     expect(built.stderr, dir).toBe('')
@@ -42,11 +42,11 @@ test('relates, factLink and derive come out with the published identity in the a
   }
 
   // Inside the component the locations carry the component package name.
-  expect(readJson(join(repo, 'a/dist/y/index.json')).facts[0].derivedFrom).toEqual(['@component/a/x:a.base'])
+  expect(readJson(join(repo, 'a/dist/y/index.json')).facts[0].derivedFrom).toEqual(['@npm/a/x:a.base'])
 
   const dist = join(repo, 'agg/dist')
   const y = readJson(join(dist, 'a/y/index.json'))
-  expect(y).toMatchObject({ package: 'demo-facts', entry: 'a/y', component: '@component/a' })
+  expect(y).toMatchObject({ package: 'demo-facts', entry: 'a/y', component: '@npm/a' })
   expect(y.facts[0].derivedFrom).toEqual(['demo-facts/a/x:a.base'])
   expect(y.facts[1].derivedFrom).toEqual(['demo-facts/a/x:a.base'])
   expect(y.facts[1].content.statement).toBe('Same as demo-facts/a/x:a.base.')
@@ -58,6 +58,6 @@ test('relates, factLink and derive come out with the published identity in the a
   // Nothing but the `component` field names a component package.
   for (const file of ['a/y', 'a/x', 'b']) {
     const text = JSON.stringify(readJson(join(dist, file, 'index.json')).facts)
-    expect(text, file).not.toContain('@component/')
+    expect(text, file).not.toContain('@npm/')
   }
 })

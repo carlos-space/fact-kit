@@ -13,25 +13,25 @@
     "dist"
   ],
   "scripts": {
-    "build": "node ../js/src/bin.ts build"
+    "build": "node ../packages/fact-kit-js/src/bin.ts build"
   },
   "devDependencies": {
-    "@component/fact-kit": "workspace:*",
-    "@component/py": "workspace:*",
-    "@component/rs": "workspace:*",
-    "@component/go": "workspace:*",
-    "@component/swift": "workspace:*"
+    "@npm/fact-kit-facts": "workspace:*",
+    "@pypi/fact-kit-facts": "workspace:*",
+    "@crates/fact-kit-facts": "workspace:*",
+    "@go/fact-kit-facts": "workspace:*",
+    "@swift/fact-kit-facts": "workspace:*"
   },
   "exports": {
     "./index.json": "./dist/index.json",
     "./schemas/*": "./dist/schemas/*",
-    "./py/index.json": "./dist/py/index.json",
-    "./py/schemas/*": "./dist/py/schemas/*",
-    "./rs/index.json": "./dist/rs/index.json",
-    "./rs/schemas/*": "./dist/rs/schemas/*",
-    "./go/index.json": "./dist/go/index.json",
-    "./go/schemas/*": "./dist/go/schemas/*",
-    "./swift/index.json": "./dist/swift/index.json",
-    "./swift/schemas/*": "./dist/swift/schemas/*"
+    "./fact-kit-py/index.json": "./dist/fact-kit-py/index.json",
+    "./fact-kit-py/schemas/*": "./dist/fact-kit-py/schemas/*",
+    "./fact-kit-rs/index.json": "./dist/fact-kit-rs/index.json",
+    "./fact-kit-rs/schemas/*": "./dist/fact-kit-rs/schemas/*",
+    "./fact-kit-go/index.json": "./dist/fact-kit-go/index.json",
+    "./fact-kit-go/schemas/*": "./dist/fact-kit-go/schemas/*",
+    "./fact-kit-swift/index.json": "./dist/fact-kit-swift/index.json",
+    "./fact-kit-swift/schemas/*": "./dist/fact-kit-swift/schemas/*"
   }
 }

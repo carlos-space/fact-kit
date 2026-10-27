@@ -5,15 +5,15 @@
 ## 安裝
 
 ```sh
-go get github.com/carlos-space/fact-kit/go@vX.Y.Z
+go get github.com/carlos-space/fact-kit-go@vX.Y.Z
 ```
 
-模組路徑是 `github.com/carlos-space/fact-kit/go`，package 名是 `factkit`。需要 Go 1.26 以上。發布用的 git tag 是 `go/vX.Y.Z`，所以 `@vX.Y.Z` 對應 tag `go/vX.Y.Z`。
+模組路徑是 `github.com/carlos-space/fact-kit-go`，package 名是 `factkit`。需要 Go 1.26 以上。本倉庫發版的 tag 是 `fact-kit-go/vX.Y.Z`。Go 工具鏈從鏡像倉庫 `github.com/carlos-space/fact-kit-go` 取模組，那裡的 tag 是 `vX.Y.Z`，所以 `@vX.Y.Z` 對應鏡像倉庫的 tag `vX.Y.Z`。
 
 ## 用法
 
 ```go
-import factkit "github.com/carlos-space/fact-kit/go"
+import factkit "github.com/carlos-space/fact-kit-go"
 
 reader, err := factkit.ReadFacts("some-facts/sdk", factkit.ReadFactsOptions{
 	Root:    "/path/to/hub",   // 省略時用目前的工作目錄
