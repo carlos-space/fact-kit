@@ -51,7 +51,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 | `fact-kit-go`                | `packages/fact-kit-go/`    | Go module（沒有上傳） | `fact-kit-go/vX.Y.Z`    |
 | `fact-kit-swift`             | `packages/fact-kit-swift/` | SwiftPM（沒有上傳）   | `fact-kit-swift/vX.Y.Z` |
 
-`facts/fact-kit-*/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 是發布紀錄，之後鏡像到 `fact-kit-go`、`fact-kit-swift` 倉庫，Go proxy 與 SwiftPM 讀鏡像倉庫的 tag。
+`facts/fact-kit-*/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 是發布紀錄，`publish.yml` 的 `mirror` job 再把套件鏡像到 `carlos-space/fact-kit-go`、`carlos-space/fact-kit-swift` 倉庫，Go proxy 與 SwiftPM 讀鏡像倉庫的 tag。
 
 這次改名前，JS 單元的 tag 是 `fact-kit/vX.Y.Z`，py、rs、go 是 `py/vX.Y.Z`、`rs/vX.Y.Z`、`go/vX.Y.Z`，Swift 是純 `X.Y.Z`。這些舊 tag 不動，也不會被新的 component 認得。版號靠 `.release-please-manifest.json` 接續：release-please 找不到新 component 的 release 時，改用 manifest 裡的版號當上一版（`packages/fact-kit-js` 是 0.8.0，其他讀取單元是 0.3.0-alpha.1）。
 
@@ -75,6 +75,8 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 預發布版的 npm dist-tag 等於階段名（`alpha`、`beta`、`rc`），只有 GA 進 `latest`，所以 `npm install` 不會裝到預發布版。腳本需要 bash 4 以上（macOS 用 `brew install bash`）、`gh`、`jq`，並且在乾淨的工作區執行。所有腳本都可以加 `--dry-run` 先看會做什麼，不寫遠端也不推送。
 
 `publish.yml` 每個註冊中心一個 job。PyPI 與 crates.io 用 Trusted Publishing，所以不存任何 token，兩個 job 都不放在 GitHub Environment 裡，發布的核准在合併 Release PR 前給一次，之後各註冊中心不再等核准。Trusted Publishing 登記時 environment 留空。PyPI 的版號不在這裡轉換：release-please 照寫 SemVer（`0.3.0-alpha.1`），`uv build` 的後端正規化成 PEP 440（`0.3.0a1`），發布腳本從建出的 wheel 讀回實際版號。crates.io 只能對已存在的 crate 設 Trusted Publishing，所以 crate 第一版由使用者用環境變數 `CARGO_REGISTRY_TOKEN` 手動發，crate 還不存在時 `crates` job 只在 summary 說明並略過。`publish.yml` 的 `dry_run` 輸入會讓所有上傳變成 dry run。
+
+`mirror` job 跑 `scripts/release/mirror-units.sh`。它對單元的發布 tag（`fact-kit-go/vX.Y.Z`）做 `git subtree split --prefix=packages/fact-kit-<語言>`，把結果推到鏡像倉庫的 `main`，再在鏡像倉庫建純版號 tag：Go 是 `vX.Y.Z`（例如 `v0.3.0-alpha.2`），Swift 是 `X.Y.Z`（例如 `0.3.0-alpha.2`）。選 subtree split 是因為它是確定性的：同樣的來源 commit 一定切出同樣的鏡像 commit，所以每次發版都是 `main` 的 fast-forward，重跑也會算出第一次推的 commit。腳本從不 force push，鏡像 tag 已存在且指向同一個 commit 時什麼都不做，指向別的 commit 時失敗（已發布的版號不能移動），鏡像 `main` 不是切出 commit 的祖先時也失敗。推送用 secret `MIRROR_PUSH_TOKEN`，它是只對這兩個鏡像倉庫有 Contents 寫入權限的 fine-grained token 或 GitHub App token。鏡像倉庫不收 PR，這個 job 是它們唯一的寫入者，所以在鏡像倉庫的 Settings 的 Features 關掉 Pull requests。派送 `publish.yml` 時 `dry_run` 設成 true，`mirror` job 只切出並印出將推送的 commit、tag 與檔案清單，不需要 token，也不推送。
 
 發布後用 `verify-install.yml` 驗證：手動派送，輸入各套件的版號。每個 job 在新的 runner 上只 sparse checkout `conformance/` 與該語言的 `consumer/<語言>/`，從註冊中心（Go 與 Swift 是鏡像倉庫的 tag）裝指定版號，跑共用樣本並印出套件從哪裡載入。
 
