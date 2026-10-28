@@ -1,0 +1,12 @@
+{
+  "name": "rust-sample-facts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "fact-kit build"
+  },
+  "exports": {
+    "./sample/index.json": "./dist/sample/index.json"
+  }
+}

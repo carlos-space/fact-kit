@@ -158,3 +158,6 @@ tmp/
 # Swift build output (Package.swift is in packages/fact-kit-swift/)
 .build/
 .swiftpm/
+
+# Samples
+samples/rust/target/

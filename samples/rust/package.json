@@ -1,0 +1,10 @@
+{
+  "name": "private-facts-sample-rust",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rust sample that reads the private @carlos-space/notchhub-facts with fact-kit",
+  "devDependencies": {
+    "@carlos-space/notchhub-facts": "^0.4.1",
+    "fact-kit": "0.9.0"
+  }
+}

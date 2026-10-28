@@ -16,3 +16,6 @@ packages/fact-kit-py/.pytest_cache
 .build
 .swiftpm
 Package.resolved
+
+# Build output of the sample crate
+samples/rust/target
