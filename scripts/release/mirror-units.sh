@@ -22,7 +22,7 @@
 #                     release tag the split runs on HEAD, so the unit can be rehearsed on a branch.
 #   MIRROR_OWNER      owner of the mirror repositories (default carlos-space); the repository is the component name
 #   MIRROR_REMOTE     full remote URL or path, replaces owner/component (tests use a local bare repository)
-#   MIRROR_PUSH_TOKEN token with contents: write on the mirror repositories; sent as an HTTP header, never in a URL
+#   MIRROR_PUSH_TOKEN GitHub App token with contents: write on the mirror repositories; sent as an HTTP header, never in a URL
 set -euo pipefail
 source "$(dirname "$0")/../lib/common.sh"
 cd "$REPO_ROOT"
