@@ -1,0 +1,48 @@
+name: publish-sample-facts
+
+# Publishes samples/sample-facts (@carlos-space/fact-kit-sample-facts) to GitHub Packages. The package stays
+# private and links to this repository through its repository field, so the facts-samples workflow reads it with
+# GITHUB_TOKEN. Run by hand after a version bump; a version already published is skipped.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: samples/sample-facts
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.1.0
+      # setup-node writes a user .npmrc for the @carlos-space scope that reads NODE_AUTH_TOKEN.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@carlos-space'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build and check the facts
+        run: |
+          pnpm build
+          pnpm exec fact-kit check --facts-dir _no-sources --index dist/sample/index.json
+      - name: Publish unless the version exists
+        run: |
+          name=$(jq -r .name package.json)
+          version=$(jq -r .version package.json)
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "$name@$version is already published; skipping."
+            exit 0
+          fi
+          pnpm publish --ignore-scripts --no-git-checks

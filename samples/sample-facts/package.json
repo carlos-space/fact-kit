@@ -1,0 +1,27 @@
+{
+  "name": "@carlos-space/fact-kit-sample-facts",
+  "version": "0.1.0",
+  "description": "Private sample facts that samples/rust and samples/go install from GitHub Packages",
+  "license": "UNLICENSED",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carlos-space/fact-kit.git",
+    "directory": "samples/sample-facts"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./sample/index.json": "./dist/sample/index.json"
+  },
+  "scripts": {
+    "build": "fact-kit build"
+  },
+  "devDependencies": {
+    "fact-kit": "0.9.0"
+  }
+}
