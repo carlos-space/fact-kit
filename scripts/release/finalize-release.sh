@@ -131,12 +131,12 @@ case "$phase" in
     sync_branch="${branch}--to-main"
     [[ -z "$(git ls-remote --heads origin "refs/heads/$sync_branch")" ]] \
       || die "遠端已有 ${sync_branch}（上次合回留下的）：先關掉它的 PR 並刪除該分支，再重跑本階段"
-    log "在 main 之上建立合回分支 ${sync_branch}（以 Release-Train-Base ${train_base:0:7} 為基底三方合併 $branch）"
+    log "在 main 之上建立合回分支 ${sync_branch}（以 Release-Train-Base ${train_base:0:7} 為基底三方合併 ${branch}）"
     run git switch -C "$sync_branch" origin/main
     if (( DRY_RUN )); then info "[dry-run] git merge-tree --write-tree --merge-base=$train_base origin/main $branch"; else
       merge_status=0
       merged="$(git merge-tree --write-tree --name-only --no-messages --merge-base="$train_base" origin/main "$branch")" || merge_status=$?
-      (( merge_status <= 1 )) || die "git merge-tree 失敗（結束碼 $merge_status）"
+      (( merge_status <= 1 )) || die "git merge-tree 失敗（結束碼 ${merge_status}）"
       tree="${merged%%$'\n'*}"
       blob() { git rev-parse -q --verify "$1:$2" 2>/dev/null || true; } # empty when the path is absent
       unresolved=()
