@@ -372,11 +372,18 @@ describe('fact-kit.read-facts', () => {
 describe('fact-kit.module-api', () => {
   const api = content('fact-kit.module-api')
 
+  // Names that are not functions: a type has no runtime value, and `DRAFT_2020_12` is a string constant.
+  const typeNames = ['NormalizeOptions', 'PinnedSource']
+  const constantNames = ['DRAFT_2020_12']
+
   it('names functions fact-kit exports', () => {
     const missing = api.exports
       .map((e: { name: string }) => e.name)
+      .filter((name: string) => !typeNames.includes(name) && !constantNames.includes(name))
       .filter((name: string) => typeof (kitModule as Record<string, unknown>)[name] !== 'function')
     expect(missing).toEqual([])
+    for (const name of constantNames) expect(typeof (kitModule as Record<string, unknown>)[name], name).toBe('string')
+    for (const name of typeNames) expect((kitModule as Record<string, unknown>)[name], name).toBeUndefined()
   })
 
   // What the unreleased code adds to the exports. Each stays out of the list a reader of 0.7.0 gets.
@@ -401,6 +408,17 @@ describe('fact-kit.module-api', () => {
     'domainEvent',
     'useCase',
   ]
+  // What the unreleased `next` row adds: the helpers a converter script shares.
+  const converterLib = [
+    'writeFormatted',
+    'stableJson',
+    'DRAFT_2020_12',
+    'NormalizeOptions',
+    'normalizeSchema',
+    'PinnedSource',
+    'sourceUrl',
+    'readPinned',
+  ]
   const namesAt = (version?: string): string[] => {
     const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(
       (fact) => fact.id === 'fact-kit.module-api',
@@ -414,11 +432,13 @@ describe('fact-kit.module-api', () => {
       expect(head, name).toContain(name)
       expect(typeof (kitModule as Record<string, unknown>)[name], name).toBe('function')
     }
+    for (const name of converterLib) expect(head, name).toContain(name)
     const old = namesAt('0.7.0')
-    expect(old.filter((name) => added.includes(name))).toEqual([])
-    expect(head.filter((name: string) => !added.includes(name))).toEqual(old)
-    // A reader that names no version gets the latest published rows, which are those of 0.8.0.
-    expect(namesAt()).toEqual(head)
+    expect(old.filter((name) => added.includes(name) || converterLib.includes(name))).toEqual([])
+    expect(head.filter((name: string) => !added.includes(name) && !converterLib.includes(name))).toEqual(old)
+    // A reader that names no version gets the latest published rows, which are those of 0.8.0 without the `next` row.
+    expect(namesAt()).toEqual(head.filter((name: string) => !converterLib.includes(name)))
+    expect(namesAt('head')).toEqual(head)
   })
 
   it('names each export once and writes the new history signature', () => {
@@ -428,8 +448,16 @@ describe('fact-kit.module-api', () => {
   })
 
   it('keeps one 0.8.0 row for each fact that changed, and next rows only for the unreleased changes', () => {
-    // Not released yet: the `publish` field (index 1.2) and the component package names of the aggregate layout.
-    const unreleased = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
+    // Not released yet: the `publish` field (index 1.2), the component package names of the aggregate layout, and
+    // the converter helpers with the `prettier` peer dependency.
+    const unreleased = [
+      'fact-kit.index',
+      'fact-kit.entry-module',
+      'fact-kit.read-facts',
+      'fact-kit.aggregate-layout',
+      'fact-kit.module-api',
+      'fact-kit.converters',
+    ]
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -494,6 +522,17 @@ describe('fact-kit.converters', () => {
     expect(pkg.peerDependencies[peerDependency]).toBe(range)
     expect(pkg.peerDependenciesMeta[peerDependency].optional).toBe(optional)
     expect(pkg.dependencies?.[peerDependency]).toBeUndefined()
+  })
+
+  it('states the prettier optional peer dependency that package.json declares, and writeFormatted names it', () => {
+    const pkg = JSON.parse(readFileSync(join(kitSrc, '..', 'package.json'), 'utf8'))
+    const [prettier] = converters.optionalPeers
+    expect(prettier.usedBy).toEqual(['writeFormatted'])
+    expect(pkg.peerDependencies[prettier.peerDependency]).toBe(prettier.range)
+    expect(pkg.peerDependenciesMeta[prettier.peerDependency].optional).toBe(true)
+    expect(pkg.dependencies?.[prettier.peerDependency]).toBeUndefined()
+    expect(prettier.install).toBe('pnpm add -D prettier@3')
+    expect(readFileSync(join(kitSrc, 'peer.ts'), 'utf8')).toContain("prettier: 'prettier@3'")
   })
 })
 
