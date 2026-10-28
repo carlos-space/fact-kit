@@ -1,9 +1,9 @@
 {
-  "name": "private-facts-sample-go",
+  "name": "facts-sample-go",
   "version": "0.0.0",
   "private": true,
-  "description": "Go sample that reads the private @carlos-space/notchhub-facts with fact-kit-go",
+  "description": "Go sample that reads fact-kit-facts installed with pnpm through fact-kit-go",
   "devDependencies": {
-    "@carlos-space/notchhub-facts": "^0.4.1"
+    "fact-kit-facts": "0.4.0"
   }
 }

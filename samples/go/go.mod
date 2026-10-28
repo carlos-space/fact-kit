@@ -1,4 +1,4 @@
-module example.com/private-facts-sample-go
+module example.com/facts-sample-go
 
 go 1.26
 

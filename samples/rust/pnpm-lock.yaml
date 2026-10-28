@@ -1,0 +1,73 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      fact-kit:
+        specifier: 0.9.0
+        version: 0.9.0
+      fact-kit-facts:
+        specifier: 0.4.0
+        version: 0.4.0
+
+packages:
+
+  ajv@8.20.0:
+    resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
+
+  fact-kit-facts@0.4.0:
+    resolution: {integrity: sha512-sqQvzB40RmWJiuMasamlMphQdcKP4ugcMbReAU2iS8TppnxGPb2HzXbT7PT6BlpphJpnQkRFNQHDm2ug+ixvcg==}
+
+  fact-kit@0.9.0:
+    resolution: {integrity: sha512-xETC+FinL/V4eDea0uDZet5G1qWv7HLdf9rQfBilq6YMVAjBUrwGlB0cy1TZTMdUR76BCDYGvB6EgR2SvIh9UQ==}
+    engines: {node: '>=24.0.0'}
+    hasBin: true
+    peerDependencies:
+      oxc-parser: ^0.155.0
+      typescript: '>=7.1.0-beta'
+    peerDependenciesMeta:
+      oxc-parser:
+        optional: true
+      typescript:
+        optional: true
+
+  fast-deep-equal@3.1.3:
+    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
+
+  fast-uri@3.1.9:
+    resolution: {integrity: sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==}
+
+  json-schema-traverse@1.0.0:
+    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
+
+  require-from-string@2.0.2:
+    resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
+    engines: {node: '>=0.10.0'}
+
+snapshots:
+
+  ajv@8.20.0:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-uri: 3.1.9
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
+
+  fact-kit-facts@0.4.0: {}
+
+  fact-kit@0.9.0:
+    dependencies:
+      ajv: 8.20.0
+
+  fast-deep-equal@3.1.3: {}
+
+  fast-uri@3.1.9: {}
+
+  json-schema-traverse@1.0.0: {}
+
+  require-from-string@2.0.2: {}

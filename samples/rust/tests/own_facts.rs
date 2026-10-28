@@ -1,5 +1,5 @@
 //! Reads the facts of this sample (`facts/`, built to `facts/dist` by `pnpm -C facts build`).
-//! Needs no private package: run it alone with `cargo test --test own_facts`.
+//! Needs only the facts build, not the installed package: run it alone with `cargo test --test own_facts`.
 
 use std::path::PathBuf;
 
