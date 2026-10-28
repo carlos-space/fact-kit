@@ -1303,6 +1303,13 @@ const facts: FactDecl[] = [
           },
         },
       },
+      {
+        since: 'next',
+        set: {
+          '/componentPackage/name':
+            '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. A unit with restricted access adds `@<scope>/`',
+        },
+      },
     ),
   }),
   fact({
@@ -1388,6 +1395,10 @@ const facts: FactDecl[] = [
   }),
 ]
 
-const entry: FactsSource = { describes: { 'fact-kit': kit.version }, facts }
+const entry: FactsSource = {
+  describes: { 'fact-kit-js': kit.version },
+  publish: { target: 'npm', name: 'fact-kit' },
+  facts,
+}
 
 export default entry

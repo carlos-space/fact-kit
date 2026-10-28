@@ -1,5 +1,5 @@
 {
-  "name": "@go/fact-kit-facts",
+  "name": "fact-kit-facts.go",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "fact-kit": "workspace:*"
   },
   "exports": {
-    "./go/index.json": "./dist/go/index.json"
+    "./fact-kit-go/index.json": "./dist/fact-kit-go/index.json"
   }
 }

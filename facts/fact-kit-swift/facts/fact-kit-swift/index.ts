@@ -12,6 +12,7 @@ export default readerFacts(
   {
     tool: 'fact-kit-swift',
     language: 'Swift',
+    publish: { target: 'swift', name: 'fact-kit' },
     package: [
       // 0.3.0-alpha.1 was published from this repository, tagged with the bare version.
       {

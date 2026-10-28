@@ -10,8 +10,8 @@
 | :---------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------- |
 | `packages/fact-kit-js/`                                                                   | JS 套件 `fact-kit`：fact 的型別與 meta-schema，以及撰寫、檢查、建置、讀取與比對的工具                                                           | npm（公開）                            |
 | `facts/`                                                                                  | 匯總套件 `fact-kit-facts`，根路徑是 fact-kit-js 的 facts，子路徑 `./fact-kit-py`、`./fact-kit-rs`、`./fact-kit-go`、`./fact-kit-swift` 是各語言 | npm（公開）                            |
-| `facts/fact-kit-js/`                                                                      | fact-kit 自己的 facts 源碼（component 套件 `@npm/fact-kit-facts`），是它的規格，測試拿它和 `packages/fact-kit-js/` 的實作比對                   | 由 `facts/` 匯總發布                   |
-| `facts/fact-kit-py/`、`facts/fact-kit-rs/`、`facts/fact-kit-go/`、`facts/fact-kit-swift/` | 其他語言讀取套件的公開 API 的 facts 源碼（component 套件 `@pypi/fact-kit-facts` 等），四種語言的讀取測試拿它比對自己的實作                      | 由 `facts/` 匯總發布                   |
+| `facts/fact-kit-js/`                                                                      | fact-kit 自己的 facts 源碼（component 套件 `fact-kit-facts.npm`），是它的規格，測試拿它和 `packages/fact-kit-js/` 的實作比對                    | 由 `facts/` 匯總發布                   |
+| `facts/fact-kit-py/`、`facts/fact-kit-rs/`、`facts/fact-kit-go/`、`facts/fact-kit-swift/` | 其他語言讀取套件的公開 API 的 facts 源碼（component 套件 `fact-kit-facts.pypi` 等），四種語言的讀取測試拿它比對自己的實作                       | 由 `facts/` 匯總發布                   |
 | `facts/_lib/`                                                                             | 各 component 套件共用的源碼                                                                                                                     | 不發布                                 |
 | `packages/fact-kit-py/`                                                                   | Python 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `packages/fact-kit-py/README.md`                                                        | PyPI                                   |
 | `packages/fact-kit-rs/`                                                                   | Rust 讀取套件 `fact-kit`（匯入名 `fact_kit`），說明在 `packages/fact-kit-rs/README.md`                                                          | crates.io                              |
@@ -102,7 +102,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
    bash scripts/release/advance-release.sh --line 0.1 --to ga --product-version 0.1.0
    ```
 
-5. 合回 main。腳本刪掉標記檔，把產品版號寫進發布分支的 root `package.json`，在 main 之上建立 `release/v0.1--to-main` 並開 PR，PR 內文附 Snapshot。等這個 PR 的 ci 通過。
+5. 合回 main。腳本刪掉標記檔，把產品版號寫進發布分支的 root `package.json`，在 main 之上建立 `release/v0.1--to-main` 並開 PR，PR 內文附 Snapshot。等這個 PR 的 ci 通過。合併回 main 時用 `git merge-tree --write-tree --merge-base`，需要 git 2.40 以上。
 
    ```bash
    bash scripts/release/finalize-release.sh --line 0.1 --phase merge-back --product-version 0.1.0

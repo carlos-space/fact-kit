@@ -28,7 +28,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const kitSrc = join(fileURLToPath(new URL('../../../packages/fact-kit-js', import.meta.url)), 'src')
 
 const entries = await loadEntries(join(root, 'facts'))
-const spec = entries.find((e) => e.entry === 'fact-kit')
+const spec = entries.find((e) => e.entry === 'fact-kit-js')
 if (!spec) throw new Error('facts/fact-kit-js is missing')
 // The facts are the spec of the unreleased code, so they are read as `head` of the built index. A fact with
 // several rows has no content of its own before the build.
@@ -211,7 +211,7 @@ describe('fact-kit.cli', () => {
   it('prints the version of package.json', async () => {
     const pkg = JSON.parse(readFileSync(join(kitSrc, '..', 'package.json'), 'utf8')) as { version: string }
     expect((await cli(['--version'])).stdout.trim()).toBe(pkg.version)
-    expect(spec.module.describes['fact-kit']).toBe(pkg.version)
+    expect(spec.module.describes['fact-kit-js']).toBe(pkg.version)
   })
 })
 
@@ -427,13 +427,14 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, and next rows only for the publish change', () => {
+  it('keeps one 0.8.0 row for each fact that changed, and next rows only for the unreleased changes', () => {
+    // Not released yet: the `publish` field (index 1.2) and the component package names of the aggregate layout.
+    const unreleased = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
-      // Only the `publish` change (index 1.2) is not released yet.
       expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
-        ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts'].includes(fact.id) ? 1 : 0,
+        unreleased.includes(fact.id) ? 1 : 0,
       )
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)

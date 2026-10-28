@@ -73,16 +73,16 @@ describe('release-train.sh', () => {
     })
     const r = run(dir, env)
     expect(r.status).toBe(0)
-    expect(r.stdout).toBe('FACT_KIT_TRAIN=--train fact-kit=0.8.0-alpha.1\n')
+    expect(r.stdout).toBe('FACT_KIT_TRAIN=--train fact-kit-js=0.8.0-alpha.1\n')
   })
 
-  test('names the describes key of the unit when it is given, and the component when it is not', () => {
+  test('names the component as the describes key, and takes fact-kit-js when no component is given', () => {
     const dir = fixture({
       prs: [{ headRefName: 'release-please--branches--release/v0.8' }],
       manifest: { 'packages/fact-kit-js': '0.8.0', facts: '0.2.0' },
     })
-    expect(run(dir, env, 'fact-kit-js', 'fact-kit').stdout).toBe('FACT_KIT_TRAIN=--train fact-kit=0.8.0\n')
     expect(run(dir, env, 'fact-kit-js').stdout).toBe('FACT_KIT_TRAIN=--train fact-kit-js=0.8.0\n')
+    expect(run(dir, env).stdout).toBe('FACT_KIT_TRAIN=--train fact-kit-js=0.8.0\n')
   })
 
   test('takes the unit of another component from the config', () => {

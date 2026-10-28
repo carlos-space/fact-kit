@@ -1,5 +1,5 @@
 {
-  "name": "@crates/fact-kit-facts",
+  "name": "fact-kit-facts.crates",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "fact-kit": "workspace:*"
   },
   "exports": {
-    "./rs/index.json": "./dist/rs/index.json"
+    "./fact-kit-rs/index.json": "./dist/fact-kit-rs/index.json"
   }
 }

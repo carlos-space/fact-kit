@@ -2,6 +2,7 @@
 // Each component describes one language with the same four facts, so a test can compare every language with the
 // JS reader the same way. Each component passes the version of its first release as `since`.
 import type { Fact, FactsModule, ReadErrorCode } from '../../packages/fact-kit-js/src/index.ts'
+import type { PublishInfo } from '../../packages/fact-kit-js/src/types.ts'
 
 export interface ReaderParam {
   name: string
@@ -38,6 +39,8 @@ export interface ReaderApi {
   /** The tool id, also the prefix of every fact id. */
   tool: string
   language: string
+  /** Where the component is published and its PublishName, which the index records as `publish`. */
+  publish: PublishInfo
   /** One value, or one per identity when the package moved: rows in ascending `since`, the last one is the current. */
   package: ReaderPackage | ReaderPackageRow[]
   read: {
@@ -114,5 +117,5 @@ export function readerFacts(api: ReaderApi, since: string): FactsModule {
       description: { en: 'The stable code of each error. The message is for people and can change.' },
     }),
   ]
-  return { describes: {}, facts }
+  return { describes: {}, publish: api.publish, facts }
 }

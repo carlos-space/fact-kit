@@ -1,5 +1,5 @@
 {
-  "name": "@npm/fact-kit-facts",
+  "name": "fact-kit-facts.npm",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,6 @@
     "fact-kit": "workspace:*"
   },
   "exports": {
-    "./fact-kit/index.json": "./dist/fact-kit/index.json"
+    "./fact-kit-js/index.json": "./dist/fact-kit-js/index.json"
   }
 }

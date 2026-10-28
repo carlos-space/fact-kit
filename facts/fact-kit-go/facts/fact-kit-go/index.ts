@@ -12,6 +12,7 @@ export default readerFacts(
   {
     tool: 'fact-kit-go',
     language: 'Go',
+    publish: { target: 'go', name: 'fact-kit' },
     package: [
       // 0.3.0-alpha.1 was published from this repository, as the module in its go/ directory.
       {
