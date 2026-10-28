@@ -454,7 +454,7 @@ describe('fact-kit.module-api', () => {
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
     // Not released yet: the package name rules (fact-kit.facts-package-naming has one row and no variants).
-    const inNext = ['fact-kit.problem-codes', 'fact-kit.check-rules']
+    const inNext = ['fact-kit.problem-codes', 'fact-kit.check-rules', 'fact-kit.aggregate-layout']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -651,10 +651,12 @@ describe('fact-kit.facts-package-naming', () => {
     )
   })
 
-  it('says the prefix follows the aggregate unit in aggregate-layout, with no trace of the old sentence', () => {
+  it('says the prefix follows the aggregate unit in aggregate-layout from the next release, and keeps the old sentence for 0.9.0', () => {
     const name = content('fact-kit.aggregate-layout').componentPackage.name as string
     expect(name).toContain('the unit that publishes the aggregate package')
     expect(name).not.toContain('A unit with restricted access')
+    const old = selectFacts(specIndex, { version: '0.10.0' }).find((f) => f.id === 'fact-kit.aggregate-layout')
+    expect((old?.content as any).value.componentPackage.name).toContain('A unit with restricted access adds')
   })
 
   it('reports policy-scope for a restricted policy with no scope, and nothing without the file', async () => {

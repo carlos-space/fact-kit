@@ -980,14 +980,14 @@ const factsPackageNaming = {
       'Top-level, such as `@carlos-space`. Required when the top or any unit is `restricted`, and `check` reports `policy-scope` when it is missing.',
   },
   checkedIn:
-    'The aggregate package, the one whose config has `aggregate`. `check` reads its own name and every component package it can find in node_modules. A component that is not installed, or whose facts do not load, is skipped.',
+    "The aggregate package, the one whose config has `aggregate`. `check` reads its own name and every component package it can find: in node_modules under the aggregate, else in a directory that the `packages` patterns of `pnpm-workspace.yaml` at `repoRoot` match and whose package.json has that name. The sources are read from the `factsDir` of the component's own config. A component that is not found, whose facts do not load, or whose facts name no unit is not checked, and `check` prints a warning with code `facts-name` that says why, so the name is not skipped silently.",
   aggregateUnit:
     'The `component` that `release-please-config.json` gives to the directory of the aggregate package, else the unit named like the aggregate package without its scope. When the policy `units` has neither, the access of the repository applies.',
   base: {
     aggregate:
       '<name without @<scope>/>, which must end in `-facts`: `<RepoName>-facts` in a product repository, `<SourceTypeName>-facts` in a facts repository.',
     component:
-      '<publish.name without @<org>/>-facts when the entry has `publish`, else <the one key of describes>-facts. A component whose entry has neither is skipped.',
+      '<publish.name without @<org>/>-facts when the entry has `publish`, else <the one key of describes>-facts, else <the sub-path of the component in `aggregate`>-facts. The component at the root sub-path `.` that has none of the three gets a warning and is not checked.',
   },
   prefix:
     '`@<scope>/` on the aggregate and on every component when the access of the aggregate unit is `restricted`, and none when it is `public`. The access of the unit a component describes is not read, whether or not the policy lists that unit.',
@@ -1259,7 +1259,7 @@ const facts: FactDecl[] = [
             },
             {
               code: 'facts-name',
-              rule: 'In an aggregate package (the config has `aggregate`), the name of the aggregate or of an installed component package is not the one `fact-kit.facts-package-naming` works out from `release-policy.json`: a missing or extra `@<scope>/` prefix, a missing or extra publish target suffix, or a shared base name with no publish target to tell the packages apart. The message names the expected name. A repository with no `release-policy.json`, and a component that is not installed or whose facts cannot be loaded, are not checked.',
+              rule: 'In an aggregate package (the config has `aggregate`), the name of the aggregate or of a component package is not the one `fact-kit.facts-package-naming` works out from `release-policy.json`: a missing or extra `@<scope>/` prefix, a missing or extra publish target suffix, or a shared base name with no publish target to tell the packages apart. The message names the expected name. A repository with no `release-policy.json` is not checked. A component that is not found in node_modules or in the workspace, or whose facts cannot be loaded, gets a warning with code `facts-name` and is not checked.',
               reads:
                 '`release-policy.json`, `release-please-config.json`, the component packages and their facts sources',
             },
@@ -1422,6 +1422,13 @@ const facts: FactDecl[] = [
       },
       {
         since: '0.9.0-alpha.1',
+        set: {
+          '/componentPackage/name':
+            '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. A unit with restricted access adds `@<scope>/`',
+        },
+      },
+      {
+        since: 'next',
         set: {
           '/componentPackage/name':
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',

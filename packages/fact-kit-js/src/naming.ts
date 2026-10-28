@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import { basename, join, relative, sep } from 'node:path'
 import { resolveComponent } from './aggregate.ts'
 import { InputError, LoadError, loadEntries, readPackageName } from './load.ts'
@@ -63,10 +63,11 @@ export async function policyProblems(
   root: string,
   cwd: string,
   aggregate: Readonly<Record<string, string>> | undefined,
-): Promise<Problem[]> {
+): Promise<{ problems: Problem[]; warnings: Problem[] }> {
   const policy = await readPolicy(root)
-  if (!policy) return []
+  if (!policy) return { problems: [], warnings: [] }
   const problems: Problem[] = []
+  const warnings: Problem[] = []
   const scope = typeof policy.scope === 'string' && policy.scope !== '' ? policy.scope : undefined
   const anyRestricted =
     isRestricted(policy.access) || Object.values(policy.units ?? {}).some((u) => isRestricted(u?.access))
@@ -77,8 +78,85 @@ export async function policyProblems(
       location: POLICY_FILE,
     })
   }
-  if (aggregate) problems.push(...(await nameProblems(root, cwd, aggregate, policy, scope)))
-  return problems
+  if (aggregate) {
+    const found = await nameProblems(root, cwd, aggregate, policy, scope)
+    problems.push(...found.problems)
+    warnings.push(...found.warnings)
+  }
+  return { problems, warnings }
+}
+
+/** The directories the `packages` patterns of `pnpm-workspace.yaml` at `root` match. `*` is one level, `**` any number. */
+async function workspaceDirs(root: string): Promise<string[]> {
+  let text: string
+  try {
+    text = await readFile(join(root, 'pnpm-workspace.yaml'), 'utf8')
+  } catch {
+    return []
+  }
+  const patterns: string[] = []
+  let inPackages = false
+  for (const line of text.split('\n')) {
+    if (/^\S/.test(line)) inPackages = /^packages:\s*$/.test(line)
+    else if (inPackages) {
+      const m = /^\s+-\s+(?:'([^']*)'|"([^"]*)"|(\S+))\s*$/.exec(line)
+      const pattern = m?.[1] ?? m?.[2] ?? m?.[3]
+      if (pattern !== undefined && !pattern.startsWith('!')) patterns.push(pattern)
+    }
+  }
+  const subdirs = async (dir: string): Promise<string[]> => {
+    try {
+      const items = await readdir(dir, { withFileTypes: true })
+      return items
+        .filter((i) => i.isDirectory() && i.name !== 'node_modules' && !i.name.startsWith('.'))
+        .map((i) => join(dir, i.name))
+    } catch {
+      return []
+    }
+  }
+  const expand = async (dir: string, parts: string[]): Promise<string[]> => {
+    const [head, ...rest] = parts
+    if (head === undefined) return [dir]
+    if (head === '**') {
+      const here = await expand(dir, rest)
+      const deeper = await Promise.all((await subdirs(dir)).map((d) => expand(d, parts)))
+      return [...here, ...deeper.flat()]
+    }
+    if (head === '*') return (await Promise.all((await subdirs(dir)).map((d) => expand(d, rest)))).flat()
+    return expand(join(dir, head), rest)
+  }
+  const dirs = new Set<string>()
+  for (const pattern of patterns) {
+    for (const d of await expand(
+      root,
+      pattern.split('/').filter((x) => x !== '' && x !== '.'),
+    ))
+      dirs.add(d)
+  }
+  return [...dirs]
+}
+
+/** The directory of the workspace package called `name`, found through `pnpm-workspace.yaml`. */
+async function findInWorkspace(root: string, name: string): Promise<string | undefined> {
+  for (const dir of await workspaceDirs(root)) {
+    try {
+      const pkg = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')) as { name?: unknown }
+      if (pkg.name === name) return dir
+    } catch {
+      // not a package
+    }
+  }
+  return undefined
+}
+
+/** `factsDir` of the component's own fact-kit.config.json, `facts` when it has none. */
+async function factsDirOf(dir: string): Promise<string> {
+  try {
+    const config = JSON.parse(await readFile(join(dir, 'fact-kit.config.json'), 'utf8')) as { factsDir?: unknown }
+    return typeof config.factsDir === 'string' ? config.factsDir : 'facts'
+  } catch {
+    return 'facts'
+  }
 }
 
 interface Part {
@@ -89,29 +167,58 @@ interface Part {
   target: string | undefined
 }
 
-/** Reads a component package: its name, and the base name and publish target its facts give it. Undefined when it can not be worked out. */
-async function readPart(cwd: string, component: string): Promise<Part | undefined> {
-  const dir = await resolveComponent(cwd, component)
-  // A component that is not installed can not be read. `build` reports it.
-  if (dir === undefined) return undefined
+/**
+ * Reads a component package: its name, and the base name and publish target its facts give it. The package is
+ * found in node_modules under the aggregate, else in the workspace `pnpm-workspace.yaml` lists. Without a package
+ * the result is a warning, and so it is for facts that can not be loaded or name no unit.
+ */
+async function readPart(
+  root: string,
+  cwd: string,
+  subpath: string,
+  component: string,
+): Promise<{ part?: Part; warning?: Problem }> {
+  const warn = (message: string): { warning: Problem } => ({
+    warning: {
+      code: 'facts-name',
+      message: `${component}: ${message}, so its name is not checked`,
+      location: POLICY_FILE,
+    },
+  })
+  const dir = (await resolveComponent(cwd, component)) ?? (await findInWorkspace(root, component))
+  if (dir === undefined) {
+    return warn('no package of that name is in node_modules or in the packages of pnpm-workspace.yaml')
+  }
   try {
     const name = await readPackageName(dir)
-    const entries = await loadEntries(join(dir, 'facts'), { cwd: dir, packageName: name })
+    const entries = await loadEntries(join(dir, await factsDirOf(dir)), { cwd: dir, packageName: name })
     const first = entries.find((e) => e.module.publish !== undefined) ?? entries[0]
     const keys = Object.keys(first?.module.describes ?? {})
     const publish = first?.module.publish
     const unitName =
-      typeof publish?.name === 'string' ? withoutScope(publish.name) : keys.length === 1 ? keys[0] : undefined
-    if (unitName === undefined) return undefined
+      typeof publish?.name === 'string'
+        ? withoutScope(publish.name)
+        : keys.length === 1
+          ? keys[0]
+          : // A component that describes no version is named by the sub-path it hangs on.
+            subpath === '.'
+            ? undefined
+            : subpath
+    if (unitName === undefined)
+      return warn(
+        'its facts have no publish name, do not describe exactly one component, and it is the root of the aggregate',
+      )
     return {
-      name,
-      dir,
-      base: `${unitName}-facts`,
-      target: typeof publish?.target === 'string' ? publish.target : undefined,
+      part: {
+        name,
+        dir,
+        base: `${unitName}-facts`,
+        target: typeof publish?.target === 'string' ? publish.target : undefined,
+      },
     }
   } catch (error) {
     // Whatever is wrong with the sources, `check` of that package reports it.
-    if (error instanceof LoadError) return undefined
+    if (error instanceof LoadError) return warn(`its facts can not be loaded (${error.message})`)
     throw error
   }
 }
@@ -122,8 +229,9 @@ async function nameProblems(
   aggregate: Readonly<Record<string, string>>,
   policy: Policy,
   scope: string | undefined,
-): Promise<Problem[]> {
+): Promise<{ problems: Problem[]; warnings: Problem[] }> {
   const problems: Problem[] = []
+  const warnings: Problem[] = []
   let aggregateName: string
   try {
     aggregateName = await readPackageName(cwd)
@@ -155,9 +263,10 @@ async function nameProblems(
   }
 
   const parts: Part[] = []
-  for (const component of Object.values(aggregate)) {
-    const part = await readPart(cwd, component)
-    if (part) parts.push(part)
+  for (const [subpath, component] of Object.entries(aggregate)) {
+    const read = await readPart(root, cwd, subpath, component)
+    if (read.part) parts.push(read.part)
+    if (read.warning) warnings.push(read.warning)
   }
   for (const part of parts) {
     const location = where(join(part.dir, 'package.json'))
@@ -182,5 +291,5 @@ async function nameProblems(
       location,
     })
   }
-  return problems
+  return { problems, warnings }
 }

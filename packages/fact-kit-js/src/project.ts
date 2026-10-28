@@ -189,10 +189,15 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
   const extra: Problem[] = []
   if (indexes.some((i) => i.source)) extra.push(...(await libRowProblems(join(cwd, factsDir, '_lib'), cwd)))
   extra.push(...(await implProblems(root, cwd, config.implDirs ?? [])))
-  extra.push(...(await policyProblems(root, cwd, config.aggregate)))
+  const policy = await policyProblems(root, cwd, config.aggregate)
+  extra.push(...policy.problems)
   if (config.docsDirs?.length) extra.push(...(await docRefProblems(config.docsDirs, cwd, knownFacts(indexes))))
 
-  return { ...result, problems: [...problems, ...result.problems, ...extra] }
+  return {
+    ...result,
+    problems: [...problems, ...result.problems, ...extra],
+    warnings: [...result.warnings, ...policy.warnings],
+  }
 }
 
 function hasPending(indexes: readonly IndexInput[]): boolean {
