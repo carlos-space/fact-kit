@@ -44,7 +44,7 @@ export interface AggregatePlan {
 }
 
 /** Finds `node_modules/<name>` going up from `cwd`, the way Node resolves a dependency. */
-async function resolveComponent(cwd: string, name: string): Promise<string | undefined> {
+export async function resolveComponent(cwd: string, name: string): Promise<string | undefined> {
   for (let dir = cwd; ; dir = dirname(dir)) {
     const candidate = join(dir, 'node_modules', name)
     try {

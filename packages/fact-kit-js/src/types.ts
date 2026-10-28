@@ -173,6 +173,8 @@ export interface Problem {
     | 'subset-of'
     | 'ref'
     | 'schema-property'
+    | 'policy-scope'
+    | 'facts-name'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string

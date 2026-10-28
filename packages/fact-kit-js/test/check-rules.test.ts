@@ -210,6 +210,49 @@ describe('c004 check: the rules of m149/d011', () => {
     expect(ok.code).toBe(0)
   })
 
+  test('impl-imports-facts: a facts package name with a publish target suffix (d002) is still a -facts package', async () => {
+    const files = {
+      'facts/a/index.ts': entry([fact('one')]),
+      'fact-kit.config.json': { implDirs: ['src'] },
+      'src/cli.ts':
+        "import a from 'fact-kit-facts.npm'\nimport b from '@scope/tool-facts.go/cli'\nconst c = await import('other-facts.pypi')\nexport { a, b, c }\n",
+    }
+    const r = await check(files)
+    expect([r.code, codes(r)]).toEqual([1, ['impl-imports-facts', 'impl-imports-facts', 'impl-imports-facts']])
+    expect(r.problems.map((p) => p.location)).toEqual(['src/cli.ts:1', 'src/cli.ts:2', 'src/cli.ts:3'])
+    // A dot after "facts" that is not a suffix of the name, and a name that only contains the letters.
+    const ok = await check({
+      ...files,
+      'src/cli.ts':
+        "import a from 'facts-helper.npm'\nimport b from 'tool-facts-extra'\nimport c from 'tool-factsheet.npm'\nexport { a, b, c }\n",
+    })
+    expect([ok.code, ok.problems]).toEqual([0, []])
+  })
+
+  test('impl-depends-on-facts: a dependency on a facts package with a publish target suffix is reported, and such a package may list one', async () => {
+    const files = {
+      'facts/a/index.ts': entry([fact('one')]),
+      'fact-kit.config.json': { repoRoot: '.' },
+      'tool/package.json': { name: 'tool', version: '1.0.0', dependencies: { 'tool-facts.npm': '^1.0.0' } },
+      'tool-facts/package.json': { name: 'tool-facts.pypi', dependencies: { 'other-facts.go': '1' } },
+    }
+    const r = await check(files)
+    expect([r.code, codes(r)]).toEqual([1, ['impl-depends-on-facts']])
+    expect(r.problems[0]).toMatchObject({ location: 'tool/package.json' })
+    expect(r.problems[0]?.message).toContain('tool-facts.npm')
+  })
+
+  test('train: a package with no describes takes its component from the name without scope, `-facts` and the publish target suffix', async () => {
+    const files = {
+      'package.json': { name: '@scope/demo-facts.npm', version: '1.0.0', type: 'module' },
+      'facts/a/index.ts': entry([fact('one', rows(row("'next'")))], '{}'),
+    }
+    const r = await check(files, ['--train', 'demo=1.2.0'])
+    expect([r.code, codes(r)]).toEqual([1, ['train-next']])
+    // The suffix is not read as part of the component, so another train changes nothing.
+    expect((await check(files, ['--train', 'demo-facts.npm=1.2.0'])).code).toBe(0)
+  })
+
   test('impl-reads-facts-dist: code in implDirs names a path in facts/dist', async () => {
     const files = {
       'facts/a/index.ts': entry([fact('one')]),

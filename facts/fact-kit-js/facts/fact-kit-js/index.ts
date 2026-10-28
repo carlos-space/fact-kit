@@ -971,6 +971,38 @@ const checkRules = keyed(
   ['code'],
 )
 
+const factsPackageNaming = {
+  policy: {
+    file: '`release-policy.json` at `repoRoot`. A repository without it gets neither `policy-scope` nor `facts-name`.',
+    access:
+      '`public` or `restricted`, at the top and, to override it, in a unit. `restricted` means the package is non-public once published.',
+    scope:
+      'Top-level, such as `@carlos-space`. Required when the top or any unit is `restricted`, and `check` reports `policy-scope` when it is missing.',
+  },
+  checkedIn:
+    "The aggregate package, the one whose config has `aggregate`. `check` reads its own name and every component package it can find: in node_modules under the aggregate, else in a directory that the `packages` patterns of `pnpm-workspace.yaml` at `repoRoot` match and whose package.json has that name. The sources are read from the `factsDir` of the component's own config. A component that is not found, whose facts do not load, or whose facts name no unit is not checked, and `check` prints a warning with code `facts-name` that says why, so the name is not skipped silently.",
+  aggregateUnit:
+    'The `component` that `release-please-config.json` gives to the directory of the aggregate package, else the unit named like the aggregate package without its scope. When the policy `units` has neither, the access of the repository applies.',
+  base: {
+    aggregate:
+      '<name without @<scope>/>, which must end in `-facts`: `<RepoName>-facts` in a product repository, `<SourceTypeName>-facts` in a facts repository.',
+    component:
+      '<publish.name without @<org>/>-facts when the entry has `publish`, else <the one key of describes>-facts, else <the sub-path of the component in `aggregate`>-facts. The component at the root sub-path `.` that has none of the three gets a warning and is not checked.',
+  },
+  prefix:
+    '`@<scope>/` on the aggregate and on every component when the access of the aggregate unit is `restricted`, and none when it is `public`. The access of the unit a component describes is not read, whether or not the policy lists that unit.',
+  suffix:
+    '`.<publish.target>` on every component whose base name is also the base name of the aggregate or of another component, the npm one included. A shared base name with no publish target is reported, and the unit has to be renamed.',
+  examples: {
+    'fact-kit (public)': ['fact-kit-facts', 'fact-kit-facts.npm', 'fact-kit-facts.pypi', 'fact-kit-facts.go'],
+    'restricted, scope @carlos-space': [
+      '@carlos-space/demo-facts',
+      '@carlos-space/demo-facts.npm',
+      '@carlos-space/other-facts',
+    ],
+  },
+}
+
 const fact = (f: Omit<FactDecl, 'tool' | 'source'>): FactDecl => ({ ...f, tool: 'fact-kit', source: published })
 
 /**
@@ -1202,6 +1234,38 @@ const facts: FactDecl[] = [
           ],
         },
       },
+      {
+        since: 'next',
+        replace: {
+          '': [
+            {
+              code: 'impl-imports-facts',
+              rule: 'Code in `implDirs` imports a `-facts` package, with or without the publish target suffix `.<target>` of `fact-kit.facts-package-naming`, as in `fact-kit-facts.npm`.',
+              reads: '`implDirs`, parsed with oxc',
+            },
+            {
+              code: 'impl-depends-on-facts',
+              rule: 'A package that is not a facts package lists a `-facts` package in `dependencies`. A name with the publish target suffix, such as `fact-kit-facts.npm`, is a `-facts` package too.',
+              reads: 'every package.json under `repoRoot`',
+            },
+          ],
+        },
+        add: {
+          '': [
+            {
+              code: 'policy-scope',
+              rule: 'The `release-policy.json` at `repoRoot` has `access: "restricted"` at the top or in a unit, and no top-level `scope`. `check` reports it itself and does not leave it to the schema of the policy. A repository with no `release-policy.json` is not checked. See `fact-kit.facts-package-naming`.',
+              reads: '`release-policy.json`',
+            },
+            {
+              code: 'facts-name',
+              rule: 'In an aggregate package (the config has `aggregate`), the name of the aggregate or of a component package is not the one `fact-kit.facts-package-naming` works out from `release-policy.json`: a missing or extra `@<scope>/` prefix, a missing or extra publish target suffix, or a shared base name with no publish target to tell the packages apart. The message names the expected name. A repository with no `release-policy.json` is not checked. A component that is not found in node_modules or in the workspace, or whose facts cannot be loaded, gets a warning with code `facts-name` and is not checked.',
+              reads:
+                '`release-policy.json`, `release-please-config.json`, the component packages and their facts sources',
+            },
+          ],
+        },
+      },
     ),
   }),
   fact({
@@ -1327,6 +1391,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: problemCodes },
       { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
+      { since: 'next', add: { '': ['policy-scope', 'facts-name'] } },
     ),
   }),
   fact({
@@ -1362,7 +1427,24 @@ const facts: FactDecl[] = [
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. A unit with restricted access adds `@<scope>/`',
         },
       },
+      {
+        since: 'next',
+        set: {
+          '/componentPackage/name':
+            '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',
+        },
+      },
     ),
+  }),
+  fact({
+    id: 'fact-kit.facts-package-naming',
+    topics: ['check', 'build', 'config'],
+    title: { en: 'Names of the facts packages of an aggregate, checked against release-policy.json' },
+    description: {
+      en: 'What `check` expects the package names of an aggregate and its component packages to be, and the two problem codes it reports. The names are `<base>`, with a publish target suffix when the base is shared and `@<scope>/` in front when the aggregate unit is restricted.',
+    },
+    when: { since: 'next' },
+    content: { value: factsPackageNaming },
   }),
   fact({
     id: 'fact-kit.read-facts',

@@ -11,7 +11,7 @@
   },
   "scripts": {
     "check": "pnpm typecheck && pnpm format:check && pnpm facts:check",
-    "facts:check": "node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-js $FACT_KIT_TRAIN && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-py && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-rs && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-go && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-swift",
+    "facts:check": "node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-js $FACT_KIT_TRAIN && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-py && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-rs && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-go && node packages/fact-kit-js/src/bin.ts check --cwd facts/fact-kit-swift && node packages/fact-kit-js/src/bin.ts check --cwd facts",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
