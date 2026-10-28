@@ -1,29 +1,9 @@
 import { readFile } from 'node:fs/promises'
+import { loadPeer } from './peer.ts'
 import type { JsonSchema } from './types.ts'
 
-const DRAFT_2020_12 = 'https://json-schema.org/draft/2020-12/schema'
-
-/** What to install when an optional peer dependency is missing, by package name. */
-const PEER_INSTALL: Record<string, string> = { typescript: 'typescript@7.1.0-beta' }
-
-/**
- * Loads an optional peer dependency on demand. When the package is not installed, throws an error that
- * names the package to install, so a reader that only uses `readFacts` or `check` never needs it.
- */
-async function loadPeer<T>(specifier: string, packageName: string, usedBy: string): Promise<T> {
-  try {
-    return (await import(specifier)) as T
-  } catch (error) {
-    const code = (error as { code?: string }).code
-    if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
-      throw new Error(
-        `${usedBy} needs the optional peer dependency ${packageName}. Install it with: pnpm add -D ${PEER_INSTALL[packageName] ?? packageName}`,
-        { cause: error },
-      )
-    }
-    throw error
-  }
-}
+/** The `$schema` URL of JSON Schema 2020-12. */
+export const DRAFT_2020_12 = 'https://json-schema.org/draft/2020-12/schema'
 
 type SyncApi = typeof import('typescript/sync')
 type AstApi = typeof import('typescript/ast')
