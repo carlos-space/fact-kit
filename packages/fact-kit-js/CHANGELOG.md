@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.8.0](https://github.com/carlos-space/fact-kit/compare/fact-kit/v0.7.0...fact-kit/v0.8.0) (2026-10-27)
+## [0.8.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.7.0...fact-kit-js/v0.8.0) (2026-10-27)
 
 
 ### Added
@@ -12,14 +12,14 @@
 * **ref:** 新增 ref 欄位引用與 x-identity ([#27](https://github.com/carlos-space/fact-kit/issues/27)) ([0116183](https://github.com/carlos-space/fact-kit/commit/0116183595f0c69ef63ee40f6149209ecbb6f1d2))
 * **ref:** 被引用的 fact 有多個版本列時自動對齊版本列 ([#28](https://github.com/carlos-space/fact-kit/issues/28)) ([4d173d9](https://github.com/carlos-space/fact-kit/commit/4d173d9be6119b79ac38dd6b096381de96f40964))
 
-## [0.7.0](https://github.com/carlos-space/fact-kit/compare/fact-kit/v0.7.0-alpha.1...fact-kit/v0.7.0) (2026-10-27)
+## [0.7.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.7.0-alpha.1...fact-kit-js/v0.7.0) (2026-10-27)
 
 
 ### chore
 
 * **release/v0.1:** fact-kit 0.7.0 ([b005509](https://github.com/carlos-space/fact-kit/commit/b005509676d96fb268d90d14d5158b0b1b2bc141))
 
-## [0.7.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit/v0.6.0...fact-kit/v0.7.0-alpha.1) (2026-10-27)
+## [0.7.0-alpha.1](https://github.com/carlos-space/fact-kit/releases/tag/fact-kit-js/v0.7.0-alpha.1) (2026-10-27)
 
 
 ### Added
@@ -36,63 +36,63 @@
 
 * **fact-kit:** movedTo 與 derivedFrom 接受同一個 entry 的 &lt;id&gt; ([#4](https://github.com/carlos-space/fact-kit/issues/4)) ([a2f667d](https://github.com/carlos-space/fact-kit/commit/a2f667d12a8b7a3708224bd0f283fe069dcdeb1b))
 
-## [0.6.0](https://github.com/carlos-space/facts/compare/fact-kit/v0.5.0...fact-kit/v0.6.0) (2026-10-24)
+## 0.6.0 (2026-10-24)
 
 
 ### Added
 
 * **fact-kit:** 值清單渲染與文件區塊替換 ([#32](https://github.com/carlos-space/facts/issues/32)) ([3842eaf](https://github.com/carlos-space/facts/commit/3842eaf54949602b3a46b18e7680686233beeb11))
 
-## [0.5.0](https://github.com/carlos-space/facts/compare/fact-kit/v0.4.2...fact-kit/v0.5.0) (2026-10-24)
+## 0.5.0 (2026-10-24)
 
 
 ### Added
 
 * **facts:** 觀察來源加讀取日與說明欄，169 筆觀察事實回填 ([#25](https://github.com/carlos-space/facts/issues/25)) ([4935ea3](https://github.com/carlos-space/facts/commit/4935ea3f20305b6286914060aadf0444d64a8c4e))
 
-## [0.4.2](https://github.com/carlos-space/facts/compare/fact-kit/v0.4.2-alpha.1...fact-kit/v0.4.2) (2026-10-24)
+## 0.4.2 (2026-10-24)
 
 
 ### chore
 
 * **release/v0.1:** fact-kit 0.4.2 ([df94ea2](https://github.com/carlos-space/facts/commit/df94ea2e994333c9f2b11cb158330cde8e8616fa))
 
-## [0.4.2-alpha.1](https://github.com/carlos-space/facts/compare/fact-kit/v0.4.1...fact-kit/v0.4.2-alpha.1) (2026-10-24)
+## 0.4.2-alpha.1 (2026-10-24)
 
 
 ### chore
 
 * **release/v0.1:** fact-kit 0.4.2-alpha.1 ([a454445](https://github.com/carlos-space/facts/commit/a45444587b4249153c6551a4283a0183fc58b768))
 
-## [0.4.1](https://github.com/carlos-space/facts/compare/fact-kit/v0.4.1-alpha.1...fact-kit/v0.4.1) (2026-10-23)
+## 0.4.1 (2026-10-23)
 
 
 ### chore
 
 * **release/fact-kit/v0.4:** fact-kit 0.4.1 ([946b415](https://github.com/carlos-space/facts/commit/946b415b77c6b38e126e67f7824078d513bbdb30))
 
-## [0.4.1-alpha.1](https://github.com/carlos-space/facts/compare/fact-kit/v0.4.0...fact-kit/v0.4.1-alpha.1) (2026-10-23)
+## 0.4.1-alpha.1 (2026-10-23)
 
 
 ### Fixed
 
 * **fact-kit:** README 補上安裝指令 ([#8](https://github.com/carlos-space/facts/issues/8)) ([f8e706a](https://github.com/carlos-space/facts/commit/f8e706adc69b4a46ef2b859f524fb9cc022e7172))
 
-## [0.4.0](https://github.com/carlos-space/facts/compare/fact-kit/v0.3.0...fact-kit/v0.4.0) (2026-10-23)
+## 0.4.0 (2026-10-23)
 
 
 ### Added
 
 * **fact-kit:** 轉換可選擇不帶說明文字，只留名稱、型別與列舉值 ([#23](https://github.com/carlos-space/facts/issues/23)) ([a1212a6](https://github.com/carlos-space/facts/commit/a1212a60ab986397cba02d4335a250ce34afe21c))
 
-## [0.3.0](https://github.com/carlos-space/facts/compare/fact-kit/v0.2.0...fact-kit/v0.3.0) (2026-10-23)
+## 0.3.0 (2026-10-23)
 
 
 ### Added
 
 * **fact-kit:** flattenSchema 合併 oneOf 分支的同名欄位，部分分支必填時記下判別條件 ([#19](https://github.com/carlos-space/facts/issues/19)) ([800fcd7](https://github.com/carlos-space/facts/commit/800fcd78b87a2e6f668ed8a13dd5741cb17d853c))
 
-## [0.2.0](https://github.com/carlos-space/facts/compare/fact-kit/v0.1.0...fact-kit/v0.2.0) (2026-10-23)
+## 0.2.0 (2026-10-23)
 
 
 ### Added

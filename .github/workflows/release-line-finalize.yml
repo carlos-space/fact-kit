@@ -1,6 +1,6 @@
 name: release-line-finalize
 
-# vX.Y.Z tag = release train closed. (Versions up to 0.2.0 were tagged product/vX.Y.Z, and a manual run can still verify one.) Verifies every unit tag, publishes the Snapshot as a
+# vX.Y.Z tag = release train closed. Verifies every unit tag, publishes the Snapshot as a
 # GitHub Release, and simulates the governance sync (Release Issue close / Project Status=Done).
 on:
   push:
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'product tag, e.g. v1.1.1 (or product/v0.2.0 for a version up to 0.2.0)'
+        description: 'product tag, e.g. v1.1.1'
         required: true
         type: string
 

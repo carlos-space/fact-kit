@@ -53,7 +53,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 
 `facts/fact-kit-*/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 是發布紀錄，`publish.yml` 的 `mirror` job 再把套件鏡像到 `carlos-space/fact-kit-go`、`carlos-space/fact-kit-swift` 倉庫，Go proxy 與 SwiftPM 讀鏡像倉庫的 tag。
 
-這次改名前，JS 單元的 tag 是 `fact-kit/vX.Y.Z`，py、rs、go 是 `py/vX.Y.Z`、`rs/vX.Y.Z`、`go/vX.Y.Z`，Swift 是純 `X.Y.Z`。這些舊 tag 不動，也不會被新的 component 認得。版號靠 `.release-please-manifest.json` 接續：release-please 找不到新 component 的 release 時，改用 manifest 裡的版號當上一版（`packages/fact-kit-js` 是 0.8.0，其他讀取單元是 0.3.0-alpha.1）。
+版號靠 `.release-please-manifest.json` 接續：release-please 找不到 component 的 release 時，改用 manifest 裡的版號當上一版（`packages/fact-kit-js` 是 0.8.0，其他讀取單元是 0.3.0-alpha.1）。
 
 三個讀取單元（py、rs、go）和 Swift 單元第一次發布的版號是切線時的 `<line>.0`（例如 0.3 線是 `0.3.0-alpha.1`），所以還沒發布過的單元在 `.release-please-manifest.json` 先寫 `0.0.0`，release-please 看到 `0.0.0` 就當作沒發布過，改用 `initial-version`。`release-policy.json` 的 stages 是 `["alpha", "ga"]`，所以第一版先發 alpha。
 
@@ -68,7 +68,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 7. 要納入 CI 的新目錄：`scripts/ci/ci-scope.conf`。
 8. 單元放在 `packages/<單元名稱>/`，目錄名就是 component。`release-config.test.ts` 會檢查 `packages/` 底下的每個目錄都在 manifest 裡。
 
-整個倉庫同一時間最多一條發布分支 `release/vX.Y`（train），用 `--units` 選要入版的單元（用 component 名稱）。入版的單元各自有版號和 tag `<component>/vX.Y.Z`，例如 `fact-kit-js/v0.9.0`。每次發布另外指派一個產品版號，產品 tag 是 `vX.Y.Z`（0.2.0 以前的產品 tag 是 `product/vX.Y.Z`，不改名，腳本兩種都認得），版號記在 root `package.json` 的 `version`。main 只收 PR，上面不會出現 release-please 開的 commit。版號檔、CHANGELOG、manifest 與產品版號在 GA 之後，隨 `release/vX.Y--to-main` 這個 squash 合回 PR 進 main。
+整個倉庫同一時間最多一條發布分支 `release/vX.Y`（train），用 `--units` 選要入版的單元（用 component 名稱）。入版的單元各自有版號和 tag `<component>/vX.Y.Z`，例如 `fact-kit-js/v0.9.0`。每次發布另外指派一個產品版號，產品 tag 是 `vX.Y.Z`，版號記在 root `package.json` 的 `version`。main 只收 PR，上面不會出現 release-please 開的 commit。版號檔、CHANGELOG、manifest 與產品版號在 GA 之後，隨 `release/vX.Y--to-main` 這個 squash 合回 PR 進 main。
 
 `--line X.Y` 是產品線，用來命名分支，不決定單元版號。單元版號由 release-please 依 commit 算出，這條線上只放 `fix:` commit 時單元只升 patch，放 `feat:` 會升 minor。產品版號由 `--product-version` 指定，每次發布必填。這條線已經有產品 tag 時，切分支必須帶 `--from <最新的產品 tag>`。
 

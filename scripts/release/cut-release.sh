@@ -11,7 +11,7 @@
 #            without an environment is skipped forward (scripts/lib/release-stages.sh). ga skips
 #            prerelease mode: the train's first Release PR is already the final version.
 #   --from   base: main (default) or a product tag such as v1.3.0, for a post-GA hotfix train.
-#            Once the line has a product tag (vX.Y.Z, or product/vX.Y.Z before 0.3), --from must name its latest one.
+#            Once the line has a product tag (vX.Y.Z), --from must name its latest one.
 #
 # No version is pinned here: release-please's prerelease strategy derives each unit's own next
 # version from its own commits, which is what keeps unit versions independent of the product marker.

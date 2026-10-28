@@ -198,7 +198,7 @@ train_gates() { # train_gates <branch> <line> <stage>
     die "發布腳本落後 main：${branch} 的 scripts/ 與 origin/main 不同。先同步再${act}：git checkout origin/main -- scripts，commit 後推上 ${branch}"
   fi
   # Base gate: a line that already shipped takes patches only, and a patch must continue from the
-  # line's latest product tag (vX.Y.Z, or product/vX.Y.Z before 0.3). cut-release.sh refuses any other base. Here it catches a train opened
+  # line's latest product tag (vX.Y.Z). cut-release.sh refuses any other base. Here it catches a train opened
   # by hand from main (merge-back is a squash, so the tag is never main's ancestor) or from an older
   # tag. It cannot reach a train that runs a finalize-release.sh from before this gate existed.
   shipped="$(product_latest_tag "$line")"
