@@ -11,9 +11,9 @@ Add it as a dev dependency of the package that declares facts, and as a dependen
 pnpm add -D fact-kit
 ```
 
-`typescript` (7.1.0-beta or later) and `oxc-parser` are optional peer dependencies. They are not installed
-with fact-kit. Install `typescript` to use the converters (see Converting). `oxc-parser` is loaded by `diff --impact`
-when it scans TypeScript source.
+`typescript` (7.1.0-beta or later), `oxc-parser` and `prettier` (3) are optional peer dependencies. They are not
+installed with fact-kit. Install `typescript` to use the converters and `prettier` to use `writeFormatted` (see
+Converting). `oxc-parser` is loaded by `diff --impact` when it scans TypeScript source.
 
 ## Authoring
 
@@ -738,6 +738,17 @@ the native binary comes as a platform package.
 | `readStringTuplesFromFile(path)`, `readStringTuples(source)`                             | `export declare const X: readonly ['a', 'b']` in a `.d.ts` | Each tuple's name and values                                                                                                                                                                                                                   |
 | `interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? })` | An interface or type alias in a `.d.ts`                    | A JSON Schema 2020-12 document; referenced types become `$defs`. JSDoc becomes `description`; `descriptions: false` removes every `description`. Union members and enum values keep the order of the source, and a tuple becomes `prefixItems` |
 | `readJsonSchemaFile(path)`                                                               | A JSON Schema file                                         | The parsed schema                                                                                                                                                                                                                              |
+
+A converter script that writes a fact's `converted.json` uses these helpers, so reruns give the same bytes:
+
+| Export                                                  | Does                                                                                                                                                                                                                                                                                                                    |
+| :------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readPinned(source, { cacheDir })`                      | Returns the text of a file pinned by `PinnedSource` (`repo`, `commit`, `path`, `sha256`, `license`). It reads `<cacheDir>/<sha256>.txt` when present, otherwise downloads the file at that commit, checks the sha256 and caches it. `cacheDir` is required, so the cache place does not depend on the working directory |
+| `sourceUrl(source)`                                     | The GitHub URL of the pinned file at its commit, for the fact's source link                                                                                                                                                                                                                                             |
+| `normalizeSchema(schema, { describe?, drop?, notes? })` | Rewrites a JSON Schema from another dialect to 2020-12: `definitions` to `$defs`, tuple `items` to `prefixItems`, string `deprecated` to `true`, `nullable` to a `null` type, `dependencies` split, and unregistered `x-` keywords, `$id`, `id` and `drop` removed. `notes` counts what changed                         |
+| `DRAFT_2020_12`                                         | The `$schema` URI of JSON Schema 2020-12                                                                                                                                                                                                                                                                                |
+| `stableJson(value)`                                     | JSON with object keys in a stable order; arrays keep their order                                                                                                                                                                                                                                                        |
+| `writeFormatted(file, text)`                            | Writes `text` formatted with the repository's prettier settings. Needs the optional peer dependency `prettier` 3, and throws an error naming it when it is missing                                                                                                                                                      |
 
 ## Tables
 
