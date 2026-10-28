@@ -12,7 +12,7 @@
 #               train's commit walk stops at them and silently drops whatever landed on main while this
 #               train was stabilising.
 #   close       merge that PR with a squash message this script controls, so Release-Train-Base stays the last
-#               line main can read; tag product/vX.Y.Z on the *train's* final commit, whose tree already carries the
+#               line main can read; tag vX.Y.Z on the *train's* final commit, whose tree already carries the
 #               product version; delete the branches; run the close checklist against origin/main. It never
 #               switches to main, which is often checked out in another worktree. The tag must sit on the
 #               train, not on main's merge result: merging produces "main's current content + the train's
@@ -44,6 +44,7 @@ done
 # 只含程式庫時產品版號同樣往前走，Snapshot 因此完整記錄「這一版由哪些單元組成」（ADR-001）。
 [[ -n "$product" ]] || die "--product-version 必填：每次發布都要指派產品版號"
 [[ "$product" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--product-version 需為 X.Y.Z"
+ptag="$(product_tag "$product")"
 branch="release/v$line"
 target="$(remote_target)"
 
@@ -96,7 +97,7 @@ case "$phase" in
     #   - 產品版號寫進根目錄 package.json，產品 tag 的樹因此帶著自己的版號，合回差異也一併帶到 main。
     # 這個 commit 只含 chore、不帶 Release-As，release-please 會判為「No user facing commits」而
     # 跳過，不會多開一次 Release PR（實測 2026-09-10，見 ADR-004 第 33 項）。
-    #   標記檔寫在單元路徑下（release-stages.sh），單元可能在任一層（js/、services/api/），所以用 git 的
+    #   標記檔寫在單元路徑下（release-stages.sh），單元可能在任一層（packages/fact-kit-js/、services/api/），所以用 git 的
     #   `**/` pathspec 找，不用固定層數的 shell glob。
     declare -a markers=()
     while IFS= read -r m; do [[ -n "$m" ]] && markers+=("$m"); done < <(git ls-files -- ':(glob)**/.release-marker')
@@ -166,7 +167,7 @@ Release-Train-Base: $train_base"
     else hotfix_note="這次發布沒有 hotfix Issue。"; fi
     body="$(cat <<BODY
 ## 動機
-${product:+product/v$product }的單元 tag 都已建立，把發布分支 $branch 的內容套回 main。發布分支自身的發版 commit 不進 main，所以以 squash 合併。
+${product:+$ptag }的單元 tag 都已建立，把發布分支 $branch 的內容套回 main。發布分支自身的發版 commit 不進 main，所以以 squash 合併。
 
 ## 變更
 - 自 $branch 套用發布內容：入版單元的版號檔、CHANGELOG、manifest 與 root package.json 的產品版號
@@ -176,7 +177,7 @@ $(bash scripts/release/snapshot.sh ${product:+--product "$product"} --check-tags
 
 ## 影響
 - main 的版號檔與 CHANGELOG 前進到這次發布，非入版單元的版號不變。
-- 合併後${product:+在發布分支的最後一個 commit 打 \`product/v$product\`，}刪除 ${branch}。
+- 合併後${product:+在發布分支的最後一個 commit 打 \`$ptag\`，}刪除 ${branch}。
 - $hotfix_note
 
 ## 驗證
@@ -223,7 +224,7 @@ BODY
     # 2. main 帶著這次發布的起算點，也就是發布分支的 Release-Train-Base。只找「任何一個」會被上一次發布的
     #    trailer 騙過。PR 若被手動以預設訊息合併，補一個只帶 trailer 的空 commit。
     train_ref="origin/$branch"
-    git rev-parse -q --verify "refs/remotes/$train_ref" >/dev/null || train_ref="product/v$product"
+    git rev-parse -q --verify "refs/remotes/$train_ref" >/dev/null || train_ref="$ptag"
     base="$(git log "$train_ref" --format='%(trailers:key=Release-Train-Base,valueonly)' 2>/dev/null | grep -m1 -E '^[0-9a-f]{7,40}$' || true)"
     [[ -n "$base" ]] || die "$train_ref 上讀不到 Release-Train-Base，無法核對 main 的起算點"
     # 先存成字串再比對：pipefail 之下，grep -q 提早結束會讓 git log 收到 SIGPIPE，整條管線被判為失敗。
@@ -232,7 +233,7 @@ BODY
       log "main 讀不到這次的 Release-Train-Base ${base:0:7}，補一個只帶 trailer 的 commit"
       if (( DRY_RUN == 0 )); then
         fix="$(git commit-tree "origin/main^{tree}" -p origin/main \
-          -m "chore(release): 記錄 product/v$product 的 Release-Train-Base" \
+          -m "chore(release): 記錄 $ptag 的 Release-Train-Base" \
           -m "合回 main 的訊息裡讀不到這一行，這裡補上，讓下次切 train 找得到起算點。" \
           -m "Release-Train-Base: $base")"
         external "$target" git push origin "$fix:refs/heads/main"
@@ -244,8 +245,8 @@ BODY
 
     # 3. 產品 tag 打在發布分支的最後一個 commit，樹裡的產品版號要等於產品版號（merge-back 已寫入）。
     #    tag 已建立時不再需要分支（重跑 close 的情形）。
-    if git rev-parse -q --verify "refs/tags/product/v$product" >/dev/null; then
-      train_tip="$(git rev-list -n1 "product/v$product")"
+    if git rev-parse -q --verify "refs/tags/$ptag" >/dev/null; then
+      train_tip="$(git rev-list -n1 "$ptag")"
     else
       git rev-parse -q --verify "refs/remotes/origin/$branch" >/dev/null \
         || die "找不到 origin/${branch}：產品 tag 需打在發布分支的最後一個 commit，請在刪除分支前執行 close"
@@ -254,16 +255,16 @@ BODY
     tip_version="$(git show "$train_tip:package.json" | jq -r .version)"
     [[ "$tip_version" == "$product" ]] \
       || die "發布分支最後一個 commit 的產品版號是 ${tip_version}，不是 ${product}：先執行 merge-back 寫入產品版號"
-    if git rev-parse -q --verify "refs/tags/product/v$product" >/dev/null; then
-      info "product/v$product 已存在且指向發布分支的最後一個 commit ${train_tip:0:7}，略過建立"
+    if git rev-parse -q --verify "refs/tags/$ptag" >/dev/null; then
+      info "$ptag 已存在且指向發布分支的最後一個 commit ${train_tip:0:7}，略過建立"
     else
-      log "打產品 tag product/v$product 於發布分支的最後一個 commit ${train_tip:0:7}"
-      run git tag -a "product/v$product" "$train_tip" -m "product v$product"
+      log "打產品 tag $ptag 於發布分支的最後一個 commit ${train_tip:0:7}"
+      run git tag -a "$ptag" "$train_tip" -m "product v$product"
     fi
-    if [[ -z "$(git ls-remote --tags origin "refs/tags/product/v$product")" ]]; then
-      external "$target" git push origin "product/v$product"
+    if [[ -z "$(git ls-remote --tags origin "refs/tags/$ptag")" ]]; then
+      external "$target" git push origin "$ptag"
     else
-      info "product/v$product 已在遠端"
+      info "$ptag 已在遠端"
     fi
 
     # 4. 刪除發布分支與流程產生的暫時分支（不變式：兩次發布之間 0 條）。本機分支正被檢出時先切離。
@@ -287,9 +288,9 @@ BODY
     [[ "$n" == 0 ]] && info "✓ release 分支數 = 0" || { info "✗ 仍有 release 分支：$(release_branches)"; ok=0; }
     leftover="$(git ls-remote --heads origin 'refs/heads/release-please--*' | wc -l | tr -d ' ')"
     [[ "$leftover" == 0 ]] && info "✓ 無殘留的 release-please 工作分支" || { info "✗ 仍有 $leftover 條 release-please 工作分支"; ok=0; }
-    if git rev-parse -q --verify "refs/tags/product/v$product" >/dev/null; then
-      [[ "$(git show "product/v$product:package.json" | jq -r .version)" == "$product" ]] \
-        && info "✓ product/v${product}，樹裡的產品版號為 ${product}" || { info "✗ product/v$product 的樹裡產品版號不是 $product"; ok=0; }
+    if git rev-parse -q --verify "refs/tags/$ptag" >/dev/null; then
+      [[ "$(git show "$ptag:package.json" | jq -r .version)" == "$product" ]] \
+        && info "✓ ${ptag}，樹裡的產品版號為 ${product}" || { info "✗ $ptag 的樹裡產品版號不是 $product"; ok=0; }
     else
       info "✗ product tag 缺"; ok=0
     fi

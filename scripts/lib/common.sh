@@ -123,7 +123,7 @@ current_branch() { git branch --show-current; }
 
 release_branches() { git branch -r --list 'origin/release/*' | sed 's#.*origin/##'; }
 
-# unit_path fact-kit -> js; the path is the key of the release-please-config.json entry whose component is
+# unit_path fact-kit-js -> packages/fact-kit-js; the path is the key of the release-please-config.json entry whose component is
 # <unit>, or whose folder name is <unit> when the entry sets no component. No directory is guessed.
 unit_path() {
   local u="$1" p
@@ -134,22 +134,21 @@ unit_path() {
 # unit_paths → every unit path the config lists, one per line
 unit_paths() { jq -r '.packages // {} | keys[]' "$CONFIG" 2>/dev/null; }
 
-unit_component() { # unit_component js -> fact-kit; the folder name when the config sets no component
+unit_component() { # unit_component packages/fact-kit-js -> fact-kit-js; the folder name when the config sets no component
   local p="${1%/}" c
   c="$(jq -r --arg p "$p" '.packages[$p].component // empty' "$CONFIG" 2>/dev/null)"
   printf '%s\n' "${c:-${p##*/}}"
 }
 
-# unit_tag <path> <version> → the tag release-please gives the unit at that version: fact-kit/v0.8.0 for js,
-# py/v0.3.0 for py, and the bare 0.3.0 for the Swift unit at ".", which sets include-component-in-tag and
-# include-v-in-tag to false. The rule lives in scripts/lib/unit-tag.jq so snapshot.sh, which does not
-# source this file, reads the same one.
+# unit_tag <path> <version> → the tag release-please gives the unit at that version: <component>/v<version>,
+# for example fact-kit-js/v0.8.0 for packages/fact-kit-js and fact-kit-swift/v0.3.0 for packages/fact-kit-swift.
+# The rule lives in scripts/lib/unit-tag.jq so snapshot.sh, which does not source this file, reads the same one.
 unit_tag() { jq -r --arg p "${1%/}" --arg v "$2" -f "$REPO_ROOT/scripts/lib/unit-tag.jq" "$CONFIG"; }
 
 # whether the unit has shipped before: release-please only applies its versioning strategy on top of a
 # previous release; without one it takes initial-version verbatim (1.0.0 when unset). <unit> is a component.
-# A tag counts when it is the unit's tag shape with a semver where the version goes. That check is what keeps
-# the Swift unit apart: its tag has no prefix, so a bare prefix glob would also match fact-kit/v0.8.0.
+# A tag counts when it is the unit's tag shape with a semver where the version goes, so a prefix that another
+# unit's tag also starts with (fact-kit-go and a future fact-kit-go-extra) does not count.
 unit_released() {
   local p prefix t
   p="$(unit_path "$1")" || return 1
@@ -210,7 +209,7 @@ workspace_dependents() { # workspace_dependents <unit>... → dependent unit nam
     pkgname="$(jq -r '.name // empty' "$p/package.json" 2>/dev/null)"
     [[ -n "$pkgname" ]] || continue
     while IFS= read -r d; do
-      # only node units have workspace dependencies; the Swift unit sits at "." beside the root package.json
+      # only node units have workspace dependencies
       [[ "$(unit_release_type "$d")" == node && -f "$d/package.json" ]] || continue
       dn="$(unit_component "$d")"
       [[ "$dn" == "$u" ]] && continue
@@ -236,5 +235,7 @@ train_units_by_manifest() {
   return 0
 }
 
+# product tags: vX.Y.Z
+source "$(dirname "${BASH_SOURCE[0]}")/product-tags.sh"
 # release stages (alpha → beta → rc → ga) and the steps that move a train between them
 source "$(dirname "${BASH_SOURCE[0]}")/release-stages.sh"

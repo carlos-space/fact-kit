@@ -3,13 +3,14 @@
 # into an empty place and run a smoke test against what was installed, not against the sources. Unit
 # tests prove the sources; this proves the published shape (files whitelist, exports, bin) still works.
 #   npm units     pnpm pack, then npm install of the tarballs into an empty directory
-#   fact-kit      consumer/js/run.sh --local <tgz>: a new npm project installs the tarball
-#   fact-kit-facts  read through the installed fact-kit with readFacts
-#   py            uv build, then consumer/py/run.sh --local <wheel>: a new virtual environment holds the wheel
-#   rs            cargo package (which builds the packaged crate), then consumer/rs/run.sh --local <.crate>
-#   go            the module directory copied out, then consumer/go/run.sh --local <copy>
-#   swift         only the files SwiftPM needs (unit_content_paths, LICENSE) copied out, then
-#                 consumer/swift/run.sh --local <copy>; the copy holds no js/ and no facts/
+#   fact-kit-js   consumer/js/run.sh --local <tgz>: a new npm project installs the tarball
+#   fact-kit-facts  read through the installed fact-kit with readFacts: the root path is fact-kit-js, and
+#                 fact-kit-facts/fact-kit-py and so on are the other languages
+#   fact-kit-py   uv build, then consumer/py/run.sh --local <wheel>: a new virtual environment holds the wheel
+#   fact-kit-rs   cargo package (which builds the packaged crate), then consumer/rs/run.sh --local <.crate>
+#   fact-kit-go   the module directory copied out, then consumer/go/run.sh --local <copy>
+#   fact-kit-swift  the package directory copied out (it is a complete SwiftPM package), then
+#                 consumer/swift/run.sh --local <copy>; the copy holds nothing of the other units
 # The consumer harnesses read the shared samples of conformance/ and print where the package was loaded from.
 # On a release branch the config lists only the train's packages, so this checks what the train ships.
 # Run after `pnpm build`; ci.yml runs it on push to release/**.
@@ -43,36 +44,43 @@ no_conformance() { # no_conformance <what>
 for p in "${paths[@]}"; do
   comp="$(jq -r --arg p "$p" '.packages[$p].component // empty' "$root/release-please-config.json")"
   case "${comp:-$p}" in
-    fact-kit)
+    fact-kit-js)
       bash "$root/consumer/js/run.sh" --local "$work"/packed/fact-kit-[0-9]*.tgz ;;
     fact-kit-facts)
-      # Read through fact-kit, as a consumer does. A train without fact-kit reads with the published one.
+      # Read through fact-kit, as a consumer does. A train without fact-kit-js reads with the published one.
       [[ -d node_modules/fact-kit ]] || npm install --no-audit --no-fund --silent fact-kit
       node --input-type=module -e "
         import { readFacts } from 'fact-kit'
-        const r = readFacts('fact-kit-facts')
-        if (!r.has('fact-kit.fact') || r.facts.length === 0) throw new Error('fact-kit-facts has no fact-kit.fact')" ;;
-    py)
+        const root = readFacts('fact-kit-facts')
+        if (!root.has('fact-kit.fact') || root.facts.length === 0) throw new Error('fact-kit-facts has no fact-kit.fact')
+        for (const [spec, id] of [
+          ['fact-kit-facts/fact-kit-py', 'fact-kit-py.package'],
+          ['fact-kit-facts/fact-kit-rs', 'fact-kit-rs.package'],
+          ['fact-kit-facts/fact-kit-go', 'fact-kit-go.package'],
+          ['fact-kit-facts/fact-kit-swift', 'fact-kit-swift.package'],
+        ]) {
+          if (!readFacts(spec).has(id)) throw new Error(spec + ' has no ' + id)
+        }" ;;
+    fact-kit-py)
       uv build --quiet --wheel --out-dir "$work/packed-py" "$root/$p"
       unzip -Z1 "$work"/packed-py/*.whl | no_conformance "the wheel of $p"
       bash "$root/consumer/py/run.sh" --local "$work"/packed-py/*.whl ;;
-    rs)
+    fact-kit-rs)
       cargo_args=(--locked --manifest-path "$root/$p/Cargo.toml" --target-dir "$work/cargo-target")
       [[ "${ASSEMBLED_ALLOW_DIRTY:-0}" != 1 ]] || cargo_args+=(--allow-dirty)
       cargo package "${cargo_args[@]}"
       tar -tzf "$work"/cargo-target/package/*.crate | no_conformance "the crate of $p"
       bash "$root/consumer/rs/run.sh" --local "$work"/cargo-target/package/*.crate ;;
-    go)
+    fact-kit-go)
       mkdir -p "$work/go-module"; cp -R "$root/$p/." "$work/go-module/"
       bash "$root/consumer/go/run.sh" --local "$work/go-module" ;;
-    swift)
-      # what SwiftPM needs from the repository root: Package.swift, Package.resolved, Sources/, Tests/ (the
-      # manifest declares a test target, so SwiftPM wants the directory) and the license
+    fact-kit-swift)
+      # The directory of the unit is a complete SwiftPM package: Package.swift, Package.resolved, Sources/, Tests/
+      # (the manifest declares a test target, so SwiftPM wants the directory) and the license.
       mkdir -p "$work/swift-package"
-      while IFS= read -r f; do [[ -e "$root/$f" ]] && cp -R "$root/$f" "$work/swift-package/"; done < <(cd "$root" && unit_content_paths "$p" | sed 's#^\./##')
-      cp "$root/LICENSE" "$work/swift-package/"
+      while IFS= read -r f; do rsync -a --exclude .build --exclude .swiftpm "$root/$f/" "$work/swift-package/"; done < <(unit_content_paths "$p")
       (cd "$work/swift-package" && find . -not -path './Sources/*' -not -path './Tests/*' | sort | sed 's/^/  assembled /')
-      for d in js facts conformance py rs go scripts; do
+      for d in packages facts conformance consumer scripts; do
         [[ ! -e "$work/swift-package/$d" ]] || { printf '%s\n' "the Swift package contains $d/" >&2; exit 1; }
       done
       bash "$root/consumer/swift/run.sh" --local "$work/swift-package" ;;

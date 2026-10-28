@@ -3,15 +3,15 @@
 # prerelease mode at the starting stage, so every listed unit gets its own X.Y.Z-<stage>.N while the
 # train stabilises. advance-release.sh moves the train on (alpha → beta → rc → ga, forward only).
 #
-# usage: cut-release.sh --line X.Y --units web,api,sdk-core [--stage alpha|beta|rc|ga] [--from main|product/vX.Y.Z] [--yes] [--dry-run]
+# usage: cut-release.sh --line X.Y --units web,api,sdk-core [--stage alpha|beta|rc|ga] [--from main|vX.Y.Z] [--yes] [--dry-run]
 #   --line   product line the train belongs to; names the branch release/v<line>
 #   --units  comma list of units in this train (components of release-please-config.json).
 #            A unit with no commits since its last tag simply does not release.
 #   --stage  starting stage; default is the first stage this repo has an environment for. A stage
 #            without an environment is skipped forward (scripts/lib/release-stages.sh). ga skips
 #            prerelease mode: the train's first Release PR is already the final version.
-#   --from   base: main (default) or a product tag such as product/v1.3.0, for a post-GA hotfix train.
-#            Once the line has a product/vX.Y.Z tag, --from must name its latest one.
+#   --from   base: main (default) or a product tag such as v1.3.0, for a post-GA hotfix train.
+#            Once the line has a product tag (vX.Y.Z), --from must name its latest one.
 #
 # No version is pinned here: release-please's prerelease strategy derives each unit's own next
 # version from its own commits, which is what keeps unit versions independent of the product marker.
@@ -57,12 +57,12 @@ git rev-parse -q --verify "refs/heads/$branch" >/dev/null && die "本地已有 $
 # A line that already shipped takes patches only, and a patch must continue from the line's latest
 # GA: cut from main it carries everything merged since, cut from an older tag it drops a shipped fix.
 # Refuse instead of picking the tag, so the base stays explicit.
-shipped="$(git tag --list "product/v${line}.*" | grep -E "^product/v${line//./\\.}\.[0-9]+$" | sort -t. -k3,3n | tail -1 || true)"
+shipped="$(product_latest_tag "$line")"
 if [[ -n "$shipped" && "$from" != "$shipped" ]]; then
-  die "產品線 product/v${line} 已發布到 ${shipped}，修補發布要接在它後面（目前起點 ${from}）：改帶 --from ${shipped}。修正已在 main 時，切出後把它 cherry-pick 進 ${branch}。要發下一個 minor 就改用新的 --line"
+  die "產品線 ${line} 已發布到 ${shipped}，修補發布要接在它後面（目前起點 ${from}）：改帶 --from ${shipped}。修正已在 main 時，切出後把它 cherry-pick 進 ${branch}。要發下一個 minor 就改用新的 --line"
 fi
 if [[ "$from" == "main" ]]; then base="origin/main"; else
-  git rev-parse -q --verify "refs/tags/$from" >/dev/null || die "起點 tag 不存在：${from}（發布後 hotfix 需自產品 tag 如 product/v1.3.0 重建，不從 main）"
+  git rev-parse -q --verify "refs/tags/$from" >/dev/null || die "起點 tag 不存在：${from}（發布後 hotfix 需自產品 tag 如 v1.3.0 重建，不從 main）"
   base="$from"
 fi
 for u in "${units[@]}"; do unit_path "$u" >/dev/null || die "unit 不存在：$u"; done
@@ -130,7 +130,7 @@ if [[ "$from" == "main" ]]; then
     info "略過非主線切點 ${c:0:7}（修補發布自 tag 重建，其切點不在 main 上）"
   done < <(git log origin/main --format='%(trailers:key=Release-Train-Base,valueonly)' -n 200 2>/dev/null | grep -E '^[0-9a-f]{7,40}$' || true)
 else
-  # 自產品 tag（如 product/v1.3.0）重建的修補發布：該 tag 之前的內容全部已發布，起算點就是它本身。
+  # 自產品 tag（如 v1.3.0）重建的修補發布：該 tag 之前的內容全部已發布，起算點就是它本身。
   # 沿用前一次發布的切點會把上一版已發過的功能重新計入，把 patch 誤算成 minor。
   prev_cut="$(git rev-parse "${from}^{commit}")"
 fi
@@ -139,7 +139,7 @@ fi
 # release-please would take initial-version verbatim (1.0.0 when unset). Start it at this line, in
 # the same format the stage gives every other unit.
 if [[ "$stage" == ga ]]; then initial="${line}.0"; else initial="${line}.0-$(stage_prerelease_type "$stage")"; fi
-declare -a fresh=()
+declare -a fresh=() fresh_release_as=()
 for u in "${units[@]}"; do
   if unit_released "$u"; then
     if [[ "$stage" == ga ]]; then info "${u}：目前 $(manifest_version "$(unit_path "$u")")，正式版號由 release-please 依 commit 計算"
@@ -147,6 +147,13 @@ for u in "${units[@]}"; do
     continue
   fi
   fresh+=("$(unit_path "$u")"); info "${u}：首次發布，起始版號 ${initial}，tag $(unit_tag "$(unit_path "$u")" "$initial")"
+  # release-please's python and rust strategies hard-code their first version as 0.1.0 and never read
+  # initial-version (strategies/python.js and rust.js, initialReleaseVersion). For those a Release-As commit
+  # sets the first version instead; it only steers the next release, and the marker it needs is dropped at
+  # merge-back like the ones advance-release.sh writes.
+  case "$(unit_release_type "$(unit_path "$u")")" in
+    python | rust) fresh_release_as+=("$u"); info "${u}：release-type 不讀 initial-version，切線時另寫 Release-As: ${initial}" ;;
+  esac
 done
 freshj="[]"; (( ${#fresh[@]} )) && { freshj="$(printf '"%s",' "${fresh[@]}")"; freshj="[${freshj%,}]"; }
 
@@ -182,6 +189,10 @@ fi
 run git commit -q -m "chore($branch): open train at $stage with ${units[*]}" -m "$body
 
 Release-Train-Base: $base_sha"
+for u in ${fresh_release_as[@]+"${fresh_release_as[@]}"}; do
+  if (( DRY_RUN )); then info "  [dry-run] ${u}：Release-As ${initial} 的標記 commit"; continue; fi
+  release_as_commit "$branch" "$u" "$(unit_path "$u")" "$initial"
+done
 
 log "推送分支（觸發 release-please → 各單元的 Release PR）"
 external "$(remote_target)" git push -u origin "$branch"

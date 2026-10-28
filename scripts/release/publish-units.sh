@@ -14,8 +14,10 @@
 #                              pre-releases unless asked (--pre). Uploaded with Trusted Publishing.
 #   Cargo.toml      crates.io  SemVer as is; cargo skips pre-releases unless the requirement names one. The
 #                              CARGO_REGISTRY_TOKEN comes from crates.io Trusted Publishing (publish.yml).
-#   go.mod          Go         nothing is uploaded: the tag go/vX.Y.Z is the release, the Go proxy reads it.
-#   Package.swift   SwiftPM    nothing is uploaded: the bare tag X.Y.Z at the repository root is the release.
+#   go.mod          Go         nothing is uploaded: the tag <component>/vX.Y.Z (fact-kit-go/vX.Y.Z) is the release record.
+#                              The Go proxy reads the tag of the repository the package is mirrored into.
+#   Package.swift   SwiftPM    nothing is uploaded: the tag <component>/vX.Y.Z (fact-kit-swift/vX.Y.Z) is the release record.
+#                              SwiftPM reads the tag of the repository the package is mirrored into.
 # Every unit's version must belong to <stage> (version_stage in scripts/lib/release-stages.sh), so a dispatch
 # with the wrong stage stops instead of publishing a prerelease under latest. A version that is already on the
 # registry is skipped, so a re-run is safe. The unit's own file must carry the version in
@@ -74,8 +76,7 @@ check_file_version() { # check_file_version <path> <file> <version in file> <man
 # lands there. That is only safe while the unit's own files still equal the tag: otherwise one version number
 # would name two different packages. publish.yml's checkout is shallow and carries no tags, so a shallow clone
 # fetches the tag first; a unit without a tag has nothing to compare. The tag shape comes from the config
-# (unit_tag), and the files compared are the unit's own (unit_content_paths): for the Swift unit at ".", not the
-# whole repository, which would also take in js/ and every file a later release commit touches.
+# (unit_tag), and the files compared are the unit's own (unit_content_paths).
 check_same_as_tag() { # check_same_as_tag <path> <version>
   local t; t="$(unit_tag "$1" "$2")"
   local -a content
@@ -200,7 +201,8 @@ publish_crates() { # publish_crates <path> <version> <stage>
 }
 
 # Go and Swift: nothing to upload. release-please creates the tag when the Release PR merges, and the tag is the
-# release: the Go proxy resolves go/vX.Y.Z, SwiftPM resolves the bare X.Y.Z. A real run requires the tag to exist.
+# release record; the mirror repositories of the Go and Swift packages take their own tags from it. A real run requires
+# the tag to exist.
 publish_tag() { # publish_tag <path> <version> <stage> <go|swift>
   local p="$1" ver="$2" what t
   t="$(unit_tag "$p" "$ver")"

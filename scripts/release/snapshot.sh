@@ -5,10 +5,11 @@
 # usage: snapshot.sh [--product X.Y.Z] [--check-tags] [--since <ref>]
 #   --check-tags  verify each unit's tag. A unit only *needs* a tag when it actually shipped in this
 #                 release, i.e. its version differs from <ref>; everything else is marked 未入版.
-#   --since       the previous product tag to compare against. Defaults to the newest product/vX.Y.Z tag
+#   --since       the previous product tag to compare against. Defaults to the newest product tag (vX.Y.Z)
 #                 older than the current checkout; with none, every unit counts as shipped.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+source "$(dirname "$0")/../lib/product-tags.sh"
 check=0 product="$(jq -r .version package.json)" since=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,7 +23,7 @@ done
 if (( check )) && [[ -z "$since" ]]; then
   # 產品 tag 之間沒有祖先關係（發布分支以 squash 合回），--merged 一律查無；退回的 --no-merged 又會取到
   # 當前這一版本身，於是每個單元都被拿來跟自己比而全數判成「未入版」。改以版本序取當前版的前一版。
-  since="$(git tag --list 'product/v[0-9]*' --sort=-v:refname | awk -v c="product/v$product" 'f{print;exit} $0==c{f=1}')"
+  since="$(product_tags | awk -v c="$(product_tag "$product")" 'f{print;exit} $0==c{f=1}')"
 fi
 prev='{}'
 if [[ -n "$since" ]] && git rev-parse -q --verify "$since^{commit}" >/dev/null; then
@@ -31,15 +32,14 @@ fi
 
 printf '%s\n' "| 單元 | 路徑 | 實作版號 | tag |"
 printf '%s\n' "| :--- | :--- | :--- | :--- |"
-printf '%s\n' "| product | package.json | $product | product/v$product |"
+printf '%s\n' "| product | package.json | $product | $(product_tag "$product") |"
 jq -r 'to_entries[] | "\(.key) \(.value)"' .release-please-manifest.json | while read -r pkg_path ver; do
   # unit 名稱一律取設定的 component，設定沒有時才退回資料夾名稱（ADR-004 第 36 項）
   unit="$(jq -r --arg p "$pkg_path" '.packages[$p].component // empty' release-please-config.json)"
   [[ -z "$unit" ]] && unit="${pkg_path##*/}"
-  # the tag shape comes from the config, one rule for every unit (scripts/lib/unit-tag.jq): fact-kit/v0.8.0,
-  # py/v0.3.0, and the bare 0.3.0 of the Swift unit. unit_tags lists the versions the unit has tags for:
-  # what follows the part of the tag before the version, kept only when it is a semver. The bare shape has no
-  # prefix, so without that filter every other tag would be listed.
+  # the tag shape comes from the config, one rule for every unit (scripts/lib/unit-tag.jq): fact-kit-js/v0.8.0,
+  # fact-kit-py/v0.3.0 and so on. unit_tags lists the versions the unit has tags for:
+  # what follows the part of the tag before the version, kept only when it is a semver.
   tag="$(jq -r --arg p "$pkg_path" --arg v "$ver" -f scripts/lib/unit-tag.jq release-please-config.json)"
   tag_prefix="$(jq -r --arg p "$pkg_path" --arg v '@V@' -f scripts/lib/unit-tag.jq release-please-config.json)"; tag_prefix="${tag_prefix%%@V@*}"
   unit_tags() { git tag --list "${tag_prefix}*" | sed "s#^${tag_prefix}##" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || true; }

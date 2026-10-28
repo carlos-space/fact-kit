@@ -20,7 +20,13 @@ function fixture(options: { prs: { headRefName: string }[]; manifest: unknown })
   cpSync(script, join(dir, 'scripts/ci/release-train.sh'))
   writeFileSync(
     join(dir, 'release-please-config.json'),
-    JSON.stringify({ packages: { js: { component: 'fact-kit' }, facts: { component: 'fact-kit-facts' } } }),
+    JSON.stringify({
+      packages: { 'packages/fact-kit-js': { component: 'fact-kit-js' }, facts: { component: 'fact-kit-facts' } },
+    }),
+  )
+  writeFileSync(
+    join(dir, 'release-policy.json'),
+    JSON.stringify({ units: { 'fact-kit-js': {}, 'fact-kit-facts': {}, 'fact-kit-py': {} } }),
   )
   writeFileSync(join(dir, 'prs.json'), JSON.stringify(options.prs))
   writeFileSync(join(dir, 'manifest.json'), JSON.stringify(options.manifest))
@@ -63,17 +69,26 @@ describe('release-train.sh', () => {
   test('prints the version of the unit that the Release PR manifest holds', () => {
     const dir = fixture({
       prs: [{ headRefName: 'feature/x' }, { headRefName: 'release-please--branches--release/v0.8' }],
-      manifest: { js: '0.8.0-alpha.1', facts: '0.2.0' },
+      manifest: { 'packages/fact-kit-js': '0.8.0-alpha.1', facts: '0.2.0' },
     })
     const r = run(dir, env)
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('FACT_KIT_TRAIN=--train fact-kit=0.8.0-alpha.1\n')
   })
 
+  test('names the describes key of the unit when it is given, and the component when it is not', () => {
+    const dir = fixture({
+      prs: [{ headRefName: 'release-please--branches--release/v0.8' }],
+      manifest: { 'packages/fact-kit-js': '0.8.0', facts: '0.2.0' },
+    })
+    expect(run(dir, env, 'fact-kit-js', 'fact-kit').stdout).toBe('FACT_KIT_TRAIN=--train fact-kit=0.8.0\n')
+    expect(run(dir, env, 'fact-kit-js').stdout).toBe('FACT_KIT_TRAIN=--train fact-kit-js=0.8.0\n')
+  })
+
   test('takes the unit of another component from the config', () => {
     const dir = fixture({
       prs: [{ headRefName: 'release-please--branches--release/v0.8' }],
-      manifest: { js: '0.8.0', facts: '0.2.0' },
+      manifest: { 'packages/fact-kit-js': '0.8.0', facts: '0.2.0' },
     })
     expect(run(dir, env, 'fact-kit-facts').stdout).toBe('FACT_KIT_TRAIN=--train fact-kit-facts=0.2.0\n')
   })
@@ -84,6 +99,14 @@ describe('release-train.sh', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
     expect(r.stderr).toContain('no open Release PR')
+  })
+
+  test('prints nothing for a unit of the policy that is not on this train', () => {
+    const dir = fixture({ prs: [{ headRefName: 'release-please--branches--release/v0.8' }], manifest: {} })
+    const r = run(dir, env, 'fact-kit-py')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(r.stderr).toContain('fact-kit-py is not on the train of release/v0.8')
   })
 
   test('fails when the manifest has no version for the unit, and when the component is unknown', () => {
