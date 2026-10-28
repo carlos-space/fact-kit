@@ -408,7 +408,7 @@ describe('fact-kit.module-api', () => {
     'domainEvent',
     'useCase',
   ]
-  // What the unreleased `next` row adds: the helpers a converter script shares.
+  // What the 0.10.0-alpha.1 row adds: the helpers a converter script shares.
   const converterLib = [
     'writeFormatted',
     'stableJson',
@@ -436,8 +436,9 @@ describe('fact-kit.module-api', () => {
     const old = namesAt('0.7.0')
     expect(old.filter((name) => added.includes(name) || converterLib.includes(name))).toEqual([])
     expect(head.filter((name: string) => !added.includes(name) && !converterLib.includes(name))).toEqual(old)
-    // A reader that names no version gets the latest published rows, which are those of 0.8.0 without the `next` row.
-    expect(namesAt()).toEqual(head.filter((name: string) => !converterLib.includes(name)))
+    // A reader that names no version gets the latest published rows, which now include the 0.10.0-alpha.1 row.
+    expect(namesAt()).toEqual(head)
+    expect(namesAt('0.9.0')).toEqual(head.filter((name: string) => !converterLib.includes(name)))
     expect(namesAt('head')).toEqual(head)
   })
 
@@ -447,20 +448,24 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one 0.9.0-alpha.1 row for the 0.9 changes, and next rows only for the unreleased changes', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9 and 0.10 changes, and no next rows', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
-    // Not released yet: the converter helpers with the `prettier` peer dependency.
-    const unreleased = ['fact-kit.module-api', 'fact-kit.converters']
+    // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
+    const in010 = ['fact-kit.module-api', 'fact-kit.converters']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
       expect((fact.variants ?? []).filter((v) => v.since === '0.9.0-alpha.1').length, fact.id).toBe(
         in09.includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
-        unreleased.includes(fact.id) ? 1 : 0,
+      expect((fact.variants ?? []).filter((v) => v.since === '0.10.0-alpha.1').length, fact.id).toBe(
+        in010.includes(fact.id) ? 1 : 0,
       )
+      expect(
+        (fact.variants ?? []).filter((v) => v.since === 'next'),
+        fact.id,
+      ).toEqual([])
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
