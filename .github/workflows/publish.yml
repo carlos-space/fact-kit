@@ -233,8 +233,10 @@ jobs:
   # Pushes packages/fact-kit-go and packages/fact-kit-swift, with the package as the repository root, to the main
   # branch of their mirror repositories and tags the bare version there (Go v0.3.0-alpha.2, Swift 0.3.0-alpha.2).
   # It runs from this workflow rather than on a tag push because a tag made with GITHUB_TOKEN raises no events.
-  # The mirror repositories take no pull requests; this job is their only writer. MIRROR_PUSH_TOKEN is a
-  # fine-grained token (or GitHub App token) with contents: write on those two repositories and nothing else.
+  # The mirror repositories take no pull requests; this job is their only writer. It pushes with a token of the
+  # release-please GitHub App (the organization variable RELEASE_PLEASE_APP_CLIENT_ID and secret
+  # RELEASE_PLEASE_APP_PRIVATE_KEY), narrowed to those two repositories and contents: write. The App is installed
+  # on every repository of the organization, so a new mirror needs no extra setup.
   # A dry run needs no token. Re-running is safe: see scripts/release/mirror-units.sh.
   mirror:
     needs: [plan, tag]
@@ -252,16 +254,25 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
+      - id: app-token
+        if: ${{ !inputs.dry_run }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_PLEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: fact-kit-go,fact-kit-swift
+          permission-contents: write
       - name: Mirror the Go and Swift packages
         env:
           PATHS: ${{ inputs.paths }}
-          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
         run: |
           mapfile -t paths < <(jq -r '.[]' <<<"$PATHS")
           flags=()
           if [[ "$DRY_RUN" == 1 ]]; then flags=(--dry-run)
           elif [[ -z "$MIRROR_PUSH_TOKEN" ]]; then
-            echo "::error::secret MIRROR_PUSH_TOKEN is not set, so nothing can be pushed to the mirror repositories"; exit 1
+            echo "::error::no GitHub App token, so nothing can be pushed to the mirror repositories"; exit 1
           fi
           bash scripts/release/mirror-units.sh ${flags[@]+"${flags[@]}"} "${paths[@]}"
