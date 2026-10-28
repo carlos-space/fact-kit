@@ -1,21 +1,25 @@
-//! Reads the fact-kit-rs entry of fact-kit-facts, installed from npm with pnpm, through the published fact-kit crate.
-//! Needs `pnpm install` first (see README.md).
+//! Reads the private @carlos-space/fact-kit-sample-facts (samples/sample-facts), installed with pnpm from GitHub
+//! Packages, through the published fact-kit crate. Needs `pnpm install` with NODE_AUTH_TOKEN set (see README.md).
 
 use std::path::PathBuf;
 
 use fact_kit::{ReadFactsOptions, read_facts};
 
 #[test]
-fn installed_facts_have_the_fact_kit_rs_facts() {
+fn installed_private_facts_are_read() {
     let options = ReadFactsOptions {
         root: Some(PathBuf::from(env!("CARGO_MANIFEST_DIR"))),
         ..ReadFactsOptions::default()
     };
-    let reader = read_facts("fact-kit-facts/fact-kit-rs", &options).unwrap_or_else(|e| {
-        panic!("cannot read fact-kit-facts/fact-kit-rs ({}). Is the package installed? Run `pnpm install`.", e.code())
+    let reader = read_facts("@carlos-space/fact-kit-sample-facts/sample", &options).unwrap_or_else(|e| {
+        panic!(
+            "cannot read @carlos-space/fact-kit-sample-facts/sample ({}). Is the package installed? Run `pnpm install` with NODE_AUTH_TOKEN set.",
+            e.code()
+        )
     });
-    assert!(!reader.facts.is_empty(), "the fact-kit-rs entry has no facts");
-    for id in ["fact-kit-rs.read-facts", "fact-kit-rs.read-errors"] {
-        assert!(reader.has(id), "fact id {id} is missing");
-    }
+    assert_eq!(
+        reader.value("fact-kit-sample.greeting").and_then(|v| v.as_str()),
+        Some("hello from a private facts package")
+    );
+    assert_eq!(reader.value("fact-kit-sample.max-retries").and_then(|v| v.as_i64()), Some(3));
 }

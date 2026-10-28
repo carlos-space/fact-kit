@@ -7,23 +7,22 @@ import (
 	factkit "github.com/carlos-space/fact-kit-go"
 )
 
-// Reads the fact-kit-go entry of fact-kit-facts, installed from npm with pnpm. It needs `pnpm install` first.
-func TestInstalledFactsHaveTheFactKitGoFacts(t *testing.T) {
-	reader, err := factkit.ReadFacts("fact-kit-facts/fact-kit-go", factkit.ReadFactsOptions{Root: "."})
+// Reads the private @carlos-space/fact-kit-sample-facts (samples/sample-facts), installed with pnpm from GitHub
+// Packages. It needs `pnpm install` with NODE_AUTH_TOKEN set (see README.md).
+func TestInstalledPrivateFactsAreRead(t *testing.T) {
+	reader, err := factkit.ReadFacts("@carlos-space/fact-kit-sample-facts/sample", factkit.ReadFactsOptions{Root: "."})
 	if err != nil {
 		var e *factkit.FactReadError
 		code := "unknown"
 		if errors.As(err, &e) {
 			code = string(e.Code)
 		}
-		t.Fatalf("cannot read fact-kit-facts/fact-kit-go (%s). Is the package installed? Run pnpm install.", code)
+		t.Fatalf("cannot read @carlos-space/fact-kit-sample-facts/sample (%s). Is the package installed? Run pnpm install with NODE_AUTH_TOKEN set.", code)
 	}
-	if len(reader.Facts) == 0 {
-		t.Fatal("the fact-kit-go entry has no facts")
+	if got, err := reader.Value("fact-kit-sample.greeting"); err != nil || got != "hello from a private facts package" {
+		t.Errorf("fact-kit-sample.greeting = %v, %v", got, err)
 	}
-	for _, id := range []string{"fact-kit-go.read-facts", "fact-kit-go.read-errors"} {
-		if !reader.Has(id) {
-			t.Errorf("fact id %s is missing", id)
-		}
+	if got, err := reader.Value("fact-kit-sample.max-retries"); err != nil || got != float64(3) {
+		t.Errorf("fact-kit-sample.max-retries = %v, %v", got, err)
 	}
 }

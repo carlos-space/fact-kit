@@ -1,7 +1,9 @@
 name: facts-samples
 
-# Samples/rust and samples/go install fact-kit-facts from npm with pnpm, as an outside project would, and read it
-# through the published readers (crates.io fact-kit, Go module fact-kit-go). Samples/rust also builds its own facts.
+# Samples/rust and samples/go install the private @carlos-space/fact-kit-sample-facts (samples/sample-facts, published
+# by publish-sample-facts.yml) from GitHub Packages with pnpm, as an outside project would, and read it through the
+# published readers (crates.io fact-kit, Go module fact-kit-go). The package links to this repository, so
+# GITHUB_TOKEN reads it. Samples/rust also builds its own facts.
 on:
   pull_request:
     paths:
@@ -16,11 +18,17 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   rust:
+    # A pull request from a fork gets no packages: read token, so it is skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PNPM_CONFIG_NPMRC_AUTH_FILE: .npmrc
     defaults:
       run:
         shell: bash
@@ -36,18 +44,30 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
+      - name: Check that NODE_AUTH_TOKEN is set
+        run: |
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "NODE_AUTH_TOKEN is empty. The .npmrc reads the token from it, so pnpm cannot install the private package." >&2
+            exit 1
+          fi
       - name: Install the facts packages
-        run: pnpm install --frozen-lockfile
+        # No lock file is committed: the private package cannot be resolved without a token at authoring time.
+        run: pnpm install --no-frozen-lockfile
       - name: Build the facts of the sample
         run: pnpm -C facts build
       - name: Test the facts of the sample
         run: cargo test --locked --test own_facts
-      - name: Test reading the installed package
+      - name: Test reading the private package
         run: cargo test --locked --test installed_facts
 
   go:
+    # A pull request from a fork gets no packages: read token, so it is skipped.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PNPM_CONFIG_NPMRC_AUTH_FILE: .npmrc
     defaults:
       run:
         shell: bash
@@ -64,7 +84,14 @@ jobs:
         with:
           go-version: '1.26'
           cache: false
+      - name: Check that NODE_AUTH_TOKEN is set
+        run: |
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "NODE_AUTH_TOKEN is empty. The .npmrc reads the token from it, so pnpm cannot install the private package." >&2
+            exit 1
+          fi
       - name: Install the facts package
-        run: pnpm install --frozen-lockfile
-      - name: Test reading the installed package
+        # No lock file is committed: the private package cannot be resolved without a token at authoring time.
+        run: pnpm install --no-frozen-lockfile
+      - name: Test reading the private package
         run: go test ./...
