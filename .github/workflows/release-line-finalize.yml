@@ -45,7 +45,7 @@ jobs:
         run: |
           ref="${{ inputs.tag || github.ref_name }}"
           source scripts/lib/product-tags.sh
-          v="$(product_tag_version "$ref")"
+          v="${ref#v}"
           prev="$(product_tags | awk -v c="$ref" 'f{print;exit} $0==c{f=1}')"
           echo "comparing against ${prev:-（無前一個產品版）}"
           bash scripts/release/snapshot.sh --product "$v" --check-tags ${prev:+--since "$prev"} > snapshot.md
