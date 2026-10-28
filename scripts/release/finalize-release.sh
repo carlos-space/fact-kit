@@ -121,7 +121,9 @@ case "$phase" in
     # 修好、GA 前 squash 帶回 main，兩邊內容相同的改動都直接合併，不會重套。逐個 commit 套用會把這些
     # 改動再套一次而衝突，因為 squash 合併後 patch-id 與 cherry-pick 紀錄都對不上。
     # 設定檔留 main 的版本，發布分支的 prerelease 設定不進 main；manifest 由下一步另外合併。
-    # 其他衝突只在合併結果等於其中一邊、沒有衝突標記時放行（例如內容相同的檔同時改名，配對不唯一）。
+    # 其他衝突逐一路徑再判一次三方：兩邊內容相同，或只有一邊相對基底改過、合併結果取了改過的那邊，
+    # 才放行。這類衝突來自改名配對不唯一（例如內容相同的檔一起搬目錄），路徑層級其實沒有衝突。
+    # 兩邊都改了同一個路徑（含一邊刪、一邊改）一律停下手動處理。
     train_base="$(git log "$branch" --format='%(trailers:key=Release-Train-Base,valueonly)' | grep -m1 -E '^[0-9a-f]{7,40}$' || true)"
     [[ -n "$train_base" ]] || die "$branch 上找不到 Release-Train-Base trailer，無法決定差異範圍"
     git merge-tree -h 2>&1 | grep -q -- '--merge-base' || die "git 版本太舊：合回需要 git merge-tree --merge-base（git 2.40 以上）"
@@ -135,12 +137,15 @@ case "$phase" in
       merged="$(git merge-tree --write-tree --name-only --no-messages --merge-base="$train_base" origin/main "$branch")" || merge_status=$?
       (( merge_status <= 1 )) || die "git merge-tree 失敗（結束碼 $merge_status）"
       tree="${merged%%$'\n'*}"
+      blob() { git rev-parse -q --verify "$1:$2" 2>/dev/null || true; } # empty when the path is absent
       unresolved=()
       while IFS= read -r p; do
         [[ -z "$p" || "$p" == "$CONFIG" || "$p" == "$MANIFEST" ]] && continue
-        got="$(git rev-parse -q --verify "$tree:$p" 2>/dev/null || true)"
-        [[ -n "$got" && ( "$got" == "$(git rev-parse -q --verify "origin/main:$p" 2>/dev/null || true)" \
-          || "$got" == "$(git rev-parse -q --verify "$branch:$p" 2>/dev/null || true)" ) ]] || unresolved+=("$p")
+        b="$(blob "$train_base" "$p")" m="$(blob origin/main "$p")" t="$(blob "$branch" "$p")" r="$(blob "$tree" "$p")"
+        if [[ "$m" == "$t" && "$r" == "$m" ]] || [[ "$m" == "$b" && "$r" == "$t" ]] || [[ "$t" == "$b" && "$r" == "$m" ]]; then
+          continue
+        fi
+        unresolved+=("$p")
       done < <(tail -n +2 <<< "$merged" | sort -u)
       (( ${#unresolved[@]} == 0 )) || die "合回有衝突要手動處理：${unresolved[*]}"
       git read-tree -u --reset "$tree"
