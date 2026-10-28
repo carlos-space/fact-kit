@@ -135,6 +135,61 @@ describe('publish-units.sh same-content check against the tag', () => {
   })
 })
 
+// The facts package at a GA version, with a built index whose facts are the case under test. The rows are those
+// of check's train-next rule: when.since, and variants[].since without pending.
+function factsPackage(facts: unknown[], entry = 'dist/index.json') {
+  const r = repo()
+  r.json('facts/package.json', { name: 'fact-kit-facts', version: '0.6.1' })
+  r.json(`facts/${entry}`, { indexFormat: '1.1', component: 'fact-kit-js', facts })
+  r.json('.release-please-manifest.json', { facts: '0.6.1' })
+  r.json('release-please-config.json', {
+    ...tagShape,
+    packages: { facts: { component: 'fact-kit-facts', 'release-type': 'node' } },
+  })
+  r.commit()
+  return r
+}
+
+const fact = (id: string, extra: object) => ({ id, tool: 'fact-kit', content: { value: 1 }, ...extra })
+
+describe('publish-units.sh refuses facts rows that still start at "next"', () => {
+  test.each([
+    ['a variant row at "next"', fact('fact-kit.a', { variants: [{ since: 'next', content: { value: 2 } }] })],
+    [
+      'a variant row whose release lines end in "next"',
+      fact('fact-kit.a', { variants: [{ since: ['0.10.0', 'next'], content: { value: 2 } }] }),
+    ],
+    ['a fact whose when.since is "next"', fact('fact-kit.a', { when: { since: 'next' } })],
+  ])('%s is refused and named', (_, bad) => {
+    const { dir } = factsPackage([fact('fact-kit.ok', {}), bad])
+    const r = run(dir, 'ga', 'facts')
+    expect(r.status).not.toBe(0)
+    expect(r.out).toMatch(/facts: index\.json still has rows that start at "next" \(fact-kit\.a\)/)
+  })
+
+  test('an entry index under dist/<entry>/ is checked too', () => {
+    const { dir } = factsPackage([fact('fact-kit.a', { when: { since: 'next' } })], 'dist/fact-kit-py/index.json')
+    const r = run(dir, 'ga', 'facts')
+    expect(r.status).not.toBe(0)
+    expect(r.out).toMatch(/fact-kit-py\/index\.json still has rows that start at "next"/)
+  })
+
+  test.each([
+    ['pinned rows', fact('fact-kit.a', { when: { since: '0.11.0' }, variants: [{ since: '0.11.0', content: {} }] })],
+    ['a pending row at "next"', fact('fact-kit.a', { variants: [{ since: 'next', pending: 'x', content: {} }] })],
+    ['"next" inside the content, not a row', fact('fact-kit.a', { content: { value: [{ since: 'next' }] } })],
+    [
+      'release lines that only name "next" before the end',
+      fact('fact-kit.a', { variants: [{ since: ['next', '0.11.0'], content: {} }] }),
+    ],
+  ])('%s pass', (_, ok) => {
+    const { dir } = factsPackage([ok])
+    const r = run(dir, 'ga', 'facts')
+    expect(r.out).toContain('check only: fact-kit-facts@0.6.1 passed (stage ga, dist-tag latest)')
+    expect(r.status).toBe(0)
+  })
+})
+
 // One fixture with a unit of every kind, each at the version under test. Only the shape of the files matters
 // here: the checks read the manifest, the unit's own version file, the tag and the registry file.
 function allKinds(version: string) {
