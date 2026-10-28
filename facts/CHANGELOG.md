@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.6.0...fact-kit-facts/v0.6.1-alpha.1) (2026-10-28)
+
+
+### Fixed
+
+* **facts:** next 列釘成 0.11.0，發布前擋下仍以 next 起算的列 ([#85](https://github.com/carlos-space/fact-kit/issues/85)) ([158512c](https://github.com/carlos-space/fact-kit/commit/158512c80d7ab8005847134484f38a6e7b8eca62))
+
 ## [0.6.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.6.0-alpha.1...fact-kit-facts/v0.6.0) (2026-10-28)
 
 
