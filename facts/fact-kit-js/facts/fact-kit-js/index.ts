@@ -1404,7 +1404,7 @@ const facts: FactDecl[] = [
         },
         add: { '/exports': newApi },
       },
-      { since: 'next', add: { '/exports': converterLibApi } },
+      { since: '0.10.0-alpha.1', add: { '/exports': converterLibApi } },
     ),
   }),
   fact({
@@ -1417,7 +1417,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', value: converters },
       {
-        since: 'next',
+        since: '0.10.0-alpha.1',
         set: {
           '/optionalPeers': [
             {

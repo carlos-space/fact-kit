@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.10.0-alpha.1...fact-kit-js/v0.10.0) (2026-10-28)
+
+
+### chore
+
+* **release/v0.5:** fact-kit-js 0.10.0 ([e9da972](https://github.com/carlos-space/fact-kit/commit/e9da972427f7bc3b19f508ea80c5a9c47d6a7080))
+
+## [0.10.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.9.0...fact-kit-js/v0.10.0-alpha.1) (2026-10-28)
+
+
+### Added
+
+* **js:** 轉換共用函式 writeFormatted、stableJson、normalizeSchema、readPinned 等 8 個匯出 ([#66](https://github.com/carlos-space/fact-kit/issues/66)) ([b40b756](https://github.com/carlos-space/fact-kit/commit/b40b7568f6ed196c0249986d03c0f319d3f5c3a1))
+
 ## [0.9.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.9.0-alpha.1...fact-kit-js/v0.9.0) (2026-10-28)
 
 
