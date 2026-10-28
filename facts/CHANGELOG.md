@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.6.0-alpha.1...fact-kit-facts/v0.6.0) (2026-10-28)
+
+
+### chore
+
+* **release/v0.6:** fact-kit-facts 0.6.0 ([860f889](https://github.com/carlos-space/fact-kit/commit/860f889fd7f02bb2e4cca7d8ba9e72679b10b295))
+
+## [0.6.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.5.0...fact-kit-facts/v0.6.0-alpha.1) (2026-10-28)
+
+
+### Added
+
+* **js:** check 依政策檔核對 facts 套件名與 scope ([#80](https://github.com/carlos-space/fact-kit/issues/80)) ([1e30c89](https://github.com/carlos-space/fact-kit/commit/1e30c89b3e5ffce81285aa795b572fdccbb26897))
+
 ## [0.5.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.5.0-alpha.1...fact-kit-facts/v0.5.0) (2026-10-28)
 
 
