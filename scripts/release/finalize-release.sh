@@ -115,25 +115,40 @@ case "$phase" in
     fi
 
     # 發布分支的基底不一定在 main 上：squash 合回讓上一次發布的 tip 不是 main 的祖先，因此自產品 tag
-    # 重建的修補發布與 main 沒有近共同祖先，直接合併會讓版號檔、CHANGELOG 全數衝突。改為在 main 之上
-    # 套用發布分支的差異，合回因此永遠是一次乾淨的單一 commit。
-    # 只套 main 還沒有的 commit，不套「基底 → 最後一個 commit」整段：修補發布的修正常先進 main 再
-    # cherry-pick 進發布分支，自 tag 重建時開分支的 commit 也同步了 main 的 scripts/。整段套用會把這些
-    # 變更重套一次，已刪的檔報錯、改過的檔衝突（promptex 1.0.1 實際遇到）。開分支的 commit 一律不套，
-    # 它改的設定與 manifest 不進 main，manifest 由下一步另外合併。
+    # 重建的修補發布與 main 沒有近共同祖先，直接合併會讓版號檔、CHANGELOG 全數衝突。改為以開分支時的
+    # Release-Train-Base 為基底，三方合併 main 與發布分支，合回因此永遠是一次單一 commit。
+    # 三方合併不看 commit 怎麼來的，只看內容：修正先進 main 再 cherry-pick 進發布分支，或在發布分支上
+    # 修好、GA 前 squash 帶回 main，兩邊內容相同的改動都直接合併，不會重套。逐個 commit 套用會把這些
+    # 改動再套一次而衝突，因為 squash 合併後 patch-id 與 cherry-pick 紀錄都對不上。
+    # 設定檔留 main 的版本，發布分支的 prerelease 設定不進 main；manifest 由下一步另外合併。
+    # 其他衝突只在 main 與發布分支在該路徑的內容完全相同（含兩邊都沒有這個檔）時放行。這類衝突來自
+    # 改名配對不唯一，例如內容相同的檔一起搬目錄，git 配錯了來源。兩邊內容不同就停下手動處理：
+    # 路徑搬過目錄時新路徑在基底不存在，「只有一邊改過」判斷不出來，一邊刪、一邊改也會被當成只改一邊。
     train_base="$(git log "$branch" --format='%(trailers:key=Release-Train-Base,valueonly)' | grep -m1 -E '^[0-9a-f]{7,40}$' || true)"
     [[ -n "$train_base" ]] || die "$branch 上找不到 Release-Train-Base trailer，無法決定差異範圍"
-    pending_list="$(train_commits_not_on_main "origin/$branch")" || die "無法列出 $branch 上 main 還沒有的 commit"
-    declare -a pending=()
-    while IFS= read -r c; do [[ -n "$c" ]] && pending+=("${c%% *}"); done <<< "$pending_list"
+    # -h 以結束碼 129 結束，pipefail 之下不能接管線；新版 git 把選項印成 --[no-]merge-base。
+    [[ "$(git merge-tree -h 2>&1 || true)" == *merge-base* ]] || die "git 版本太舊：合回需要 git merge-tree --merge-base（git 2.40 以上）"
     sync_branch="${branch}--to-main"
-    log "在 main 之上建立合回分支 ${sync_branch}（套用發布分支上 main 還沒有的 ${#pending[@]} 個 commit）"
+    [[ -z "$(git ls-remote --heads origin "refs/heads/$sync_branch")" ]] \
+      || die "遠端已有 ${sync_branch}（上次合回留下的）：先關掉它的 PR 並刪除該分支，再重跑本階段"
+    log "在 main 之上建立合回分支 ${sync_branch}（以 Release-Train-Base ${train_base:0:7} 為基底三方合併 ${branch}）"
     run git switch -C "$sync_branch" origin/main
-    for c in "${pending[@]}"; do
-      if (( DRY_RUN )); then info "[dry-run] 套用 $(git log -1 --format='%h %s' "$c")"; continue; fi
-      git diff "$c^" "$c" -- . ':!release-please-config.json' | git apply --3way --allow-empty \
-        || die "套用 $(git log -1 --format='%h %s' "$c") 時衝突，請手動處理後再執行本階段"
-    done
+    if (( DRY_RUN )); then info "[dry-run] git merge-tree --write-tree --merge-base=$train_base origin/main $branch"; else
+      merge_status=0
+      merged="$(git merge-tree --write-tree --name-only --no-messages --merge-base="$train_base" origin/main "$branch")" || merge_status=$?
+      (( merge_status <= 1 )) || die "git merge-tree 失敗（結束碼 ${merge_status}）"
+      tree="${merged%%$'\n'*}"
+      blob() { git rev-parse -q --verify "$1:$2" 2>/dev/null || true; } # empty when the path is absent
+      unresolved=()
+      while IFS= read -r p; do
+        [[ -z "$p" || "$p" == "$CONFIG" || "$p" == "$MANIFEST" ]] && continue
+        m="$(blob origin/main "$p")" t="$(blob "$branch" "$p")" r="$(blob "$tree" "$p")"
+        [[ "$m" == "$t" && "$r" == "$m" ]] || unresolved+=("$p")
+      done < <(tail -n +2 <<< "$merged" | sort -u)
+      (( ${#unresolved[@]} == 0 )) || die "合回有衝突要手動處理：${unresolved[*]}"
+      git read-tree -u --reset "$tree"
+      git checkout origin/main -- "$CONFIG"
+    fi
 
     log "以 main 的 manifest 為底，只保留 train 單元版號：${units[*]}"
     if (( DRY_RUN )); then info "[dry-run] merge $MANIFEST with origin/main"; else
@@ -152,7 +167,7 @@ Release-Train-Base: $train_base"
     else
       info "合回內容已存在，略過提交"
     fi
-    external "$target" git push -f origin "$sync_branch"
+    external "$target" git push origin "$sync_branch"
 
     # Release-Train-Base 必須寫在 PR body 裡：release PR 以 squash 合併，GitHub 取 PR 標題加
     # 內文作為 commit 訊息，合回分支上那個 commit 的訊息會整個被丟棄。放錯位置的後果是
