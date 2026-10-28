@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.0-alpha.1...fact-kit-js/v0.11.0) (2026-10-28)
+
+
+### chore
+
+* **release/v0.6:** fact-kit-js 0.11.0 ([b0dc8c9](https://github.com/carlos-space/fact-kit/commit/b0dc8c9c28f000aa1f0bfad6acf819fbdb3cb4a6))
+
 ## [0.11.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.10.0...fact-kit-js/v0.11.0-alpha.1) (2026-10-28)
 
 
