@@ -58,6 +58,7 @@ export default readerFacts(
           { name: 'Version', js: 'version' },
           { name: 'Entry', js: 'entry' },
           { name: 'Describes', js: 'describes' },
+          { name: 'Publish', js: 'publish' },
           { name: 'Facts', js: 'facts' },
           { name: 'Has', js: 'has' },
           { name: 'Get', js: 'get' },

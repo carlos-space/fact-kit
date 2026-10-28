@@ -24,6 +24,15 @@ pub struct ReadFactsOptions {
     pub os: Option<String>,
 }
 
+/// Where the described component is published, from the `publish` of the index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Publish {
+    /// `npm`, `pypi`, `crates`, `go` or `swift`.
+    pub target: String,
+    /// The name of the package on that target.
+    pub name: String,
+}
+
 /// The facts one reader sees, with where they came from.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FactReader {
@@ -35,6 +44,8 @@ pub struct FactReader {
     pub entry: String,
     /// The component this entry describes and the version it covers. It is never compared with what is installed.
     pub describes: BTreeMap<String, String>,
+    /// Where the component is published. `None` when the index has no `publish`. It is not used to check any version.
+    pub publish: Option<Publish>,
     /// The facts this reader sees, each flattened to the row that applies.
     pub facts: Vec<SelectedFact>,
 }
@@ -146,6 +157,15 @@ pub fn read_facts(spec: &str, options: &ReadFactsOptions) -> Result<FactReader, 
                 .collect()
         })
         .unwrap_or_default();
+    let publish = index
+        .get("publish")
+        .and_then(Value::as_object)
+        .and_then(|p| {
+            Some(Publish {
+                target: p.get("target")?.as_str()?.to_string(),
+                name: p.get("name")?.as_str()?.to_string(),
+            })
+        });
     Ok(FactReader {
         package: index
             .get("package")
@@ -158,6 +178,7 @@ pub fn read_facts(spec: &str, options: &ReadFactsOptions) -> Result<FactReader, 
             .and_then(Value::as_str)
             .map_or(entry, str::to_string),
         describes,
+        publish,
         facts,
     })
 }

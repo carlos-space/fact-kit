@@ -9,7 +9,7 @@ mod resolve;
 mod select;
 
 pub use error::FactReadError;
-pub use read::{FactReader, ReadFactsOptions, read_facts};
+pub use read::{FactReader, Publish, ReadFactsOptions, read_facts};
 pub use select::{
     NO_SINCE, SelectOptions, SelectedFact, compare_versions, release_line, select_facts,
 };

@@ -43,6 +43,7 @@ class FactReader:
         version: str,
         entry: str,
         describes: dict[str, str],
+        publish: dict[str, str] | None = None,
         facts: list[dict[str, Any]],
     ) -> None:
         self.package = package
@@ -53,6 +54,8 @@ class FactReader:
         """Sub-path of the entry inside the package."""
         self.describes = describes
         """The component this entry describes and the version it covers."""
+        self.publish = publish
+        """Where the component is published, ``{"target": ..., "name": ...}``, or ``None`` when the index has none."""
         self.facts = facts
         """The facts this reader sees, each flattened to the row that applies."""
         self._by_id = {f["id"]: f for f in facts}
@@ -103,11 +106,20 @@ def read_facts(
     assert_index(index, f"read_facts: {file}")
     facts = select_facts(index, version=version, include=include, platform=platform, os=os)
     describes = index.get("describes")
+    raw_publish = index.get("publish")
+    publish = (
+        {"target": raw_publish["target"], "name": raw_publish["name"]}
+        if isinstance(raw_publish, dict)
+        and isinstance(raw_publish.get("target"), str)
+        and isinstance(raw_publish.get("name"), str)
+        else None
+    )
     entry_name = index.get("entry")
     return FactReader(
         package=index["package"],
         version=_owning_version(file, package_name),
         entry=entry_name if isinstance(entry_name, str) else entry,
         describes=describes if isinstance(describes, dict) else {},
+        publish=publish,
         facts=facts,
     )

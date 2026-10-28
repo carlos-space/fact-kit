@@ -15,13 +15,13 @@ const pkg = { name: '@demo/tool-facts', version: '1.0.0', type: 'module' }
 const readIndex = (dir: string, entryName: string): any =>
   JSON.parse(readFileSync(join(dir, 'dist', entryName, 'index.json'), 'utf8'))
 
-describe('c001 index format 1.1 is written', () => {
-  test('the built index has indexFormat 1.1, and no ac', async () => {
+describe('c001 index format 1.2 is written', () => {
+  test('the built index has indexFormat 1.2, and no ac', async () => {
     const dir = makeTmp('format')
     writeTree(dir, { 'package.json': pkg, 'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [fact('demo.a')]) })
     expect((await buildFacts({ cwd: dir })).problems).toEqual([])
     const index = readIndex(dir, 'cli')
-    expect(index.indexFormat).toBe('1.1')
+    expect(index.indexFormat).toBe('1.2')
     expect(Object.keys(index)[0]).toBe('indexFormat')
     expect(JSON.stringify(index)).not.toContain('"ac"')
     expect(validateIndex(index)).toEqual([])

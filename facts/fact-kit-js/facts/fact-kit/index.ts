@@ -211,6 +211,18 @@ const factSchema = {
   },
 }
 
+const publishSchema = {
+  description:
+    'Where the described component is published and under what name there (its PublishName), e.g. `{ "target": "npm", "name": "fact-kit" }`. `describes` is keyed by the component name, which can differ from the name on the registry. `readFacts` on the JS side uses it to find the installed package when `describes` is not keyed by an npm package name, and only when `target` is `npm`. The readers of the other languages return it and do not check any version. `check` rejects entries of one package that disagree. Left out, `readFacts` takes the `describes` key as the npm package name.',
+  type: 'object',
+  required: ['target', 'name'],
+  additionalProperties: false,
+  properties: {
+    target: { enum: ['npm', 'pypi', 'crates', 'go', 'swift'] },
+    name: nonEmpty,
+  },
+}
+
 const indexSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'Fact index (dist/<entry>/index.json)',
@@ -542,6 +554,11 @@ const readFactsSpec = {
       { name: 'version', type: 'string', summary: 'Version of the installed fact package, from its `package.json`.' },
       { name: 'entry', type: 'string' },
       { name: 'describes', type: 'Record<string, string>' },
+      {
+        name: 'publish',
+        type: '{ target: "npm" | "pypi" | "crates" | "go" | "swift"; name: string } | undefined',
+        summary: 'The `publish` field of the index, as it is. Undefined for an index that has none.',
+      },
       { name: 'facts', type: 'SelectedFact[]', summary: 'The facts this reader sees, each flattened to its row.' },
       { name: 'has', type: '(id: string) => boolean' },
       { name: 'get', type: '(id: string) => SelectedFact', summary: 'Throws when there is no such fact.' },
@@ -557,6 +574,16 @@ const readFactsSpec = {
     'The package cannot be resolved from `root` (`not-found`).',
     'The resolved file is not a fact index (`not-an-index`) or has an index format other than 1.x (`unsupported-index-format`).',
     'A version is not semver (`invalid-version`).',
+    'No `version` is given, and the described component is installed under `root` in a newer version than the facts describe (`describes-behind`). The component is looked up as `publish.name` when the index has `publish` with target `npm`, is not looked up when `publish` has another target, and is looked up by the `describes` key when there is no `publish`.',
+  ],
+}
+
+// What readFacts documented before `publish`: no `publish` member, and the version check by the `describes` key only.
+const readFactsBefore = {
+  ...readFactsSpec,
+  returns: { members: readFactsSpec.returns.members.filter((m) => m.name !== 'publish') },
+  throws: [
+    ...readFactsSpec.throws.slice(0, -1),
     'No `version` is given, and the described component is installed under `root` in a newer version than the facts describe.',
   ],
 }
@@ -793,6 +820,7 @@ const problemCodes = keyed([
   'unknown-fact-id',
   'missing-schema-file',
   'describes',
+  'publish',
   'since-format',
   'ambiguous-rows',
   'top-level-content',
@@ -846,6 +874,11 @@ const checkRules = keyed(
     {
       code: 'describes',
       rule: '`describes` names more than one component, or the entries of one package disagree (different components, or `{}` mixed with one).',
+      reads: 'sources',
+    },
+    {
+      code: 'publish',
+      rule: 'The entries of one package disagree on `publish` (different targets or names, or one entry without it).',
       reads: 'sources',
     },
     {
@@ -1159,7 +1192,17 @@ const facts: FactDecl[] = [
     id: 'fact-kit.index',
     topics: ['fact', 'build'],
     title: { en: 'Fields of a built index.json' },
-    content: { schema: indexSchema },
+    variants: history(
+      { since: '0.0.0', schema: indexSchema },
+      {
+        since: 'next',
+        set: {
+          '/properties/indexFormat/description':
+            '`1.2` for what this version builds. A missing field reads as `1.0`. Readers take any `1.x`.',
+          '/properties/publish': publishSchema,
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.entry-module',
@@ -1168,7 +1211,10 @@ const facts: FactDecl[] = [
     description: {
       en: 'Run with Node type stripping, so only erasable syntax is allowed and relative imports end in `.ts`.',
     },
-    content: { schema: entryModuleSchema },
+    variants: history(
+      { since: '0.0.0', schema: entryModuleSchema },
+      { since: 'next', set: { '/properties/publish': publishSchema } },
+    ),
   }),
   fact({
     id: 'fact-kit.config-file',
@@ -1263,7 +1309,7 @@ const facts: FactDecl[] = [
     id: 'fact-kit.read-facts',
     topics: ['read'],
     title: { en: 'readFacts parameters and return value' },
-    content: { value: readFactsSpec },
+    variants: history({ since: '0.0.0', value: readFactsBefore }, { since: 'next', value: readFactsSpec }),
   }),
   fact({
     id: 'fact-kit.module-api',

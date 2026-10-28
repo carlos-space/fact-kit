@@ -1,5 +1,18 @@
 import Foundation
 
+/// Where the described component is published, from the `publish` of the index.
+public struct Publish: Sendable, Equatable {
+  /// `npm`, `pypi`, `crates`, `go` or `swift`.
+  public let target: String
+  /// The name of the package on that target.
+  public let name: String
+
+  public init(target: String, name: String) {
+    self.target = target
+    self.name = name
+  }
+}
+
 /// The facts one reader sees, read from an installed fact package.
 public struct FactReader: Sendable {
   /// Name of the fact package, from the index.
@@ -10,16 +23,22 @@ public struct FactReader: Sendable {
   public let entry: String
   /// The component this entry describes and the version it covers.
   public let describes: [String: String]
+  /// Where the component is published. `nil` when the index has no `publish`. It checks no version.
+  public let publish: Publish?
   /// The facts this reader sees, each flattened to the row that applies.
   public let facts: [SelectedFact]
 
   private let byId: [String: SelectedFact]
 
-  init(package: String, version: String, entry: String, describes: [String: String], facts: [SelectedFact]) {
+  init(
+    package: String, version: String, entry: String, describes: [String: String], publish: Publish?,
+    facts: [SelectedFact]
+  ) {
     self.package = package
     self.version = version
     self.entry = entry
     self.describes = describes
+    self.publish = publish
     self.facts = facts
     var map: [String: SelectedFact] = [:]
     for fact in facts { map[fact.id] = fact }
@@ -87,6 +106,10 @@ public func readFacts(
   if case .object(let d)? = top["describes"] {
     for (key, value) in d.pairs { if case .string(let s) = value { describes[key] = s } }
   }
+  var publish: Publish?
+  if case .object(let p)? = top["publish"], case .string(let target)? = p["target"], case .string(let name)? = p["name"] {
+    publish = Publish(target: target, name: name)
+  }
   var entryName = entry
   if case .string(let e)? = top["entry"] { entryName = e }
   return FactReader(
@@ -94,6 +117,7 @@ public func readFacts(
     version: owningVersion(of: file, named: name, packageDir: packageDir),
     entry: entryName,
     describes: describes,
+    publish: publish,
     facts: selected
   )
 }
@@ -110,7 +134,7 @@ private func owningVersion(of file: URL, named name: String, packageDir: URL) ->
       return ""
     }
     let parent = dir.deletingLastPathComponent()
-    if parent.path == dir.path { return "" }
+    if dir.path == "/" || parent.path == dir.path { return "" }
     dir = parent
   }
 }

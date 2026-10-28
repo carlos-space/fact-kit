@@ -230,6 +230,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
   const out: ResolvedEntry[] = entries.map((e) => ({
     module: {
       describes: e.source.describes,
+      ...(e.source.publish !== undefined ? { publish: e.source.publish } : {}),
       ...(e.source.formatVersion !== undefined ? { formatVersion: e.source.formatVersion } : {}),
       facts: [],
     },

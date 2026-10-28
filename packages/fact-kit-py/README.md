@@ -40,7 +40,7 @@ for item in reader.facts:  # 這個讀者看得到的所有 fact，順序同 ind
 | `platform` | 讀者的平台，例如 `"claude-code"`                                       |
 | `os`       | `"macos"`、`"linux"` 或 `"windows"`                                    |
 
-`FactReader` 有 `package`、`version`（已安裝 fact 套件的版號）、`entry`、`describes`、`facts`、`has(id)`、`get(id)` 與 `value(id)`。`get` 找不到 id 時丟 `KeyError`，`value` 遇到沒有 `value` 的 content 時丟 `ValueError`。
+`FactReader` 有 `package`、`version`（已安裝 fact 套件的版號）、`entry`、`describes`、`publish`（`{"target", "name"}` 的 dict，index 沒有 `publish` 時是 `None`，不用來比對版本）、`facts`、`has(id)`、`get(id)` 與 `value(id)`。`get` 找不到 id 時丟 `KeyError`，`value` 遇到沒有 `value` 的 content 時丟 `ValueError`。
 
 只想篩選已經讀進來的 index 時，用 `select_facts(index, *, version=None, include=(), platform=None, os=None) -> list[dict]`。`compare_versions(a, b)` 與 `release_line(version)` 是版號比較與發布線的公開函式。
 

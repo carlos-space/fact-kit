@@ -41,7 +41,7 @@ enum Resolver {
         break
       }
       let parent = dir.deletingLastPathComponent()
-      if parent.path == dir.path { break }
+      if dir.path == "/" || parent.path == dir.path { break }
       dir = parent
     }
 
@@ -71,7 +71,7 @@ enum Resolver {
         }
       }
       let parent = dir.deletingLastPathComponent()
-      if parent.path == dir.path { break }
+      if dir.path == "/" || parent.path == dir.path { break }
       dir = parent
     }
     throw FactReadError.notFound("readFacts: cannot find \(name) from \(root.path). Install it there.")

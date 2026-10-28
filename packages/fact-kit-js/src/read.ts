@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { assertIndex, selectFacts } from './select.ts'
 import type { SelectOptions, SelectedFact } from './select.ts'
-import type { FactIndex, Since } from './types.ts'
+import type { FactIndex, PublishInfo, Since } from './types.ts'
 import { FactReadError, compareSemver, parseVersion } from './version.ts'
 
 /** What `onRead` is told: the fact that was read and the fact package it came from. */
@@ -24,6 +24,8 @@ export interface FactReader {
   entry: string
   /** The component this entry describes and the version it covers. */
   describes: Readonly<Record<string, string>>
+  /** Where the described component is published, as the index says. Undefined when the index has none. */
+  publish: Readonly<PublishInfo> | undefined
   /** The facts this reader sees, each flattened to the row that applies. */
   facts: readonly SelectedFact[]
   /** Whether a fact with this id exists. */
@@ -129,12 +131,12 @@ export function loadInstalledIndex(spec: string, root: string): InstalledIndex {
  * Reads the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, so each hub gets
  * the version its own lockfile pins. The fact package is resolved at call time with `createRequire` based at
  * `root`, never imported at the top of a module. The package must export `./index.json` or `./<path>/index.json`.
- * The index may be format 1.0 or 1.1.
+ * The index may be format 1.0, 1.1 or 1.2.
  *
  * `version`, `include`, `platform` and `os` choose what the reader sees, see {@link selectFacts}. Without
  * `version`, a described product that is installed under `root` sets it: the facts of the installed version are
  * read, and facts for an older version than the one `describes` names still work. An installed product that is
- * newer than the facts cover makes reading throw, because the facts do not say anything about that version yet.
+ * newer than the facts cover makes reading throw `describes-behind`, because the facts do not say anything about that version yet.
  * A product that is not installed there, such as a CLI or a service, sets nothing, and the reader gets the
  * latest published facts.
  */
@@ -142,19 +144,25 @@ export function readFacts(spec: string, options: ReadFactsOptions = {}): FactRea
   const root = options.root ?? process.cwd()
   const { index, packageName, entry, packageVersion } = loadInstalledIndex(spec, root)
   const describes = index.describes ?? {}
+  const publish = index.publish
 
   let version = options.version
   let productVersion: string | undefined
   for (const [product, described] of version === undefined ? Object.entries(describes) : []) {
-    const installed = installedVersion(root, product)
+    // With `publish`, the component is looked up by its npm name, and only when it is published to npm.
+    // Without it, the `describes` key is the npm package name.
+    const lookup = publish === undefined ? product : publish.target === 'npm' ? publish.name : undefined
+    if (lookup === undefined) continue
+    const installed = installedVersion(root, lookup)
     if (installed === undefined) continue
     const a = parseVersion(installed)
     const b = parseVersion(described)
     // Versions that are not semver can only be told apart by equality.
     const newer = a && b ? compareSemver(a, b) > 0 : installed !== described
     if (newer) {
-      throw new Error(
-        `readFacts: ${spec} describes ${product} ${described}, but ${root} has ${product} ${installed}. ` +
+      throw new FactReadError(
+        'describes-behind',
+        `readFacts: ${spec} describes ${product} ${described}, but ${root} has ${lookup} ${installed}. ` +
           `Install the ${packageName} version that describes ${product} ${installed}.`,
       )
     }
@@ -200,6 +208,7 @@ export function readFacts(spec: string, options: ReadFactsOptions = {}): FactRea
     version: packageVersion,
     entry: entryName,
     describes,
+    publish,
     facts: listed,
     has: (id) => {
       const fact = byId.get(id)
