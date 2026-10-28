@@ -2,6 +2,7 @@ import { exampleFactRefs } from './examples.ts'
 import type { ExampleGroup } from './examples.ts'
 import { ambiguousRows, factRows, topLevelContent } from './select.ts'
 import { contentFieldProblem, refProblems } from './refs.ts'
+import { FACTS_SUFFIX } from './rules.ts'
 import { subschemas } from './schema-walk.ts'
 import { subsetProblems } from './subset.ts'
 import type { RefDecl } from './author.ts'
@@ -167,12 +168,12 @@ function checkRows(fact: Fact, location: string, problems: Problem[], warnings: 
 }
 
 // --- rules about a release ----------------------------------------------------------------------------
-/** The component a package's facts describe: the one key of `describes`, else the package name without scope and `-facts`. */
+/** The component a package's facts describe: the one key of `describes`, else the package name without scope, `-facts` and publish target suffix. */
 export function componentOf(index: Partial<FactIndex> | null | undefined): string | undefined {
   const keys = Object.keys(index?.describes ?? {})
   if (keys.length === 1) return keys[0]
   if (keys.length > 1 || typeof index?.package !== 'string') return undefined
-  return index.package.replace(/^@[^/]+\//, '').replace(/-facts$/, '')
+  return index.package.replace(/^@[^/]+\//, '').replace(FACTS_SUFFIX, '')
 }
 
 /** Every `since` of a fact with where it is and whether its row is `pending`. */

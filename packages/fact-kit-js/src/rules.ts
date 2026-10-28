@@ -146,7 +146,10 @@ export async function docRefProblems(dirs: readonly string[], base: string, know
 /** `facts/dist` as a path part: bounded by the start, the end, `/` or `\\`. */
 const FACTS_DIST = /(?:^|[/\\])facts[/\\]dist(?:$|[/\\])/
 
-const isFactsPackage = (name: unknown): boolean => typeof name === 'string' && name.endsWith('-facts')
+/** A facts package name ends in `-facts`, with the publish target suffix `.<target>` when the base name is shared. */
+export const FACTS_SUFFIX = /-facts(?:\.[a-z0-9]+)?$/
+
+const isFactsPackage = (name: unknown): boolean => typeof name === 'string' && FACTS_SUFFIX.test(name)
 
 function packageOfSpecifier(specifier: string): string | undefined {
   if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:')) return undefined
