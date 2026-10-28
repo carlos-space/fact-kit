@@ -44,7 +44,7 @@ done
 # 只含程式庫時產品版號同樣往前走，Snapshot 因此完整記錄「這一版由哪些單元組成」（ADR-001）。
 [[ -n "$product" ]] || die "--product-version 必填：每次發布都要指派產品版號"
 [[ "$product" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--product-version 需為 X.Y.Z"
-ptag="$(product_tag "$product")"   # vX.Y.Z; versions up to 0.2.0 were tagged product/vX.Y.Z
+ptag="$(product_tag "$product")"
 branch="release/v$line"
 target="$(remote_target)"
 
