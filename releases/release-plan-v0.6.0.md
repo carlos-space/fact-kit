@@ -10,18 +10,18 @@
 
 ## 含哪些工作
 
-| PR | 單元 | 狀態 |
-| :--- | :--- | :--- |
-| #80 feat(js): check 依政策檔核對 facts 套件名與 scope | fact-kit-js、fact-kit-facts | 待合回 |
-| #79 docs(js): README 列出轉換共用的匯出與 prettier optional peer | fact-kit-js | 已合回 |
+| PR                                                               | 單元                        | 狀態   |
+| :--------------------------------------------------------------- | :-------------------------- | :----- |
+| #80 feat(js): check 依政策檔核對 facts 套件名與 scope            | fact-kit-js、fact-kit-facts | 待合回 |
+| #79 docs(js): README 列出轉換共用的匯出與 prettier optional peer | fact-kit-js                 | 已合回 |
 
 ## 各單元版號
 
 GA 當下由工具產出後貼入，不手抄。
 
-| 單元 | 實作版號 | tag |
-| :--- | :--- | :--- |
-| product | 0.6.0 | v0.6.0 |
+| 單元    | 實作版號 | tag    |
+| :------ | :------- | :----- |
+| product | 0.6.0    | v0.6.0 |
 
 ## 破壞性變更
 
