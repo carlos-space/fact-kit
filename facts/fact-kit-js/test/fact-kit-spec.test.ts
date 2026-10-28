@@ -427,15 +427,19 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, and next rows only for the unreleased changes', () => {
-    // Not released yet: the `publish` field (index 1.2) and the component package names of the aggregate layout.
-    const unreleased = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
+  it('keeps one 0.8.0 row for each fact that changed, one 0.9.0-alpha.1 row for the 0.9 changes and no next rows', () => {
+    // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
+    const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
-        unreleased.includes(fact.id) ? 1 : 0,
+      expect((fact.variants ?? []).filter((v) => v.since === '0.9.0-alpha.1').length, fact.id).toBe(
+        in09.includes(fact.id) ? 1 : 0,
       )
+      expect(
+        (fact.variants ?? []).filter((v) => v.since === 'next'),
+        fact.id,
+      ).toEqual([])
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
