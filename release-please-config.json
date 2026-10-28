@@ -30,10 +30,6 @@
     }
   ],
   "packages": {
-    "packages/fact-kit-js": {
-      "component": "fact-kit-js",
-      "release-type": "node"
-    },
     "facts": {
       "component": "fact-kit-facts",
       "release-type": "node"
@@ -42,6 +38,6 @@
   "plugins": [],
   "versioning": "prerelease",
   "prerelease-type": "alpha.1",
-  "prerelease": false,
-  "last-release-sha": "d6d685d5f31760dd95ce68f0419180846edbaa06"
+  "prerelease": true,
+  "last-release-sha": "d536b402103ef598796ffabf7f353a9dfff89b49"
 }
