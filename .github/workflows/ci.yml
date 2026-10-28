@@ -89,7 +89,7 @@ jobs:
       # read the Release PR of that release branch. Other branches have no Release PR and set nothing.
       - name: Train of the open Release PR
         if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.base_ref, 'release/')
-        run: bash scripts/ci/release-train.sh fact-kit-js fact-kit >> "$GITHUB_ENV"
+        run: bash scripts/ci/release-train.sh fact-kit-js >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.base_ref || github.ref_name }}
