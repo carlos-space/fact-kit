@@ -21,7 +21,8 @@
 # Every unit's version must belong to <stage> (version_stage in scripts/lib/release-stages.sh), so a dispatch
 # with the wrong stage stops instead of publishing a prerelease under latest. A version that is already on the
 # registry is skipped, so a re-run is safe. The unit's own file must carry the version in
-# .release-please-manifest.json (the Go unit has no such file).
+# .release-please-manifest.json (the Go unit has no such file). An npm package whose facts index still has rows
+# that start at "next" is refused (check_no_next).
 #
 # usage: publish-units.sh <alpha|beta|rc|ga> <path>...
 #        publish-units.sh --registries <path>...    print npm=true / pypi=true / crates=true / go=true / swift=true
@@ -95,6 +96,23 @@ check_no_conformance() { # check_no_conformance <what>
   if grep -E '(^|/)conformance/' >/dev/null; then die "$1 contains conformance/; it must not be published"; fi
 }
 
+# A row that still starts at "next" is read by a head reader only, so a default reader of the published package
+# never sees it: fact-kit pin must run on the release branch before the Release PR merges. check --train catches
+# this only when a push meets an open Release PR, and the Release PR's own CI is skipped, so the publish checks it
+# again. The rows are those of check's train-next rule (sinceOfRows in check.ts): when.since, and every
+# variants[].since without pending, that is "next" or an array ending in "next".
+check_no_next() { # check_no_next <dir> <what>
+  local f ids
+  while IFS= read -r f; do
+    ids="$(jq -r '
+      def next: . == "next" or (type == "array" and length > 0 and last == "next");
+      (if type == "object" then (.facts // []) else [] end)[] | objects
+      | select((.when.since? | next) or any((.variants // [])[] | objects; (has("pending") | not) and (.since | next)))
+      | .id' "$f")" || die "$2: $f is not a JSON file jq can read"
+    [[ -z "$ids" ]] || die "$2: ${f#"$1"/} still has rows that start at \"next\" ($(paste -sd, - <<<"$ids")). Run fact-kit pin on the release branch before the Release PR merges"
+  done < <(find "$1" -name index.json -type f | sort)
+}
+
 publish_npm() { # publish_npm <path> <version> <stage>
   local p="$1" ver="$2" stage="$3" name reg tgz out
   local -a dry=()
@@ -119,6 +137,7 @@ publish_npm() { # publish_npm <path> <version> <stage>
   [[ -n "$tgz" ]] || die "no tarball after packing $p"
   tar -xzf "$tgz" -C "$out/unpacked"
   bash scripts/release/scan-tarball.sh "$out/unpacked" "$p" || die "$name tarball failed the content scan; nothing was published"
+  check_no_next "$out/unpacked" "$name tarball"
 
   dry_run && dry=(--dry-run)
   echo "publishing $name@$ver to $reg with dist-tag $(npm_dist_tag "$stage") ${dry[*]:-}"
@@ -262,6 +281,8 @@ for u in "$@"; do
   esac
   vs="$(version_stage "$ver")" || die "$u: version $ver is not X.Y.Z or X.Y.Z-<alpha|beta|rc>.N, so its release stage is unknown"
   [[ "$vs" == "$stage" ]] || die "$u: version $ver belongs to stage $vs, but this release's stage is $stage"
+  # the built package, when the job has built it; the packed tarball is checked again in publish_npm
+  [[ "$reg" != npm || ! -d "$u/dist" ]] || check_no_next "$u/dist" "$u"
   check_same_as_tag "$u" "$ver"
   case "$reg" in
     npm) publish_npm "$u" "$ver" "$stage" ;;

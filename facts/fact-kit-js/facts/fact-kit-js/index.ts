@@ -1235,7 +1235,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.11.0',
         replace: {
           '': [
             {
@@ -1391,7 +1391,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: problemCodes },
       { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
-      { since: 'next', add: { '': ['policy-scope', 'facts-name'] } },
+      { since: '0.11.0', add: { '': ['policy-scope', 'facts-name'] } },
     ),
   }),
   fact({
@@ -1428,7 +1428,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.11.0',
         set: {
           '/componentPackage/name':
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',
@@ -1443,7 +1443,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'What `check` expects the package names of an aggregate and its component packages to be, and the two problem codes it reports. The names are `<base>`, with a publish target suffix when the base is shared and `@<scope>/` in front when the aggregate unit is restricted.',
     },
-    when: { since: 'next' },
+    when: { since: '0.11.0' },
     content: { value: factsPackageNaming },
   }),
   fact({

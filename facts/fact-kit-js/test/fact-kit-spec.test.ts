@@ -453,8 +453,8 @@ describe('fact-kit.module-api', () => {
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
-    // Not released yet: the package name rules (fact-kit.facts-package-naming has one row and no variants).
-    const inNext = ['fact-kit.problem-codes', 'fact-kit.check-rules', 'fact-kit.aggregate-layout']
+    // The package name rules (fact-kit.facts-package-naming has one row and no variants).
+    const in011 = ['fact-kit.problem-codes', 'fact-kit.check-rules', 'fact-kit.aggregate-layout']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -464,9 +464,14 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.10.0-alpha.1').length, fact.id).toBe(
         in010.includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
-        inNext.includes(fact.id) ? 1 : 0,
+      expect((fact.variants ?? []).filter((v) => v.since === '0.11.0').length, fact.id).toBe(
+        in011.includes(fact.id) ? 1 : 0,
       )
+      expect(
+        (fact.variants ?? []).some((v) => v.since === 'next'),
+        fact.id,
+      ).toBe(false)
+      expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
@@ -636,12 +641,13 @@ describe('fact-kit.facts-package-naming', () => {
   const naming = content('fact-kit.facts-package-naming')
   const rules = content('fact-kit.check-rules') as { code: string; rule: string }[]
 
-  it('is read from the next release only, and the codes it names have a rule that points back at it', () => {
+  it('is read from 0.11.0 on, and the codes it names have a rule that points back at it', () => {
     const fact = specIndex.facts.find((f) => f.id === 'fact-kit.facts-package-naming')
-    expect(fact?.when?.since).toBe('next')
+    expect(fact?.when?.since).toBe('0.11.0')
     expect(selectFacts(specIndex, { version: '0.10.0' }).map((f) => f.id)).not.toContain(
       'fact-kit.facts-package-naming',
     )
+    expect(selectFacts(specIndex, {}).map((f) => f.id)).toContain('fact-kit.facts-package-naming')
     expect(content('fact-kit.problem-codes')).toEqual(expect.arrayContaining(['policy-scope', 'facts-name']))
     for (const code of ['policy-scope', 'facts-name']) {
       expect(rules.find((r) => r.code === code)?.rule, code).toContain('fact-kit.facts-package-naming')
