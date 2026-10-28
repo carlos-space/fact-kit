@@ -34,6 +34,11 @@ printf '%s\n' "| 單元 | 路徑 | 實作版號 | tag |"
 printf '%s\n' "| :--- | :--- | :--- | :--- |"
 printf '%s\n' "| product | package.json | $product | $(product_tag "$product") |"
 jq -r 'to_entries[] | "\(.key) \(.value)"' .release-please-manifest.json | while read -r pkg_path ver; do
+  # 產品 tag 打在發布分支上，那裡的設定只列這條發布線的單元。設定沒有的單元不在這一版，也算不出 tag。
+  if ! jq -e --arg p "$pkg_path" '.packages | has($p)' release-please-config.json >/dev/null; then
+    printf '%s\n' "| ${pkg_path##*/} | $pkg_path | $ver | 未入版（不在這次的發布設定） |"
+    continue
+  fi
   # unit 名稱一律取設定的 component，設定沒有時才退回資料夾名稱（ADR-004 第 36 項）
   unit="$(jq -r --arg p "$pkg_path" '.packages[$p].component // empty' release-please-config.json)"
   [[ -z "$unit" ]] && unit="${pkg_path##*/}"
