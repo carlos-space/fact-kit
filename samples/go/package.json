@@ -1,0 +1,9 @@
+{
+  "name": "facts-sample-go",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Go sample that reads a private -facts package installed with pnpm from GitHub Packages",
+  "devDependencies": {
+    "@carlos-space/fact-kit-sample-facts": "0.1.0"
+  }
+}

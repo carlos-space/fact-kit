@@ -1,0 +1,10 @@
+{
+  "name": "facts-sample-rust",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rust sample that reads a private -facts package installed with pnpm from GitHub Packages",
+  "devDependencies": {
+    "@carlos-space/fact-kit-sample-facts": "0.1.0",
+    "fact-kit": "0.9.0"
+  }
+}
