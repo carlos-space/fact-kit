@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.8.0...fact-kit-js/v0.9.0-alpha.1) (2026-10-28)
+
+
+### Added
+
+* **read:** index 加選填欄位 publish，JS 依發布目標核對已安裝版本 ([#63](https://github.com/carlos-space/fact-kit/issues/63)) ([e3ca09c](https://github.com/carlos-space/fact-kit/commit/e3ca09caa8ad214392da92bc4ed7cae6f8ff24a7))
+
 ## [0.8.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.7.0...fact-kit-js/v0.8.0) (2026-10-27)
 
 
