@@ -1,5 +1,6 @@
 {
   "product": { "name": "fact-kit", "members": [] },
+  "access": "public",
   "units": {
     "fact-kit-js": { "kind": "package", "stages": ["alpha", "ga"] },
     "fact-kit-facts": { "kind": "package", "stages": ["alpha", "ga"] },
