@@ -128,6 +128,29 @@ describe('mirror-units.sh', () => {
     expect(t.mirrorGit('tag', '--list').split('\n')).toEqual(['v0.3.0-alpha.1', 'v0.3.0-alpha.2'])
   })
 
+  test('a release of the next line, cut from main after a squash merge-back, is one commit on top of main', () => {
+    const t = setup()
+    t.commit('init')
+    t.git('switch', '-q', '-c', 'release/v0.3')
+    t.release('go', '0.3.0-alpha.1')
+    t.release('go', '0.3.0')
+    expect(t.run([units.go.path]).status).toBe(0)
+    const first = t.mirrorGit('rev-parse', 'main')
+    // main gets the line back as one squash commit, so the tags of release/v0.3 are not ancestors of main
+    t.git('switch', '-q', 'main')
+    t.git('merge', '-q', '--squash', 'release/v0.3')
+    t.commit('chore(release): product v0.3.0 -> main')
+    expect(t.git('rev-list', '--count', 'main..fact-kit-go/v0.3.0')).not.toBe('0')
+    t.release('go', '0.4.0-alpha.1')
+    const r = t.run([units.go.path])
+    expect(r.status, r.out).toBe(0)
+    const second = t.mirrorGit('rev-parse', 'main')
+    expect(t.mirrorGit('rev-parse', `${second}^`)).toBe(first)
+    expect(t.mirrorGit('rev-parse', 'v0.4.0-alpha.1^{commit}')).toBe(second)
+    expect(t.mirrorGit('show', `${second}:notes.txt`)).toBe('change for 0.4.0-alpha.1')
+    expect(t.mirrorGit('tag', '--list').split('\n')).toEqual(['v0.3.0', 'v0.4.0-alpha.1'])
+  })
+
   test('the mirror commits are the same when computed twice', () => {
     const a = setup()
     a.release('swift', '0.3.0-alpha.1')
@@ -163,7 +186,7 @@ describe('mirror-units.sh', () => {
     expect(r.out).toMatch(/must not move/)
   })
 
-  test('a main that is not an ancestor is refused and nothing is pushed', () => {
+  test('a main that is not the commit of the highest tag is refused and nothing is pushed', () => {
     const t = setup()
     t.release('go', '0.3.0-alpha.1')
     const other = t.dir + '-other'
@@ -176,7 +199,7 @@ describe('mirror-units.sh', () => {
     const stray = t.mirrorGit('rev-parse', 'main')
     const r = t.run([units.go.path])
     expect(r.status).not.toBe(0)
-    expect(r.out).toMatch(/fast-forward/)
+    expect(r.out).toMatch(/pushed to the mirror by hand/)
     expect(t.mirrorGit('rev-parse', 'main')).toBe(stray)
     expect(t.mirrorGit('tag', '--list')).toBe('')
   })
@@ -187,7 +210,7 @@ describe('mirror-units.sh', () => {
     const r = t.run(['--dry-run', units.go.path])
     expect(r.status, r.out).toBe(0)
     expect(r.out).toMatch(/mirror tag\s+v0\.3\.0-alpha\.2/)
-    expect(r.out).toMatch(/split commit\s+[0-9a-f]{40}/)
+    expect(r.out).toMatch(/mirror commit\s+[0-9a-f]{40}/)
     expect(r.out).toMatch(/^ {2}go\.mod$/m)
     expect(r.out).toMatch(/^go\.mod: module github\.com\/carlos-space\/fact-kit-go$/m)
     expect(t.mirrorGit('for-each-ref')).toBe('')
