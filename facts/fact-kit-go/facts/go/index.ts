@@ -12,13 +12,31 @@ export default readerFacts(
   {
     tool: 'fact-kit-go',
     language: 'Go',
-    package: {
-      registry: 'go module proxy',
-      name: 'github.com/carlos-space/fact-kit-go',
-      import: 'factkit',
-      tagPrefix: 'fact-kit-go/v',
-      requires: 'go>=1.26',
-    },
+    package: [
+      // 0.3.0-alpha.1 was published from this repository, as the module in its go/ directory.
+      {
+        since: '0.3.0-alpha.1',
+        value: {
+          registry: 'go module proxy',
+          name: 'github.com/carlos-space/fact-kit/go',
+          import: 'factkit',
+          tagPrefix: 'go/v',
+          requires: 'go>=1.26',
+        },
+      },
+      // From 0.3.0-alpha.2 it is published from the mirror repository, whose tags are vX.Y.Z.
+      {
+        since: '0.3.0-alpha.2',
+        value: {
+          registry: 'go module proxy',
+          name: 'github.com/carlos-space/fact-kit-go',
+          import: 'factkit',
+          tagPrefix: 'v',
+          sourceTagPrefix: 'fact-kit-go/v',
+          requires: 'go>=1.26',
+        },
+      },
+    ],
     read: {
       name: 'ReadFacts',
       signature: 'ReadFacts(spec string, opts ReadFactsOptions) (*FactReader, error)',

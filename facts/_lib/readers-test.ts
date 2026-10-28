@@ -9,7 +9,7 @@ import type { FactDecl, FactReader, ReadErrorCode } from '../../packages/fact-ki
 import { loadEntries } from '../../packages/fact-kit-js/src/load.ts'
 import { cleanTmp, makeTmp, writeTree } from '../../packages/fact-kit-js/test/helpers.ts'
 import kit from '../fact-kit-js/facts/fact-kit/index.ts'
-import type { ReaderApi } from './readers-lib.ts'
+import type { ReaderApi, ReaderPackage } from './readers-lib.ts'
 
 const factsDir = fileURLToPath(new URL('..', import.meta.url))
 const aggregate = JSON.parse(readFileSync(join(factsDir, 'package.json'), 'utf8')) as { name: string; version: string }
@@ -40,7 +40,20 @@ async function installComponent(component: string): Promise<string> {
   return hub
 }
 
-export function readerSpec(component: string, since: string, names: { read: string; select: string }): void {
+/** What a reader on `version` sees in `<tool>.package`; `since` is the release that row starts at. */
+export interface PackageIdentity {
+  version: string | undefined
+  since: string
+  name: string
+  tagPrefix: string
+}
+
+export function readerSpec(
+  component: string,
+  since: string,
+  names: { read: string; select: string },
+  identities: PackageIdentity[] = [],
+): void {
   const tool = component
   const spec = `${aggregate.name}/${component}`
   let hub: string
@@ -56,7 +69,11 @@ export function readerSpec(component: string, since: string, names: { read: stri
       expect(reader.facts.map((f) => f.id).sort()).toEqual(
         ['package', 'read-errors', 'read-facts', 'select-facts'].map((n) => `${tool}.${n}`),
       )
-      expect(reader.facts.map((f) => f.since)).toEqual(Array(4).fill(since))
+      const sinceById = Object.fromEntries(reader.facts.map((f) => [f.id, f.since]))
+      const latest = identities.at(-1)
+      expect(Object.values(sinceById).filter((s) => s !== since)).toEqual(
+        latest && latest.since !== since ? [latest.since] : [],
+      )
     })
 
     it('has no row left on next', () => {
@@ -89,6 +106,15 @@ export function readerSpec(component: string, since: string, names: { read: stri
     it('maps the four error codes of the JS reader', () => {
       const errors = reader.value<ReaderApi['errors']>(`${tool}.read-errors`)
       expect(errors.codes.map((c) => c.code)).toEqual(READ_ERROR_CODES)
+    })
+
+    it.each(identities)('the package identity of $version ($since row) is $name', (identity) => {
+      const read = readFacts(spec, { root: hub, version: identity.version })
+      const fact = read.get(`${tool}.package`)
+      expect(fact.since).toBe(identity.since)
+      const pkg = read.value<ReaderPackage>(`${tool}.package`)
+      expect(pkg.name).toBe(identity.name)
+      expect(pkg.tagPrefix).toBe(identity.tagPrefix)
     })
 
     it('a reader on a release before the first one gets none of them', () => {
