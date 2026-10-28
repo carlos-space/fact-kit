@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.3.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.3.0-alpha.2...fact-kit-facts/v0.3.0) (2026-10-28)
+
+
+### chore
+
+* **release/v0.3:** fact-kit-facts 0.3.0 ([fe8969e](https://github.com/carlos-space/fact-kit/commit/fe8969e5cd067391fcfb9f2dc2edbc8dac741403))
+
+## [0.3.0-alpha.2](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.3.0-alpha.1...fact-kit-facts/v0.3.0-alpha.2) (2026-10-28)
+
+
+### chore
+
+* **release/v0.3:** fact-kit-facts 0.3.0-alpha.2 ([8eea645](https://github.com/carlos-space/fact-kit/commit/8eea6452c2f20fac9efe59b1443586449eb11b36))
+
+
+### Fixed
+
+* **facts:** 讀取套件 facts 的 Go、Swift package 依版本給出安裝身分 ([#55](https://github.com/carlos-space/fact-kit/issues/55)) ([5cb7c90](https://github.com/carlos-space/fact-kit/commit/5cb7c90bb30e8004db73fff4725f27742f7de01c))
+
+## [0.3.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.2.0...fact-kit-facts/v0.3.0-alpha.1) (2026-10-27)
+
+
+### Added
+
+* **facts:** 讀取套件的 facts 從 pending 釘成 0.3.0-alpha.1 ([#40](https://github.com/carlos-space/fact-kit/issues/40)) ([b818289](https://github.com/carlos-space/fact-kit/commit/b818289280a46ce71735354e992a9b9768e5d456))
+
 ## [0.2.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.1.0...fact-kit-facts/v0.2.0) (2026-10-27)
 
 

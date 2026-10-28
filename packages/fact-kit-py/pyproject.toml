@@ -1,6 +1,6 @@
 [project]
 name = "fact-kit"
-version = "0.0.0"
+version = "0.3.0"
 description = "Reads the fact packages built by fact-kit"
 readme = "README.md"
 license = "MIT"

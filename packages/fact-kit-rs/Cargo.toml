@@ -1,6 +1,6 @@
 [package]
 name = "fact-kit"
-version = "0.0.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 description = "Read the facts of a fact-kit index.json from Rust"
