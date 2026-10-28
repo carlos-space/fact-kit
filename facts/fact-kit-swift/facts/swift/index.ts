@@ -12,13 +12,31 @@ export default readerFacts(
   {
     tool: 'fact-kit-swift',
     language: 'Swift',
-    package: {
-      registry: 'swiftpm',
-      name: 'https://github.com/carlos-space/fact-kit',
-      import: 'FactKit',
-      tagPrefix: 'fact-kit-swift/v',
-      requires: 'swift-tools-version 6.0',
-    },
+    package: [
+      // 0.3.0-alpha.1 was published from this repository, tagged with the bare version.
+      {
+        since: '0.3.0-alpha.1',
+        value: {
+          registry: 'swiftpm',
+          name: 'https://github.com/carlos-space/fact-kit',
+          import: 'FactKit',
+          tagPrefix: '',
+          requires: 'swift-tools-version 6.0',
+        },
+      },
+      // From 0.3.0-alpha.2 it is published from the mirror repository, whose tags are X.Y.Z.
+      {
+        since: '0.3.0-alpha.2',
+        value: {
+          registry: 'swiftpm',
+          name: 'https://github.com/carlos-space/fact-kit-swift',
+          import: 'FactKit',
+          tagPrefix: '',
+          sourceTagPrefix: 'fact-kit-swift/v',
+          requires: 'swift-tools-version 6.0',
+        },
+      },
+    ],
     read: {
       name: 'readFacts',
       signature:
