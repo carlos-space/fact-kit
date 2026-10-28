@@ -28,7 +28,8 @@ jobs:
     timeout-minutes: 30
     env:
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PNPM_CONFIG_NPMRC_AUTH_FILE: .npmrc
+      # Absolute, because pnpm -C facts resolves a relative path from facts/.
+      PNPM_CONFIG_NPMRC_AUTH_FILE: ${{ github.workspace }}/samples/rust/.npmrc
     defaults:
       run:
         shell: bash
@@ -67,7 +68,7 @@ jobs:
     timeout-minutes: 30
     env:
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PNPM_CONFIG_NPMRC_AUTH_FILE: .npmrc
+      PNPM_CONFIG_NPMRC_AUTH_FILE: ${{ github.workspace }}/samples/go/.npmrc
     defaults:
       run:
         shell: bash
