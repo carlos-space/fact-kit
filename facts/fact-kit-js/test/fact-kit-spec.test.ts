@@ -448,11 +448,13 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9 and 0.10 changes, and no next rows', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9 and 0.10 changes, and one next row for the naming rules only', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
+    // Not released yet: the package name rules (fact-kit.facts-package-naming has one row and no variants).
+    const inNext = ['fact-kit.problem-codes', 'fact-kit.check-rules']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -462,10 +464,9 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.10.0-alpha.1').length, fact.id).toBe(
         in010.includes(fact.id) ? 1 : 0,
       )
-      expect(
-        (fact.variants ?? []).filter((v) => v.since === 'next'),
-        fact.id,
-      ).toEqual([])
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+        inNext.includes(fact.id) ? 1 : 0,
+      )
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
@@ -628,5 +629,45 @@ describe('fact-kit.aggregate-layout', () => {
       '<sub-path>',
       '<sub-path>/<entry>',
     ])
+  })
+})
+
+describe('fact-kit.facts-package-naming', () => {
+  const naming = content('fact-kit.facts-package-naming')
+  const rules = content('fact-kit.check-rules') as { code: string; rule: string }[]
+
+  it('is read from the next release only, and the codes it names have a rule that points back at it', () => {
+    const fact = specIndex.facts.find((f) => f.id === 'fact-kit.facts-package-naming')
+    expect(fact?.when?.since).toBe('next')
+    expect(selectFacts(specIndex, { version: '0.10.0' }).map((f) => f.id)).not.toContain(
+      'fact-kit.facts-package-naming',
+    )
+    expect(content('fact-kit.problem-codes')).toEqual(expect.arrayContaining(['policy-scope', 'facts-name']))
+    for (const code of ['policy-scope', 'facts-name']) {
+      expect(rules.find((r) => r.code === code)?.rule, code).toContain('fact-kit.facts-package-naming')
+    }
+    expect(Object.keys(naming).sort()).toEqual(
+      ['aggregateUnit', 'base', 'checkedIn', 'examples', 'policy', 'prefix', 'suffix'].sort(),
+    )
+  })
+
+  it('says the prefix follows the aggregate unit in aggregate-layout, with no trace of the old sentence', () => {
+    const name = content('fact-kit.aggregate-layout').componentPackage.name as string
+    expect(name).toContain('the unit that publishes the aggregate package')
+    expect(name).not.toContain('A unit with restricted access')
+  })
+
+  it('reports policy-scope for a restricted policy with no scope, and nothing without the file', async () => {
+    const dir = makeTmp('naming-spec')
+    writeTree(dir, {
+      'fact-kit.config.json': { repoRoot: '.' },
+      'release-policy.json': { product: { name: 'x', members: [] }, access: 'restricted' },
+    })
+    const r = await cli(['check', '--cwd', dir, '--json'])
+    expect([r.code, JSON.parse(r.stdout).problems.map((p: { code: string }) => p.code)]).toEqual([1, ['policy-scope']])
+    expect(naming.policy.scope).toContain('policy-scope')
+    const none = makeTmp('naming-spec')
+    writeTree(none, { 'fact-kit.config.json': { repoRoot: '.' } })
+    expect((await cli(['check', '--cwd', none, '--json'])).code).toBe(0)
   })
 })

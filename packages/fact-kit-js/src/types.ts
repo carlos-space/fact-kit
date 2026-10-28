@@ -169,12 +169,12 @@ export interface Problem {
     | 'impl-imports-facts'
     | 'impl-reads-facts-dist'
     | 'impl-depends-on-facts'
-    | 'policy-scope'
-    | 'facts-name'
     | 'builder'
     | 'subset-of'
     | 'ref'
     | 'schema-property'
+    | 'policy-scope'
+    | 'facts-name'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string
