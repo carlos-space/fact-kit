@@ -1195,7 +1195,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', schema: indexSchema },
       {
-        since: 'next',
+        since: '0.9.0-alpha.1',
         set: {
           '/properties/indexFormat/description':
             '`1.2` for what this version builds. A missing field reads as `1.0`. Readers take any `1.x`.',
@@ -1213,7 +1213,7 @@ const facts: FactDecl[] = [
     },
     variants: history(
       { since: '0.0.0', schema: entryModuleSchema },
-      { since: 'next', set: { '/properties/publish': publishSchema } },
+      { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
     ),
   }),
   fact({
@@ -1304,7 +1304,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.9.0-alpha.1',
         set: {
           '/componentPackage/name':
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. A unit with restricted access adds `@<scope>/`',
@@ -1316,7 +1316,7 @@ const facts: FactDecl[] = [
     id: 'fact-kit.read-facts',
     topics: ['read'],
     title: { en: 'readFacts parameters and return value' },
-    variants: history({ since: '0.0.0', value: readFactsBefore }, { since: 'next', value: readFactsSpec }),
+    variants: history({ since: '0.0.0', value: readFactsBefore }, { since: '0.9.0-alpha.1', value: readFactsSpec }),
   }),
   fact({
     id: 'fact-kit.module-api',
