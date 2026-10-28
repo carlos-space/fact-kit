@@ -16,11 +16,11 @@
     "build": "node ../packages/fact-kit-js/src/bin.ts build"
   },
   "devDependencies": {
-    "@npm/fact-kit-facts": "workspace:*",
-    "@pypi/fact-kit-facts": "workspace:*",
-    "@crates/fact-kit-facts": "workspace:*",
-    "@go/fact-kit-facts": "workspace:*",
-    "@swift/fact-kit-facts": "workspace:*"
+    "fact-kit-facts.npm": "workspace:*",
+    "fact-kit-facts.pypi": "workspace:*",
+    "fact-kit-facts.crates": "workspace:*",
+    "fact-kit-facts.go": "workspace:*",
+    "fact-kit-facts.swift": "workspace:*"
   },
   "exports": {
     "./index.json": "./dist/index.json",

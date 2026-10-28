@@ -92,7 +92,7 @@ and publish one aggregate package that holds all their indexes. The aggregate li
 `devDependencies` (`"workspace:*"`) and in `fact-kit.config.json`:
 
 ```json
-{ "aggregate": { ".": "@npm/fact-kit-facts", "fact-kit-py": "@pypi/fact-kit-facts" } }
+{ "aggregate": { ".": "fact-kit-facts.npm", "fact-kit-py": "fact-kit-facts.pypi" } }
 ```
 
 `fact-kit build` in the aggregate package copies the built indexes of the components (build them first; with pnpm,

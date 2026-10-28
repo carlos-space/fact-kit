@@ -28,7 +28,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const kitSrc = join(fileURLToPath(new URL('../../../packages/fact-kit-js', import.meta.url)), 'src')
 
 const entries = await loadEntries(join(root, 'facts'))
-const spec = entries.find((e) => e.entry === 'fact-kit')
+const spec = entries.find((e) => e.entry === 'fact-kit-js')
 if (!spec) throw new Error('facts/fact-kit-js is missing')
 // The facts are the spec of the unreleased code, so they are read as `head` of the built index. A fact with
 // several rows has no content of its own before the build.
@@ -211,7 +211,7 @@ describe('fact-kit.cli', () => {
   it('prints the version of package.json', async () => {
     const pkg = JSON.parse(readFileSync(join(kitSrc, '..', 'package.json'), 'utf8')) as { version: string }
     expect((await cli(['--version'])).stdout.trim()).toBe(pkg.version)
-    expect(spec.module.describes['fact-kit']).toBe(pkg.version)
+    expect(spec.module.describes['fact-kit-js']).toBe(pkg.version)
   })
 })
 

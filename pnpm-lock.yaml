@@ -133,19 +133,19 @@ importers:
 
   facts:
     devDependencies:
-      '@crates/fact-kit-facts':
+      fact-kit-facts.crates:
         specifier: workspace:*
         version: link:fact-kit-rs
-      '@go/fact-kit-facts':
+      fact-kit-facts.go:
         specifier: workspace:*
         version: link:fact-kit-go
-      '@npm/fact-kit-facts':
+      fact-kit-facts.npm:
         specifier: workspace:*
         version: link:fact-kit-js
-      '@pypi/fact-kit-facts':
+      fact-kit-facts.pypi:
         specifier: workspace:*
         version: link:fact-kit-py
-      '@swift/fact-kit-facts':
+      fact-kit-facts.swift:
         specifier: workspace:*
         version: link:fact-kit-swift
 

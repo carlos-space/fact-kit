@@ -12,6 +12,7 @@ export default readerFacts(
   {
     tool: 'fact-kit-rs',
     language: 'Rust',
+    publish: { target: 'crates', name: 'fact-kit' },
     package: {
       registry: 'crates.io',
       name: 'fact-kit',

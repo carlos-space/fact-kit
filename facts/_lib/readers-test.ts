@@ -8,7 +8,7 @@ import { buildIndex, readFacts } from '../../packages/fact-kit-js/src/index.ts'
 import type { FactDecl, FactReader, ReadErrorCode } from '../../packages/fact-kit-js/src/index.ts'
 import { loadEntries } from '../../packages/fact-kit-js/src/load.ts'
 import { cleanTmp, makeTmp, writeTree } from '../../packages/fact-kit-js/test/helpers.ts'
-import kit from '../fact-kit-js/facts/fact-kit/index.ts'
+import kit from '../fact-kit-js/facts/fact-kit-js/index.ts'
 import type { ReaderApi, ReaderPackage } from './readers-lib.ts'
 
 const factsDir = fileURLToPath(new URL('..', import.meta.url))

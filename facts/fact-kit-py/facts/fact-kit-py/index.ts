@@ -12,6 +12,7 @@ export default readerFacts(
   {
     tool: 'fact-kit-py',
     language: 'Python',
+    publish: { target: 'pypi', name: 'fact-kit' },
     package: {
       registry: 'pypi',
       name: 'fact-kit',

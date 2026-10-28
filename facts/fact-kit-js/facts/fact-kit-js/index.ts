@@ -1388,6 +1388,10 @@ const facts: FactDecl[] = [
   }),
 ]
 
-const entry: FactsSource = { describes: { 'fact-kit': kit.version }, facts }
+const entry: FactsSource = {
+  describes: { 'fact-kit-js': kit.version },
+  publish: { target: 'npm', name: 'fact-kit' },
+  facts,
+}
 
 export default entry
