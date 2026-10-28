@@ -169,6 +169,8 @@ export interface Problem {
     | 'impl-imports-facts'
     | 'impl-reads-facts-dist'
     | 'impl-depends-on-facts'
+    | 'policy-scope'
+    | 'facts-name'
     | 'builder'
     | 'subset-of'
     | 'ref'
