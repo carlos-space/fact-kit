@@ -18,8 +18,9 @@ const READ_ERROR_CODES: ReadErrorCode[] = ['not-an-index', 'unsupported-index-fo
 // Only the JS reader has these (m151/d003).
 const JS_ONLY = new Set(['options.onRead'])
 
-const jsRead = (kit.facts.find((f) => (f as { id?: string }).id === 'fact-kit.read-facts') as FactDecl | undefined)
-  ?.content as {
+// The newest row of the fact, because `readFacts` has rows by version.
+const jsReadDecl = kit.facts.find((f) => (f as { id?: string }).id === 'fact-kit.read-facts') as FactDecl | undefined
+const jsRead = (jsReadDecl?.variants?.at(-1)?.content ?? jsReadDecl?.content) as {
   value: { parameters: { name: string }[]; returns: { members: { name: string }[] } }
 }
 

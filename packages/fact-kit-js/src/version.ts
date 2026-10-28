@@ -1,7 +1,8 @@
 import type { Since } from './types.ts'
 
 /** The stable `code` of an error a reader throws. The message is for people and can change. */
-export type ReadErrorCode = 'not-an-index' | 'unsupported-index-format' | 'not-found' | 'invalid-version'
+export type ReadErrorCode =
+  'not-an-index' | 'unsupported-index-format' | 'not-found' | 'invalid-version' | 'describes-behind'
 
 export class FactReadError extends Error {
   readonly code: ReadErrorCode

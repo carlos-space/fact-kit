@@ -5,6 +5,7 @@ import { promisify } from 'node:util'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { readFacts } from '../src/index.ts'
 import { splitSpec } from '../src/read.ts'
+import { FactReadError } from '../src/version.ts'
 import { cleanTmp, makeTmp, writeTree } from './helpers.ts'
 
 afterEach(() => {
@@ -153,6 +154,74 @@ describe('c004 readFacts', () => {
     const nested = join(root, 'apps', 'site')
     writeTree(nested, { 'package.json': { name: 'site', private: true } })
     expect(() => readFacts('pkg-facts/cli', { root: nested })).toThrow('has demo 1.2.0')
+  })
+
+  describe('publish (index 1.2): the npm name of a component whose describes key is a ComponentName', () => {
+    const publishTree = (root: string, installed: string, publish: unknown) =>
+      writeTree(root, {
+        'package.json': { name: 'hub', private: true },
+        // describes is keyed by the ComponentName `fact-kit-js`. The npm package is `fact-kit`.
+        'node_modules/fact-kit/package.json': { name: 'fact-kit', version: installed },
+        'node_modules/fact-kit-js/package.json': { name: 'fact-kit-js', version: '9.9.9' },
+        'node_modules/pkg-facts/package.json': {
+          name: 'pkg-facts',
+          version: '3.0.0',
+          exports: { './cli/index.json': './index.json' },
+        },
+        'node_modules/pkg-facts/index.json': {
+          indexFormat: '1.2',
+          package: 'pkg-facts',
+          entry: 'cli',
+          describes: { 'fact-kit-js': '1.2.0' },
+          ...(publish === undefined ? {} : { publish }),
+          facts: [fact('demo.a', 1)],
+        },
+      })
+
+    test('target npm: reads when the installed PublishName version equals describes, and returns publish', () => {
+      const root = makeTmp('publish-equal')
+      publishTree(root, '1.2.0', { target: 'npm', name: 'fact-kit' })
+      const reader = readFacts('pkg-facts/cli', { root })
+      expect(reader.value('demo.a')).toBe(1)
+      expect(reader.publish).toEqual({ target: 'npm', name: 'fact-kit' })
+    })
+
+    test('target npm: throws describes-behind when the installed PublishName version is newer', () => {
+      const root = makeTmp('publish-newer')
+      publishTree(root, '1.3.0', { target: 'npm', name: 'fact-kit' })
+      let error: unknown
+      try {
+        readFacts('pkg-facts/cli', { root })
+      } catch (e) {
+        error = e
+      }
+      expect(error).toBeInstanceOf(FactReadError)
+      expect((error as FactReadError).code).toBe('describes-behind')
+      expect((error as Error).message).toContain('has fact-kit 1.3.0')
+    })
+
+    test('another target is not checked', () => {
+      const root = makeTmp('publish-pypi')
+      publishTree(root, '1.3.0', { target: 'pypi', name: 'fact-kit' })
+      const reader = readFacts('pkg-facts/cli', { root })
+      expect(reader.value('demo.a')).toBe(1)
+      expect(reader.publish?.target).toBe('pypi')
+    })
+
+    test('without publish the describes key is the package name, as before', () => {
+      const root = makeTmp('publish-none')
+      // node_modules/fact-kit-js is 9.9.9, newer than describes 1.2.0.
+      publishTree(root, '1.2.0', undefined)
+      let error: unknown
+      try {
+        readFacts('pkg-facts/cli', { root })
+      } catch (e) {
+        error = e
+      }
+      expect((error as FactReadError).code).toBe('describes-behind')
+      expect((error as Error).message).toContain('has fact-kit-js 9.9.9')
+      expect(readFacts('pkg-facts/cli', { root, version: 'head' }).publish).toBeUndefined()
+    })
   })
 
   test('splits specs of plain and scoped packages', () => {

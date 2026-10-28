@@ -54,7 +54,7 @@ describe('c003 build', () => {
     const cliIndex = JSON.parse(readFileSync(join(dir, 'dist/cli/index.json'), 'utf8'))
     expect(Object.keys(cliIndex)).toEqual(['indexFormat', 'package', 'entry', 'formatVersion', 'describes', 'facts'])
     expect(cliIndex).toMatchObject({
-      indexFormat: '1.1',
+      indexFormat: '1.2',
       package: '@demo/tool-facts',
       entry: 'cli',
       formatVersion: '2',

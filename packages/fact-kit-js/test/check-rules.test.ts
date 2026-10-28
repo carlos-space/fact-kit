@@ -53,6 +53,23 @@ describe('c004 check: the rules of m149/d011', () => {
     expect([r.code, codes(r)]).toEqual([1, ['describes']])
   })
 
+  test('publish: entries of one package that disagree are reported, and equal ones are not', async () => {
+    const withPublish = (target: string, id = 'one') =>
+      `export default { describes: { demo: '1.2.0' }, publish: { target: '${target}', name: 'demo' }, facts: [${fact(id)}] }\n`
+    const same = await check({ 'facts/a/index.ts': withPublish('npm'), 'facts/b/index.ts': withPublish('npm', 'two') })
+    expect([same.code, codes(same)]).toEqual([0, []])
+    const other = await check({
+      'facts/a/index.ts': withPublish('npm'),
+      'facts/b/index.ts': withPublish('pypi', 'two'),
+    })
+    expect([other.code, codes(other)]).toEqual([1, ['publish']])
+    const missing = await check({
+      'facts/a/index.ts': withPublish('npm'),
+      'facts/b/index.ts': entry([fact('two')]),
+    })
+    expect([missing.code, codes(missing)]).toEqual([1, ['publish']])
+  })
+
   test('describes: {} is allowed (m149/d016), and so is the same component in two entries', async () => {
     const r = await check({
       'facts/a/index.ts': entry([fact('one')], '{}'),

@@ -43,7 +43,7 @@ if let Some(value) = reader.value("demo.limit") {
 | `platform` | `Option<String>`  | `None`       | 讀者的平台，例如 `"claude-code"`     |
 | `os`       | `Option<String>`  | `None`       | `"macos"`、`"linux"` 或 `"windows"`  |
 
-`FactReader` 的成員：`package`、`version`（已安裝 -facts 套件的版號）、`entry`、`describes`、`facts`，以及 `has(id)`、`get(id)`、`value(id)`。`get` 與 `value` 找不到時回 `None`，不丟例外。`value` 在那筆 fact 沒有 `content.value` 時也回 `None`。
+`FactReader` 的成員：`package`、`version`（已安裝 -facts 套件的版號）、`entry`、`describes`、`publish`（`Option<Publish>`，有 `target` 與 `name`，index 沒有 `publish` 時是 `None`，不用來比對版本）、`facts`，以及 `has(id)`、`get(id)`、`value(id)`。`get` 與 `value` 找不到時回 `None`，不丟例外。`value` 在那筆 fact 沒有 `content.value` 時也回 `None`。
 
 只要篩選、不要讀檔，可以呼叫 `select_facts(&index, &SelectOptions)`，`index` 是解析過的 `serde_json::Value`。
 

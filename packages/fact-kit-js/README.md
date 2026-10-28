@@ -53,7 +53,7 @@ the fact locations a fact is computed from.
 the top-level `content` has to be a guess. The rules are in [`conformance/README.md`](../conformance/README.md).
 
 `build` writes `dist/<entry>/index.json` and `dist/<entry>/schemas/`, and reports the `exports` entries
-package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.1"`, and a fact with `variants`
+package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.2"`, and a fact with `variants`
 gets the latest published row as its top-level `content`, which is what a reader of format 1.0 uses. `build` validates format and ids only; it does not scan
 for local paths or domains, so run `check` before publishing.
 
@@ -683,7 +683,7 @@ facts.value('tool.some-fact')
 ```
 
 `spec` is `<package>` or `<package>/<path>`, and the path may have several segments. The package must export
-`./index.json` or `./<path>/index.json`. Both index format 1.0 and 1.1 are read.
+`./index.json` or `./<path>/index.json`. Index formats 1.0, 1.1 and 1.2 are read.
 
 | Option     | Meaning                                                                                                          |
 | :--------- | :--------------------------------------------------------------------------------------------------------------- |
@@ -696,13 +696,25 @@ facts.value('tool.some-fact')
 
 Without `version`, a described component that is installed under `root` sets it: the facts of the installed
 version are read, and facts for an older version than `describes` names work too. An installed component that is
-newer than `describes` makes `readFacts` throw, because the facts do not cover that version yet. When the
-component is not installed (a CLI or a service), the reader gets the latest published rows.
+newer than `describes` makes `readFacts` throw `FactReadError` with the code `describes-behind`, because the
+facts do not cover that version yet. When the component is not installed (a CLI or a service), the reader gets the
+latest published rows.
+
+`describes` is keyed by the component name, which is not always the npm package name. An entry can say where the
+component is published with `publish: { target, name }` (index format 1.2, optional), where `target` is `npm`,
+`pypi`, `crates`, `go` or `swift` and `name` is the package name on that target, e.g. `{ target: 'npm', name: 'fact-kit' }`
+for the component `fact-kit-js`. The check against the installed version follows `publish`:
+
+- `target` is `npm`: `readFacts` looks for `node_modules/<publish.name>/package.json` and compares that version.
+- `target` is anything else: nothing is compared, and the reader gets the latest published rows.
+- No `publish` (an index before 1.2, or an entry that leaves it out): the key of `describes` is the package name, as before.
+
+`check` reports `publish` when entries of one package disagree on it, and `reader.publish` returns the field as the index has it.
 
 `selectFacts(index, { version, include, platform, os })` is the same selection as a pure function over a parsed
 `index.json`. Each fact in the result is flattened to the row that applies, with that row's `since` and
 `stability`. Errors are `FactReadError` with a stable `code`: `not-an-index`, `unsupported-index-format`,
-`not-found` and `invalid-version`.
+`not-found`, `invalid-version` and `describes-behind` (the installed component is newer than `describes`).
 
 `get(id)` and `value(id)` throw for an unknown id, so a misspelled id fails the build; `has(id)` tests for
 one. `version` is the installed fact package's version, for citing where a fact came from.

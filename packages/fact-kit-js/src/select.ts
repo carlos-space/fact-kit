@@ -212,7 +212,7 @@ function removed(fact: Fact, reader: Reader, latest: Semver | undefined): boolea
 }
 
 /**
- * The facts one reader sees. A pure function over a parsed `index.json` of format 1.0 or 1.1.
+ * The facts one reader sees. A pure function over a parsed `index.json` of format 1.0, 1.1 or 1.2.
  *
  * Each fact has rows (`variants`, or the whole fact as one row). A row applies to the reader when its `since`
  * has been reached, its `pending` label is included, and its `platforms` and `os` conditions list the reader's

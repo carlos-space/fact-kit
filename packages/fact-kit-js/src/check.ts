@@ -343,6 +343,7 @@ export function checkFacts(options: CheckOptions): CheckResult {
   const factById = new Map<string, Fact>()
   const references: { id: string; field: string; target: string; spec?: string; location: string }[] = []
   let component: { name: string | null; file: string } | undefined
+  let publishOf: { text: string | null; file: string } | undefined
   const strict = options.strict !== false
   const specs = new Set<string>()
   const edges = new Map<string, string[]>()
@@ -465,6 +466,21 @@ export function checkFacts(options: CheckOptions): CheckResult {
         } else if (!component) {
           component = { name, file }
         }
+      }
+    }
+    if (input.source) {
+      // Every entry of a package is published as one thing, so they must agree on `publish`, absent included.
+      const publish = (input.index as Partial<FactIndex> | null)?.publish
+      const text = publish === undefined || publish === null ? null : JSON.stringify([publish.target, publish.name])
+      if (publishOf && publishOf.text !== text) {
+        const show = (t: string | null) => (t === null ? 'no publish' : `publish ${t}`)
+        problems.push({
+          code: 'publish',
+          message: `${file} has ${show(text)}, but ${publishOf.file} of the same package has ${show(publishOf.text)}`,
+          location: at(file, '/publish'),
+        })
+      } else if (!publishOf) {
+        publishOf = { text, file }
       }
     }
     if (doScan) scan(input.index, file, allowed, problems)

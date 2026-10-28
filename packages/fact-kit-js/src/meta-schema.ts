@@ -204,6 +204,13 @@ export const factSchema = {
   then: { properties: { source: { properties: { kind: { const: 'observed' } } } } },
 }
 
+const publishSchema = {
+  type: 'object',
+  required: ['target', 'name'],
+  additionalProperties: false,
+  properties: { target: { enum: ['npm', 'pypi', 'crates', 'go', 'swift'] }, name: nonEmptyString },
+}
+
 /** Meta-schema for a built `index.json`. */
 export const indexSchema = {
   $schema: DRAFT,
@@ -219,6 +226,7 @@ export const indexSchema = {
     component: nonEmptyString,
     formatVersion: nonEmptyString,
     describes: { type: 'object', additionalProperties: nonEmptyString },
+    publish: publishSchema,
     facts: { type: 'array', items: { $ref: FACT_SCHEMA_ID } },
   },
 }

@@ -328,6 +328,7 @@ describe('c003 readFacts: version default and onRead', () => {
       'get',
       'has',
       'package',
+      'publish',
       'value',
       'version',
     ])

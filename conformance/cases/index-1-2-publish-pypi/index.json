@@ -1,0 +1,26 @@
+{
+  "indexFormat": "1.2",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo-component": "0.50.0"
+  },
+  "publish": {
+    "target": "pypi",
+    "name": "demo"
+  },
+  "facts": [
+    {
+      "id": "demo.a",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.a",
+      "content": {
+        "value": "a"
+      },
+      "source": {
+        "kind": "published"
+      }
+    }
+  ]
+}

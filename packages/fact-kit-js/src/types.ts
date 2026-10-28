@@ -104,9 +104,19 @@ export interface DerivedFact {
 /** Anything that can stand for a fact in `relates` and `factLink`. */
 export type FactLike = Fact | FactDecl | DerivedFact
 
+/** Where a registry publishes the described component. */
+export type PublishTarget = 'npm' | 'pypi' | 'crates' | 'go' | 'swift'
+
+/** Where the described component is published and its name there (the PublishName). */
+export interface PublishInfo {
+  target: PublishTarget
+  name: string
+}
+
 /** What a `facts/<entry>/index.ts` module default-exports, as written. */
 export interface FactsSource {
   describes: Record<string, string>
+  publish?: PublishInfo
   formatVersion?: string
   facts: (FactDecl | DerivedFact)[]
 }
@@ -115,13 +125,15 @@ export interface FactsSource {
 export interface FactsModule {
   /** The one component this entry describes and the latest published version it covers, e.g. `{ mainflow: '1.2.0' }`. */
   describes: Record<string, string>
+  /** Where the component is published, when the entry says so. Index format 1.2 and later. */
+  publish?: PublishInfo
   formatVersion?: string
   facts: Fact[]
 }
 
 /** The built `dist/<entry>/index.json`. */
 export interface FactIndex extends FactsModule {
-  /** `1.1` for what this version writes. A missing field reads as `1.0`. */
+  /** `1.2` for what this version writes. A missing field reads as `1.0`. */
   indexFormat?: string
   package: string
   entry: string
@@ -138,6 +150,7 @@ export interface Problem {
     | 'unknown-fact-id'
     | 'missing-schema-file'
     | 'describes'
+    | 'publish'
     | 'since-format'
     | 'ambiguous-rows'
     | 'top-level-content'

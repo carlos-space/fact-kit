@@ -54,7 +54,7 @@ let value = try reader.value("fact-kit-swift.package")  // content.value，型�
 ## 和 JS 版的差異
 
 - **`root` 必填。** JS 版預設用目前的工作目錄。Swift 版不這樣做，因為工作目錄在 Xcode 與測試主機下不固定，容易讀到錯的地方。
-- **不比對 `describes`。** JS 版在沒給 `version` 時，會拿 `describes` 和已安裝的產品版本比對。Swift 版不做，`reader.describes` 只是原樣回傳。
+- **不比對 `describes`。** JS 版在沒給 `version` 時，會拿 `describes` 和已安裝的產品版本比對。Swift 版不做，`reader.describes` 只是原樣回傳。`reader.publish`（`Publish?`，有 `target` 與 `name`）是 index 的 `publish` 欄位原樣回傳，沒有時是 `nil`，同樣不用來比對版本。
 - **不提供 `onRead`。**
 - JSON 用套件自己的解析器。物件保留 key 順序，重複的 key 取最後一個值，位置留在第一次出現的地方。落單的 UTF-16 代理字元會變成 U+FFFD。
 

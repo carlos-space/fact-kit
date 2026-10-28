@@ -106,6 +106,7 @@ describe('fact-kit.fact and fact-kit.index', () => {
       'describes',
       'facts',
       'formatVersion',
+      'publish',
     ])
   })
 })
@@ -426,14 +427,14 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, and no next row', () => {
+  it('keeps one 0.8.0 row for each fact that changed, and next rows only for the publish change', () => {
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
-      expect(
-        (fact.variants ?? []).filter((v) => v.since === 'next'),
-        fact.id,
-      ).toEqual([])
+      // Only the `publish` change (index 1.2) is not released yet.
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+        ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts'].includes(fact.id) ? 1 : 0,
+      )
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
     expect(changed.sort()).toEqual([
