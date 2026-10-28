@@ -126,7 +126,8 @@ case "$phase" in
     # 路徑搬過目錄時新路徑在基底不存在，「只有一邊改過」判斷不出來，一邊刪、一邊改也會被當成只改一邊。
     train_base="$(git log "$branch" --format='%(trailers:key=Release-Train-Base,valueonly)' | grep -m1 -E '^[0-9a-f]{7,40}$' || true)"
     [[ -n "$train_base" ]] || die "$branch 上找不到 Release-Train-Base trailer，無法決定差異範圍"
-    git merge-tree -h 2>&1 | grep -q -- '--merge-base' || die "git 版本太舊：合回需要 git merge-tree --merge-base（git 2.40 以上）"
+    # -h 以結束碼 129 結束，pipefail 之下不能接管線；新版 git 把選項印成 --[no-]merge-base。
+    [[ "$(git merge-tree -h 2>&1 || true)" == *merge-base* ]] || die "git 版本太舊：合回需要 git merge-tree --merge-base（git 2.40 以上）"
     sync_branch="${branch}--to-main"
     [[ -z "$(git ls-remote --heads origin "refs/heads/$sync_branch")" ]] \
       || die "遠端已有 ${sync_branch}（上次合回留下的）：先關掉它的 PR 並刪除該分支，再重跑本階段"
