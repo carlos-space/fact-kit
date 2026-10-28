@@ -235,7 +235,7 @@ train_units_by_manifest() {
   return 0
 }
 
-# product tags: vX.Y.Z from the version after 0.2.0 on, product/vX.Y.Z before
+# product tags: vX.Y.Z
 source "$(dirname "${BASH_SOURCE[0]}")/product-tags.sh"
 # release stages (alpha → beta → rc → ga) and the steps that move a train between them
 source "$(dirname "${BASH_SOURCE[0]}")/release-stages.sh"
