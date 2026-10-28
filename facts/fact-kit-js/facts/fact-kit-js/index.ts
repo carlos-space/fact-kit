@@ -1097,6 +1097,58 @@ const newApi = [
   },
 ]
 
+/** The helpers a converter script shares: formatting, stable JSON, schema normalization and pinned upstream files. */
+const converterLibApi = [
+  {
+    name: 'writeFormatted',
+    signature: 'writeFormatted(file: string, text: string) => Promise<void>',
+    summary:
+      'Writes `text` to `file` formatted with the prettier settings that `resolveConfig(file)` finds (none when there is no config), so a rerun gives the same bytes. Creates the parent directories. `prettier` is an optional peer dependency that is loaded when the function runs, and a missing package throws an error that names what to install: `pnpm add -D prettier@3`.',
+  },
+  {
+    name: 'stableJson',
+    signature: 'stableJson(value: unknown) => string',
+    summary:
+      'JSON with two-space indent and the keys of every object in code-unit order, for generated files. Arrays keep their order. There is no trailing newline.',
+  },
+  {
+    name: 'DRAFT_2020_12',
+    signature: "const DRAFT_2020_12: 'https://json-schema.org/draft/2020-12/schema'",
+    summary:
+      'The `$schema` URL of JSON Schema 2020-12. It is the value `interfaceToJsonSchema` and `normalizeSchema` put in `$schema`.',
+  },
+  {
+    name: 'NormalizeOptions',
+    signature: 'interface NormalizeOptions { describe?, drop?, notes? }',
+    summary:
+      'The options of `normalizeSchema`. `describe(text) => string` is called for each `description` and returns the text to keep. `drop` lists keywords to remove at any depth. `notes` is a `Map<string, number>` that counts what was dropped or rewritten, for the converter report. A type, exported with `export type`.',
+  },
+  {
+    name: 'normalizeSchema',
+    signature: 'normalizeSchema(input: JsonSchema, options?: NormalizeOptions) => JsonSchema',
+    summary:
+      'Rewrites a JSON Schema from another dialect (draft-07, OpenAPI 3.0) to 2020-12, only where a schema is expected, so a property named `items` or `deprecated` is left alone. `definitions` becomes `$defs` and `#/definitions/` references follow. A tuple `items: [...]` becomes `prefixItems` and `additionalItems` becomes `items`. A string `deprecated` becomes `true` and its message is appended to `description` as `Deprecated: <message>`. `nullable: true` adds `null` to `type`. `dependencies` splits into `dependentRequired` and `dependentSchemas`. `x-` keywords that fact-kit does not register (`X_KEYWORDS`), `$id`, `id` and the keywords in `drop` are removed. The result starts with `$schema` set to `DRAFT_2020_12`.',
+  },
+  {
+    name: 'PinnedSource',
+    signature: 'interface PinnedSource { repo, commit, path, sha256, license }',
+    summary:
+      'An upstream file pinned to a commit: `repo` is `owner/name`, `commit` is the full SHA, `path` is the file in the repository, `sha256` is the hex digest of its bytes and `license` is an SPDX id. A type, exported with `export type`.',
+  },
+  {
+    name: 'sourceUrl',
+    signature: 'sourceUrl(source: PinnedSource) => string',
+    summary:
+      'The GitHub page of the pinned file at its commit (`blob/<commit>/<path>` of the repository), where a reader opens it.',
+  },
+  {
+    name: 'readPinned',
+    signature: 'readPinned(source: PinnedSource, options: { cacheDir: string }) => Promise<string>',
+    summary:
+      'The text of the pinned file. Reads `<cacheDir>/<sha256>.txt` when it exists, otherwise downloads the file at that commit from the raw-content address of GitHub, checks the sha256 and writes the cache. `cacheDir` is required, so the cache place does not depend on the working directory. Throws `<repo>/<path>: sha256 is <actual>, expected <sha256>` when the bytes do not match, also for a cached file, and `<url>: HTTP <status>` when the download fails.',
+  },
+]
+
 const facts: FactDecl[] = [
   fact({
     id: 'fact-kit.fact',
@@ -1352,6 +1404,7 @@ const facts: FactDecl[] = [
         },
         add: { '/exports': newApi },
       },
+      { since: 'next', add: { '/exports': converterLibApi } },
     ),
   }),
   fact({
@@ -1359,9 +1412,24 @@ const facts: FactDecl[] = [
     topics: ['convert', 'authoring'],
     title: { en: 'Converters and the optional TypeScript peer dependency' },
     description: {
-      en: 'The converters read TypeScript with the TypeScript 7.1 API, which starts a native compiler process. `typescript` is an optional peer dependency that is loaded when a converter runs, and a converter throws an error that names the package to install when it is missing.',
+      en: 'The converters read TypeScript with the TypeScript 7.1 API, which starts a native compiler process. `typescript` is an optional peer dependency that is loaded when a converter runs, and a converter throws an error that names the package to install when it is missing. `writeFormatted` loads the optional peer dependency `prettier` the same way.',
     },
-    content: { value: converters },
+    variants: history(
+      { since: '0.0.0', value: converters },
+      {
+        since: 'next',
+        set: {
+          '/optionalPeers': [
+            {
+              peerDependency: 'prettier',
+              range: '>=3.0.0',
+              install: 'pnpm add -D prettier@3',
+              usedBy: ['writeFormatted'],
+            },
+          ],
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.example-group',
