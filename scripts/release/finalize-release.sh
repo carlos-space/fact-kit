@@ -121,9 +121,9 @@ case "$phase" in
     # 修好、GA 前 squash 帶回 main，兩邊內容相同的改動都直接合併，不會重套。逐個 commit 套用會把這些
     # 改動再套一次而衝突，因為 squash 合併後 patch-id 與 cherry-pick 紀錄都對不上。
     # 設定檔留 main 的版本，發布分支的 prerelease 設定不進 main；manifest 由下一步另外合併。
-    # 其他衝突逐一路徑再判一次三方：兩邊內容相同，或只有一邊相對基底改過、合併結果取了改過的那邊，
-    # 才放行。這類衝突來自改名配對不唯一（例如內容相同的檔一起搬目錄），路徑層級其實沒有衝突。
-    # 兩邊都改了同一個路徑（含一邊刪、一邊改）一律停下手動處理。
+    # 其他衝突只在 main 與發布分支在該路徑的內容完全相同（含兩邊都沒有這個檔）時放行。這類衝突來自
+    # 改名配對不唯一，例如內容相同的檔一起搬目錄，git 配錯了來源。兩邊內容不同就停下手動處理：
+    # 路徑搬過目錄時新路徑在基底不存在，「只有一邊改過」判斷不出來，一邊刪、一邊改也會被當成只改一邊。
     train_base="$(git log "$branch" --format='%(trailers:key=Release-Train-Base,valueonly)' | grep -m1 -E '^[0-9a-f]{7,40}$' || true)"
     [[ -n "$train_base" ]] || die "$branch 上找不到 Release-Train-Base trailer，無法決定差異範圍"
     git merge-tree -h 2>&1 | grep -q -- '--merge-base' || die "git 版本太舊：合回需要 git merge-tree --merge-base（git 2.40 以上）"
@@ -141,11 +141,8 @@ case "$phase" in
       unresolved=()
       while IFS= read -r p; do
         [[ -z "$p" || "$p" == "$CONFIG" || "$p" == "$MANIFEST" ]] && continue
-        b="$(blob "$train_base" "$p")" m="$(blob origin/main "$p")" t="$(blob "$branch" "$p")" r="$(blob "$tree" "$p")"
-        if [[ "$m" == "$t" && "$r" == "$m" ]] || [[ "$m" == "$b" && "$r" == "$t" ]] || [[ "$t" == "$b" && "$r" == "$m" ]]; then
-          continue
-        fi
-        unresolved+=("$p")
+        m="$(blob origin/main "$p")" t="$(blob "$branch" "$p")" r="$(blob "$tree" "$p")"
+        [[ "$m" == "$t" && "$r" == "$m" ]] || unresolved+=("$p")
       done < <(tail -n +2 <<< "$merged" | sort -u)
       (( ${#unresolved[@]} == 0 )) || die "合回有衝突要手動處理：${unresolved[*]}"
       git read-tree -u --reset "$tree"
