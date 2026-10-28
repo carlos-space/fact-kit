@@ -248,7 +248,7 @@ jobs:
       group: mirror
       cancel-in-progress: false
     steps:
-      # Full history and tags: git subtree split reads every commit that touched the package.
+      # Tags: mirror-units.sh reads the tree and the commit of each unit release tag.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0

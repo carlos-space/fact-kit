@@ -6,20 +6,21 @@
 #   Go     v<version>    (0.3.0-alpha.2 -> v0.3.0-alpha.2)    the Go proxy needs the "v"
 #   Swift  <version>     (0.3.0-alpha.2 -> 0.3.0-alpha.2)     SwiftPM reads SemVer tags without the "v"
 #
-# The mirror history is `git subtree split --prefix=<unit path>` of the unit's release tag
-# (<component>/v<version>, see unit_tag). The split is deterministic: the same source commits give the same mirror
-# commits, and a later release descends from an earlier one on the release branch, so every release is a
-# fast-forward of main and a rerun computes the commit it pushed the first time. The script never forces a push.
+# Each release is one mirror commit: the tree of <unit path> at the unit's release tag (<component>/v<version>, see
+# unit_tag), on top of the mirror's main. Its author, committer and dates are those of the release tag's commit, so
+# the same tag on the same main always gives the same commit. The mirror does not carry the source history: a
+# release line is cut from main, the previous line came back to main as a squash, so the source commits of two lines
+# are not ancestors of each other, while the Go proxy and SwiftPM only read the tags. The script never forces a push.
 #
-# A rerun is safe:
-#   - the mirror tag exists and points at the split commit: nothing to do
-#   - the mirror tag exists and points elsewhere: refuse, because a published version must not move
-#   - the split commit is already part of main (an older version dispatched again): only the tag is pushed
-#   - main is not an ancestor of the split commit: refuse (someone pushed to the mirror, or history was rewritten)
+# main is always the commit of the highest version tagged in the mirror. A rerun is safe:
+#   - the mirror tag exists and its tree is the unit's tree at the release tag: nothing to do
+#   - the mirror tag exists with another tree: refuse, because a published version must not move
+#   - a higher version is already tagged (an older version dispatched again): only the tag is pushed, main stays
+#   - main is not the commit of the highest tag: refuse (someone pushed to the mirror by hand)
 #
 # usage: mirror-units.sh [--dry-run] <path>...      units that are not Go or Swift are skipped
-#   --dry-run         split and print what would be pushed (commit, tag, file list); nothing is written. Without a
-#                     release tag the split runs on HEAD, so the unit can be rehearsed on a branch.
+#   --dry-run         print what would be pushed (commit, tag, file list); nothing is written. Without a release tag
+#                     the unit's tree is taken from HEAD, so the unit can be rehearsed on a branch.
 #   MIRROR_OWNER      owner of the mirror repositories (default carlos-space); the repository is the component name
 #   MIRROR_REMOTE     full remote URL or path, replaces owner/component (tests use a local bare repository)
 #   MIRROR_PUSH_TOKEN GitHub App token with contents: write on the mirror repositories; sent as an HTTP header, never in a URL
@@ -40,6 +41,19 @@ mirror_tag() {
   esac
 }
 
+# version_gt <a> <b> → success when version a is above b (X.Y.Z or X.Y.Z-<alpha|beta|rc>.N)
+version_gt() {
+  local a="$1" b="$2" sa="${1%%-*}" sb="${2%%-*}"
+  [[ "$a" != "$b" ]] || return 1
+  if [[ "$sa" != "$sb" ]]; then
+    [[ "$(printf '%s\n%s\n' "$sa" "$sb" | sort -V | tail -1)" == "$sa" ]]
+    return
+  fi
+  [[ "$a" != "$sa" ]] || return 0 # a is the release, b a pre-release of it
+  [[ "$b" != "$sb" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "${a#*-}" "${b#*-}" | sort -V | tail -1)" == "${a#*-}" ]]
+}
+
 # git against the mirror, with the token as a header when there is one
 mgit() {
   if [[ -n "${MIRROR_PUSH_TOKEN:-}" ]]; then
@@ -50,7 +64,7 @@ mgit() {
 }
 
 mirror_unit() { # mirror_unit <path>
-  local p="${1%/}" reg ver comp remote mtag ref sha tagged main errs
+  local p="${1%/}" reg ver comp remote mtag ref tree sha tagged main top="" topsha="" s r an ae ad
   reg="$(unit_registry "$p" 2>/dev/null || true)"
   if [[ "$reg" != go && "$reg" != swift ]]; then info "$p: not a Go or Swift unit, skipped"; return 0; fi
   jq -e --arg p "$p" '.packages | has($p)' "$CONFIG" >/dev/null || die "unexpected package path: $p (not a key of packages in $CONFIG)"
@@ -63,32 +77,40 @@ mirror_unit() { # mirror_unit <path>
   ref="$(unit_tag "$p" "$ver")"
   if ! git rev-parse -q --verify "refs/tags/$ref^{commit}" >/dev/null 2>&1; then
     (( dry )) || die "release tag $ref does not exist, so $p $ver has not been released"
-    info "release tag $ref does not exist yet (dry run): splitting HEAD"
+    info "release tag $ref does not exist yet (dry run): taking the tree of HEAD"
     ref=HEAD
   fi
-  # subtree split writes a progress counter to stderr; keep it out of the log unless the split fails
-  errs="$(mktemp)"
-  sha="$(git subtree split --prefix="$p" "$ref" 2>"$errs")" || { tr '\r' '\n' < "$errs" >&2; rm -f "$errs"; die "$p: git subtree split failed"; }
-  rm -f "$errs"
-  [[ -n "$sha" ]] || die "$p: git subtree split produced no commit (is $p part of $ref?)"
+  tree="$(git rev-parse -q --verify "$ref:$p" 2>/dev/null)" && [[ "$(git cat-file -t "$tree")" == tree ]] || die "$p is not part of $ref"
   case "$reg" in
-    go) git cat-file -e "$sha:go.mod" 2>/dev/null || die "$p: the split root has no go.mod" ;;
-    swift) git cat-file -e "$sha:Package.swift" 2>/dev/null || die "$p: the split root has no Package.swift" ;;
+    go) git cat-file -e "$tree:go.mod" 2>/dev/null || die "$p: the unit has no go.mod at $ref" ;;
+    swift) git cat-file -e "$tree:Package.swift" 2>/dev/null || die "$p: the unit has no Package.swift at $ref" ;;
   esac
 
   # what the mirror has now (a read; works without a token on a public repository)
-  tagged="$(mgit ls-remote "$remote" "refs/tags/$mtag" | cut -f1)"
+  tagged="$(mgit ls-remote --refs "$remote" "refs/tags/$mtag" | cut -f1)"
   main="$(mgit ls-remote "$remote" refs/heads/main | cut -f1)"
   local action=push
   if [[ -n "$tagged" ]]; then
-    [[ "$tagged" == "$sha" ]] || die "$comp already has tag $mtag at ${tagged:0:12}, but $ref splits to ${sha:0:12}; a published version must not move"
+    mgit fetch -q --no-tags "$remote" "refs/tags/$mtag"
+    [[ "$(git rev-parse "$tagged^{tree}")" == "$tree" ]] || die "$comp already has tag $mtag at ${tagged:0:12} with other content than $p at $ref; a published version must not move"
+    sha="$tagged"
     action=none
-  elif [[ -n "$main" ]]; then
-    mgit fetch -q --no-tags "$remote" refs/heads/main
-    if git merge-base --is-ancestor "$sha" "$main" 2>/dev/null; then action=tag-only
-    elif ! git merge-base --is-ancestor "$main" "$sha" 2>/dev/null; then
-      die "$comp main (${main:0:12}) is not an ancestor of $ref's split (${sha:0:12}); pushing would not be a fast-forward"
+  else
+    while IFS=$'\t' read -r s r; do
+      r="${r#refs/tags/}"
+      [[ "$reg" != go ]] || r="${r#v}"
+      version_stage "$r" >/dev/null 2>&1 || continue
+      if [[ -z "$top" ]] || version_gt "$r" "$top"; then top="$r"; topsha="$s"; fi
+    done < <(mgit ls-remote --refs --tags "$remote")
+    if [[ -n "$main" ]]; then
+      [[ "$main" == "$topsha" ]] || die "$comp main (${main:0:12}) is not the commit of its highest tag${top:+ $(mirror_tag "$reg" "$top") (${topsha:0:12})}; someone pushed to the mirror by hand"
+      mgit fetch -q --no-tags "$remote" refs/heads/main
     fi
+    IFS=$'\x1f' read -r an ae ad < <(git log -1 --format='%an%x1f%ae%x1f%aI' "$ref")
+    sha="$(GIT_AUTHOR_NAME="$an" GIT_AUTHOR_EMAIL="$ae" GIT_AUTHOR_DATE="$ad" \
+      GIT_COMMITTER_NAME="$an" GIT_COMMITTER_EMAIL="$ae" GIT_COMMITTER_DATE="$ad" \
+      git commit-tree --no-gpg-sign "$tree" ${main:+-p "$main"} -m "$comp $ver" -m "Source: $ref ($(git rev-parse "$ref^{commit}"))")"
+    if [[ -n "$top" ]] && version_gt "$top" "$ver"; then action=tag-only; fi
   fi
 
   local report
@@ -96,7 +118,7 @@ mirror_unit() { # mirror_unit <path>
     echo "## $comp  ($p $ver)"
     echo "source        $ref"
     echo "mirror        $remote"
-    echo "split commit  $sha"
+    echo "mirror commit $sha"
     echo "mirror tag    $mtag"
     echo "remote main   ${main:-(empty)}"
     echo "action        $action"
