@@ -448,15 +448,15 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10 and 0.11 changes, and one next row for the interfaceToJsonSchema rules only', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11 and 0.11.1 changes, and no next row', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
     // The package name rules (fact-kit.facts-package-naming has one row and no variants).
     const in011 = ['fact-kit.problem-codes', 'fact-kit.check-rules', 'fact-kit.aggregate-layout']
-    // Not released yet: the recursion and function member rules of interfaceToJsonSchema.
-    const inNext = ['fact-kit.converters']
+    // Released in 0.11.1-alpha.1: the recursion and function member rules of interfaceToJsonSchema.
+    const in0111 = ['fact-kit.converters']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -469,9 +469,10 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.0').length, fact.id).toBe(
         in011.includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
-        inNext.includes(fact.id) ? 1 : 0,
+      expect((fact.variants ?? []).filter((v) => v.since === '0.11.1-alpha.1').length, fact.id).toBe(
+        in0111.includes(fact.id) ? 1 : 0,
       )
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)

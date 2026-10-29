@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.1-alpha.1...fact-kit-js/v0.11.1) (2026-10-29)
+
+
+### chore
+
+* **release/v0.6:** fact-kit-js 0.11.1 ([96dce72](https://github.com/carlos-space/fact-kit/commit/96dce7222a292a9e813f1baef983109abcd88b20))
+
+## [0.11.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.0...fact-kit-js/v0.11.1-alpha.1) (2026-10-29)
+
+
+### Fixed
+
+* **js:** interfaceToJsonSchema 轉得出遞迴型別、方法與函式型別屬性 ([#92](https://github.com/carlos-space/fact-kit/issues/92)) ([f26af63](https://github.com/carlos-space/fact-kit/commit/f26af63a1f2d63d61f4780e4833594d5dba2ca1a))
+
 ## [0.11.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.0-alpha.1...fact-kit-js/v0.11.0) (2026-10-28)
 
 

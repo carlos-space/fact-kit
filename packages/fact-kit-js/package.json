@@ -1,6 +1,6 @@
 {
   "name": "fact-kit",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Tooling to declare, check and build facts",
   "license": "MIT",
   "type": "module",
