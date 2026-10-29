@@ -1517,7 +1517,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.11.1-alpha.1',
         replace: {
           '/exports': [
             {
