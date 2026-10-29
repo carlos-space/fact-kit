@@ -15,6 +15,16 @@ pnpm add -D fact-kit
 installed with fact-kit. Install `typescript` to use the converters and `prettier` to use `writeFormatted` (see
 Converting). `oxc-parser` is loaded by `diff --impact` when it scans TypeScript source.
 
+### Version range
+
+List fact-kit in the facts package's `devDependencies` with a `^` range, for example `"fact-kit": "^0.8.0"`, not a
+pinned `0.8.0`. A pinned version makes one workspace install two copies of fact-kit as soon as its packages differ
+by a patch.
+
+While fact-kit is 0.x, `^0.8.0` accepts `>=0.8.0 <0.9.0`, so it locks the minor. A 0.x minor may be incompatible, so
+moving to the next minor is an explicit upgrade. From 1.0 on, `^1.0.0` accepts `>=1.0.0 <2.0.0` and excludes
+prereleases.
+
 ## Authoring
 
 A package holds one directory per entry: `facts/<entry>/index.ts`, which default-exports
