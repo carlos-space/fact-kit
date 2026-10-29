@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.0...fact-kit-js/v0.11.1-alpha.1) (2026-10-29)
+
+
+### Fixed
+
+* **js:** interfaceToJsonSchema 轉得出遞迴型別、方法與函式型別屬性 ([#92](https://github.com/carlos-space/fact-kit/issues/92)) ([f26af63](https://github.com/carlos-space/fact-kit/commit/f26af63a1f2d63d61f4780e4833594d5dba2ca1a))
+
 ## [0.11.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.0-alpha.1...fact-kit-js/v0.11.0) (2026-10-28)
 
 
