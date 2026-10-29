@@ -55,7 +55,7 @@ jobs:
       - name: Product GitHub Release (notes = Snapshot)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ inputs.tag || github.ref_name }}" --title "Product v${{ steps.snap.outputs.version }}" --notes-file snapshot.md || echo "release exists"
+        run: gh release create "${{ inputs.tag || github.ref_name }}" --title "${{ inputs.tag || github.ref_name }}" --notes-file snapshot.md || echo "release exists"
       # 治理同步：這一版的 release PR 已合回 main，排入這一版（label release:vX.Y.Z）的 Issue 全部關閉。
       # 功能 Issue 由功能 PR 的 Closes 關閉，staging 修補只寫 Refs，由 release PR 集中 Closes。GitHub
       # 在 commit 進入預設分支後才非同步關閉 Issue，所以仍開著的 Issue 會重查幾次再判定。
