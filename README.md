@@ -1,6 +1,10 @@
 # fact-kit
 
-撰寫、檢查、建置與讀取 facts 的工具。一筆 fact 是由工具決定、使用者必須照著做或一定會遇到的事，例如指令、設定欄位、hook 事件與行為。fact 以 JSON 與 JSON Schema 發布，讀取時不需要 fact-kit。
+撰寫、檢查、建置與讀取 facts 的工具。facts 是產品定義與規格的單一來源，記錄每個版本是什麼、做什麼、接受什麼。一筆 fact 是由工具決定、使用者必須照著做或一定會遇到的事，例如指令、設定欄位、hook 事件與行為。
+
+文件、測試與提示詞都讀 facts，實作不讀，由測試比對實作有沒有偏離。facts 不含實作方法與決策理由，這兩樣寫在決策文件。fact 以 JSON 與 JSON Schema 發布，讀取時不需要 fact-kit。
+
+facts 套件用 `^` 範圍依賴 fact-kit，0.x 時等於鎖住 minor。規則與原因寫在 JS 套件說明的 [Version range](packages/fact-kit-js/README.md#version-range) 一節。
 
 ## 內容
 
