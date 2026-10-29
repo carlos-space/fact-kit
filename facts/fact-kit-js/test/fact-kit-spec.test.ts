@@ -448,13 +448,15 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9 and 0.10 changes, and one next row for the naming rules only', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10 and 0.11 changes, and one next row for the interfaceToJsonSchema rules only', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
     // The package name rules (fact-kit.facts-package-naming has one row and no variants).
     const in011 = ['fact-kit.problem-codes', 'fact-kit.check-rules', 'fact-kit.aggregate-layout']
+    // Not released yet: the recursion and function member rules of interfaceToJsonSchema.
+    const inNext = ['fact-kit.converters']
     for (const fact of specIndex.facts) {
       const rows = (fact.variants ?? []).filter((v) => v.since === '0.8.0')
       expect(rows.length, fact.id).toBeLessThanOrEqual(1)
@@ -467,10 +469,9 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.0').length, fact.id).toBe(
         in011.includes(fact.id) ? 1 : 0,
       )
-      expect(
-        (fact.variants ?? []).some((v) => v.since === 'next'),
-        fact.id,
-      ).toBe(false)
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+        inNext.includes(fact.id) ? 1 : 0,
+      )
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -541,6 +542,20 @@ describe('fact-kit.converters', () => {
     expect(pkg.dependencies?.[prettier.peerDependency]).toBeUndefined()
     expect(prettier.install).toBe('pnpm add -D prettier@3')
     expect(readFileSync(join(kitSrc, 'peer.ts'), 'utf8')).toContain("prettier: 'prettier@3'")
+  })
+
+  it('describes the recursion and function member rules of interfaceToJsonSchema from the next release only', () => {
+    const summaryAt = (version: string): string => {
+      const fact = selectFacts(specIndex, { version }).find((f) => f.id === 'fact-kit.converters')
+      const value = (fact?.content as { value: { exports: { name: string; summary: string }[] } }).value
+      return value.exports.find((e) => e.name === 'interfaceToJsonSchema')!.summary
+    }
+    expect(summaryAt('0.11.0')).toBe(
+      'An interface or type alias as a JSON Schema 2020-12 document. Referenced types become `$defs`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported.',
+    )
+    expect(summaryAt('head')).toBe(
+      'An interface or type alias as a JSON Schema 2020-12 document. A named interface or alias becomes a `$defs` entry, and a generic instantiation such as `Record<string, unknown>` is written in place. A type that refers to itself is a `$defs` entry that every place it appears references with `$ref`, an instantiation such as `Tree<string>` included. An instantiation is named as TypeScript prints it, such as `Tree<string>`, and a root type that refers to itself is also written out at the top. A generic type that makes a new instantiation at each level, such as `next?: Nest<Box<T>>` inside `Nest<T>`, throws an error that names it. A method is left out, and a property whose type is a function becomes `{ "$comment": "<signature>" }` with the signature as TypeScript prints it, such as `(n: number) => string`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported. An error thrown while converting is not replaced by an error from closing the compiler process.',
+    )
   })
 })
 

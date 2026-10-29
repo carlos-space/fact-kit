@@ -735,11 +735,30 @@ TypeScript 7 runs its compiler as a native process, which `interfaceToJsonSchema
 before it returns. Install the `typescript` package on the platform that runs the conversion, because
 the native binary comes as a platform package.
 
-| Function                                                                                 | Reads                                                      | Returns                                                                                                                                                                                                                                        |
-| :--------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `readStringTuplesFromFile(path)`, `readStringTuples(source)`                             | `export declare const X: readonly ['a', 'b']` in a `.d.ts` | Each tuple's name and values                                                                                                                                                                                                                   |
-| `interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? })` | An interface or type alias in a `.d.ts`                    | A JSON Schema 2020-12 document; referenced types become `$defs`. JSDoc becomes `description`; `descriptions: false` removes every `description`. Union members and enum values keep the order of the source, and a tuple becomes `prefixItems` |
-| `readJsonSchemaFile(path)`                                                               | A JSON Schema file                                         | The parsed schema                                                                                                                                                                                                                              |
+| Function                                                                                 | Reads                                                      | Returns                                                    |
+| :--------------------------------------------------------------------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------- |
+| `readStringTuplesFromFile(path)`, `readStringTuples(source)`                             | `export declare const X: readonly ['a', 'b']` in a `.d.ts` | Each tuple's name and values                               |
+| `interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? })` | An interface or type alias in a `.d.ts`                    | A JSON Schema 2020-12 document, written by the rules below |
+| `readJsonSchemaFile(path)`                                                               | A JSON Schema file                                         | The parsed schema                                          |
+
+`interfaceToJsonSchema` writes the document by these rules:
+
+- A named interface or alias becomes a `$defs` entry, and a generic instantiation such as
+  `Record<string, unknown>` is written in place.
+- A type that refers to itself is a `$defs` entry that every place it appears references with `$ref`,
+  an instantiation such as `Tree<string>` included. An instantiation is named as TypeScript prints it,
+  such as `Tree<string>` (referenced as `#/$defs/Tree%3Cstring%3E`), and a root type that refers to
+  itself is also written out at the top.
+- A generic type that makes a new instantiation at each level, such as `next?: Nest<Box<T>>` inside
+  `Nest<T>`, throws an error that names it.
+- A method is left out, and a property whose type is a function becomes
+  `{ "$comment": "<signature>" }` with the signature as TypeScript prints it, such as
+  `(n: number) => string`.
+- Union members and enum values keep the order of the source, `0 | number` keeps both members, and a
+  tuple becomes `prefixItems`.
+- JSDoc becomes `description`, and `descriptions: false` removes every `description`.
+- Type errors in the input are not reported. An error thrown while converting is not replaced by an
+  error from closing the compiler process.
 
 A converter script that writes a fact's `converted.json` uses these helpers, so reruns give the same bytes:
 
