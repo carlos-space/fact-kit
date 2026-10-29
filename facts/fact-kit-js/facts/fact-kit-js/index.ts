@@ -693,6 +693,9 @@ const moduleApi = {
   ],
 }
 
+const interfaceToJsonSchemaSignature =
+  'interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? }) => Promise<JsonSchema>'
+
 const converters = {
   requires: {
     peerDependency: 'typescript',
@@ -700,31 +703,33 @@ const converters = {
     optional: true,
     install: 'pnpm add -D typescript@7.1.0-beta',
   },
-  exports: [
-    {
-      name: 'readStringTuples',
-      signature: 'readStringTuples(source: string) => Promise<Record<string, string[]>>',
-      summary:
-        'The string literal tuples exported by a TypeScript source, by name: `export declare const X: readonly [...]` and `export const X = [...] as const`. Parses only, so imports do not have to resolve.',
-    },
-    {
-      name: 'readStringTuplesFromFile',
-      signature: 'readStringTuplesFromFile(path: string) => Promise<Record<string, string[]>>',
-      summary: 'Reads the file and returns `readStringTuples` of it.',
-    },
-    {
-      name: 'interfaceToJsonSchema',
-      signature:
-        'interfaceToJsonSchema({ path, type, tsconfig?, additionalProperties?, descriptions? }) => Promise<JsonSchema>',
-      summary:
-        'An interface or type alias as a JSON Schema 2020-12 document. Referenced types become `$defs`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported.',
-    },
-    {
-      name: 'readJsonSchemaFile',
-      signature: 'readJsonSchemaFile(path: string) => Promise<JsonSchema>',
-      summary: 'Reads a JSON Schema file. Does not need TypeScript.',
-    },
-  ],
+  exports: keyed(
+    [
+      {
+        name: 'readStringTuples',
+        signature: 'readStringTuples(source: string) => Promise<Record<string, string[]>>',
+        summary:
+          'The string literal tuples exported by a TypeScript source, by name: `export declare const X: readonly [...]` and `export const X = [...] as const`. Parses only, so imports do not have to resolve.',
+      },
+      {
+        name: 'readStringTuplesFromFile',
+        signature: 'readStringTuplesFromFile(path: string) => Promise<Record<string, string[]>>',
+        summary: 'Reads the file and returns `readStringTuples` of it.',
+      },
+      {
+        name: 'interfaceToJsonSchema',
+        signature: interfaceToJsonSchemaSignature,
+        summary:
+          'An interface or type alias as a JSON Schema 2020-12 document. Referenced types become `$defs`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported.',
+      },
+      {
+        name: 'readJsonSchemaFile',
+        signature: 'readJsonSchemaFile(path: string) => Promise<JsonSchema>',
+        summary: 'Reads a JSON Schema file. Does not need TypeScript.',
+      },
+    ],
+    ['name'],
+  ),
 }
 
 const historyRowSchema = {
@@ -1507,6 +1512,19 @@ const facts: FactDecl[] = [
               range: '>=3.0.0',
               install: 'pnpm add -D prettier@3',
               usedBy: ['writeFormatted'],
+            },
+          ],
+        },
+      },
+      {
+        since: 'next',
+        replace: {
+          '/exports': [
+            {
+              name: 'interfaceToJsonSchema',
+              signature: interfaceToJsonSchemaSignature,
+              summary:
+                'An interface or type alias as a JSON Schema 2020-12 document. A named interface or alias becomes a `$defs` entry, and a generic instantiation such as `Record<string, unknown>` is written in place. A type that refers to itself is a `$defs` entry that every place it appears references with `$ref`, an instantiation such as `Tree<string>` included. An instantiation is named as TypeScript prints it, such as `Tree<string>`, and a root type that refers to itself is also written out at the top. A generic type that makes a new instantiation at each level, such as `next?: Nest<Box<T>>` inside `Nest<T>`, throws an error that names it. A method is left out, and a property whose type is a function becomes `{ "$comment": "<signature>" }` with the signature as TypeScript prints it, such as `(n: number) => string`. Union members and enum values keep the order of the source, `0 | number` keeps both members, and a tuple becomes `prefixItems`. JSDoc becomes `description`, and `descriptions: false` removes every `description`. Type errors in the input are not reported. An error thrown while converting is not replaced by an error from closing the compiler process.',
             },
           ],
         },
