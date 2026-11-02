@@ -1,1 +1,1 @@
-{ "allowedDomains": ["json-schema.org"], "testDirs": ["test"] }
+{ "allowedDomains": ["json-schema.org"], "testDirs": ["test"], "implDirs": ["../../packages/fact-kit-js/src"] }
