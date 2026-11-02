@@ -86,6 +86,18 @@ export function installedVersion(root: string, name: string): string | undefined
   }
 }
 
+/** An installed `index.json`, found and parsed, with where it came from. Nothing in `data` is checked. */
+export interface InstalledJson {
+  data: unknown
+  /** Path of the `index.json` that was read. */
+  file: string
+  packageName: string
+  /** Sub-path of the spec, empty when it names only the package. */
+  entry: string
+  /** `package.json` version of the fact package. */
+  packageVersion: string
+}
+
 /** An installed index, parsed and checked to be an index, with where it came from. */
 export interface InstalledIndex {
   index: FactIndex
@@ -99,11 +111,12 @@ export interface InstalledIndex {
 }
 
 /**
- * Finds and parses the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`.
- * Resolved at call time with `createRequire` based at `root`. Throws `FactReadError` when it can not be found
- * or is not an index.
+ * Finds and parses the installed `<package>[/<entry>]/index.json` as installed under `root`, and does not check
+ * what is in it. Resolved at call time with `createRequire` based at `root`. Use it when the caller checks the
+ * contents itself. Throws `FactReadError` with code `not-found` when the file can not be resolved, and with code
+ * `not-an-index` when it is not JSON.
  */
-export function loadInstalledIndex(spec: string, root: string): InstalledIndex {
+export function loadInstalledJson(spec: string, root: string): InstalledJson {
   const { packageName, entry } = splitSpec(spec)
   const require = createRequire(join(root, 'noop.js'))
   const target = entry ? `${packageName}/${entry}/index.json` : `${packageName}/index.json`
@@ -117,14 +130,24 @@ export function loadInstalledIndex(spec: string, root: string): InstalledIndex {
         `Install ${packageName} there and check that it exports "./${entry ? `${entry}/` : ''}index.json". (${(error as Error).message})`,
     )
   }
-  let parsed: unknown
+  let data: unknown
   try {
-    parsed = JSON.parse(readFileSync(file, 'utf8'))
+    data = JSON.parse(readFileSync(file, 'utf8'))
   } catch (error) {
     throw new FactReadError('not-an-index', `readFacts: ${file} is not a fact index (${(error as Error).message})`)
   }
-  assertIndex(parsed, `readFacts: ${file}`)
-  return { index: parsed as FactIndex, file, packageName, entry, packageVersion: owningVersion(file, packageName) }
+  return { data, file, packageName, entry, packageVersion: owningVersion(file, packageName) }
+}
+
+/**
+ * Finds and parses the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, and
+ * checks it to be an index: {@link loadInstalledJson} followed by `assertIndex`. Throws `FactReadError` when it
+ * can not be found or is not an index.
+ */
+export function loadInstalledIndex(spec: string, root: string): InstalledIndex {
+  const { data, file, packageName, entry, packageVersion } = loadInstalledJson(spec, root)
+  assertIndex(data, `readFacts: ${file}`)
+  return { index: data as FactIndex, file, packageName, entry, packageVersion }
 }
 
 /**

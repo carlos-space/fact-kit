@@ -78,16 +78,24 @@ export { pinVersion } from './pin.ts'
 export type { PinOptions, PinResult } from './pin.ts'
 export { mergeSince } from './merge-since.ts'
 export type { MergeSinceOptions, MergeSinceResult } from './merge-since.ts'
-export { impactOf } from './impact.ts'
-export type { Impact, ImpactOptions } from './impact.ts'
+export { impactOf, registerImpactExtractor } from './impact.ts'
+export type { Impact, ImpactExtractor, ImpactOptions } from './impact.ts'
 export { InputError, LoadError, loadEntries } from './load.ts'
 export type { LoadedEntry } from './load.ts'
-export { readFacts } from './read.ts'
-export type { FactRead, FactReader, ReadFactsOptions } from './read.ts'
-export { NO_SINCE, selectFacts } from './select.ts'
-export type { SelectOptions, SelectedFact } from './select.ts'
-export { FactReadError, compareVersions, releaseLine } from './version.ts'
-export type { ReadErrorCode } from './version.ts'
+export { installedVersion, loadInstalledIndex, loadInstalledJson, readFacts, splitSpec } from './read.ts'
+export type { FactRead, FactReader, InstalledIndex, InstalledJson, ReadFactsOptions } from './read.ts'
+export { NO_SINCE, assertIndex, factRows, selectFacts } from './select.ts'
+export type { Row, SelectOptions, SelectedFact } from './select.ts'
+export {
+  FactReadError,
+  compareSemver,
+  compareVersions,
+  mustParse,
+  parseVersion,
+  releaseLine,
+  sinceIssue,
+} from './version.ts'
+export type { ReadErrorCode, Semver, SinceIssue } from './version.ts'
 export { diffFacts, diffIndexFiles, diffIndexes } from './diff.ts'
 export type { IndexDiff } from './diff.ts'
 export { interfaceToJsonSchema, readJsonSchemaFile, readStringTuples, readStringTuplesFromFile } from './convert.ts'
@@ -104,3 +112,6 @@ export { normalizeSchema } from './normalize.ts'
 export type { NormalizeOptions } from './normalize.ts'
 export { readPinned, sourceUrl } from './pinned.ts'
 export type { PinnedSource } from './pinned.ts'
+export { BUILDER, isObject, isText, makeBuilt, registerBuilderCheck, setMark } from './markers.ts'
+export { applyEdits, findRows } from './rows.ts'
+export type { Edit, FindRowsOptions, SinceRow } from './rows.ts'

@@ -57,7 +57,7 @@ export async function resolveComponent(cwd: string, name: string): Promise<strin
 }
 
 /** Directories under `root` that hold an `index.json`, not looking inside `schemas`. */
-async function findIndexDirs(root: string): Promise<string[]> {
+export async function findIndexDirs(root: string): Promise<string[]> {
   const found: string[] = []
   async function walk(dir: string): Promise<void> {
     let items

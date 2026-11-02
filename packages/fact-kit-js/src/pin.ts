@@ -17,6 +17,8 @@ export interface PinOptions {
   configFile?: string
   /** Fact sources, relative to `cwd`. Defaults to the config, then `facts`. */
   factsDir?: string
+  /** Property names whose object value is data, not a row. Replaces the default list. Defaults to the config, then the built-in list. */
+  dataKeys?: readonly string[]
 }
 
 export interface PinResult {
@@ -45,6 +47,7 @@ export async function pinVersion(options: PinOptions): Promise<PinResult> {
   const oxc = await loadOxc()
   const config = await readConfig(cwd, options.configFile)
   const factsDir = join(cwd, options.factsDir ?? config.factsDir ?? 'facts')
+  const dataKeys = options.dataKeys ?? config.dataKeys
   const libDir = join(factsDir, '_lib')
   const files = (await walk(factsDir, CODE)).filter((f) => f !== libDir && !f.startsWith(libDir + sep))
 
@@ -58,7 +61,7 @@ export async function pinVersion(options: PinOptions): Promise<PinResult> {
       throw new InputError(`${rel}: cannot parse: ${(parsed.errors[0] as { message: string }).message}`)
     }
     const edits: Edit[] = []
-    for (const row of findRows(parsed.program)) {
+    for (const row of findRows(parsed.program, dataKeys ? { dataKeys } : {})) {
       if (!row.since) continue
       const last = row.since.kind === 'string' ? row.since.item : row.since.items[row.since.items.length - 1]
       if (last?.text !== 'next') continue

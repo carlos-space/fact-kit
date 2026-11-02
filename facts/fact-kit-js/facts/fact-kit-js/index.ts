@@ -1825,6 +1825,12 @@ const facts: FactDecl[] = [
               description:
                 'The most facts one `*.facts.ts` may hold. Only `split-size` reads it, and only when `splitRules` is `true`.',
             },
+            dataKeys: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Property names whose object value is data, not a row, for `pin` and `merge-since`. Replaces the built-in list. See `fact-kit.row-data-keys`.',
+            },
           },
         },
         set: {
@@ -1986,7 +1992,7 @@ const facts: FactDecl[] = [
         add: { '/exports': newApi },
       },
       { since: '0.10.0-alpha.1', add: { '/exports': converterLibApi } },
-      { ...planned, add: { '/exports': entryExports }, set: { '/kinds': exportKinds } },
+      { since: 'next', add: { '/exports': entryExports }, set: { '/kinds': exportKinds } },
     ),
   }),
   fact({
@@ -2143,7 +2149,7 @@ const facts: FactDecl[] = [
     topics: ['pin', 'merge-since', 'config'],
     title: { en: 'Keys that pin and merge-since treat as data' },
     description: { en: 'The setting that decides which property names `pin` and `merge-since` do not read rows in.' },
-    variants: [{ ...planned, content: { value: rowDataKeys } }],
+    variants: [{ since: 'next', content: { value: rowDataKeys } }],
   }),
   fact({
     id: 'fact-kit.impact-extractors',
@@ -2152,7 +2158,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'How a package adds the way `impactOf` finds references to a fact in a kind of file the built-in extractors do not read.',
     },
-    variants: [{ ...planned, content: { value: impactExtractors } }],
+    variants: [{ since: 'next', content: { value: impactExtractors } }],
   }),
 ]
 

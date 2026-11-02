@@ -1,12 +1,14 @@
 import { readdir, readFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { planAggregate } from './aggregate.ts'
+import { findIndexDirs, planAggregate } from './aggregate.ts'
+import type { PlacedExamples } from './aggregate.ts'
 import { readConfig } from './project.ts'
 import { readPackageName } from './load.ts'
 import { loadOxc } from './oxc.ts'
 import type { ExampleGroup, ExampleScenario } from './examples.ts'
 import type { OxcModule } from './oxc.ts'
+import type { FactIndex } from './types.ts'
 
 export interface Impact {
   /** The fact asked about, as given. */
@@ -31,6 +33,34 @@ export interface ImpactOptions {
   configFile?: string
   /** Directory the components' indexes were built into. Defaults to `dist`. */
   outDir?: string
+  /** Extractors for this call only. They run after the registered ones, and a name given twice keeps the last. */
+  extractors?: readonly ImpactExtractor[]
+}
+
+/** Finds the references to a fact in one kind of file of `docsDirs`. */
+export interface ImpactExtractor {
+  /** The built-in extractors are `markdown` and `typescript`. One with the same name replaces the built-in. */
+  name: string
+  /** File extensions with the dot, such as `.mdx`. */
+  extensions: readonly string[]
+  /**
+   * `lookup` returns the id to report for a reference to the fact asked about, or to a fact computed from it,
+   * and undefined for any other.
+   */
+  extract(input: { file: string; text: string; lookup(reference: string): string | undefined }): {
+    line: number
+    id: string
+  }[]
+}
+
+const registered = new Map<string, ImpactExtractor>()
+
+/** Adds an extractor for the rest of the process. Returns a function that removes it. */
+export function registerImpactExtractor(extractor: ImpactExtractor): () => void {
+  registered.set(extractor.name, extractor)
+  return () => {
+    if (registered.get(extractor.name) === extractor) registered.delete(extractor.name)
+  }
 }
 
 const SKIPPED_DIRS = new Set(['node_modules', 'dist'])
@@ -134,6 +164,23 @@ const lineOf = (source: string, offset: number): number => {
   return line
 }
 
+/** The indexes a package without `aggregate` built itself, `<outDir>/<entry>/index.json`, under their published spec. */
+async function ownIndexes(cwd: string, outDir: string): Promise<{ spec: string; index: FactIndex }[]> {
+  const root = join(cwd, outDir)
+  const dirs = await findIndexDirs(root)
+  if (dirs.length === 0) {
+    throw new Error(`no built index under ${outDir}/ of ${cwd}. Build it first, or set "aggregate" in the config`)
+  }
+  const name = await readPackageName(cwd)
+  const out: { spec: string; index: FactIndex }[] = []
+  for (const dir of dirs) {
+    const index = JSON.parse(await readFile(join(dir, 'index.json'), 'utf8')) as FactIndex
+    const entry = typeof index.entry === 'string' ? index.entry : relative(root, dir).split(sep).join('/')
+    out.push({ spec: entry ? `${name}/${entry}` : name, index })
+  }
+  return out
+}
+
 /**
  * Finds what a change to the fact `id` reaches. `cwd` is an aggregate package: the built indexes of its
  * components give the facts, and `derivedFrom` gives the edges. `docsDirs` of the config are searched for
@@ -144,21 +191,24 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
   const cwd = resolve(options.cwd ?? process.cwd())
   const outDir = options.outDir ?? 'dist'
   const config = await readConfig(cwd, options.configFile)
-  if (!config.aggregate) {
-    throw new Error(
-      `${join(cwd, 'fact-kit.config.json')} has no "aggregate", so there are no component packages to read`,
-    )
+  let placed: { spec: string; index: FactIndex }[]
+  let placedExamples: PlacedExamples[] = []
+  if (config.aggregate) {
+    const plan = await planAggregate(cwd, await readPackageName(cwd), config.aggregate, outDir)
+    if (plan.problems.length > 0) throw new Error(plan.problems.map((p) => p.message).join('\n'))
+    placed = plan.placed
+    placedExamples = plan.examples
+  } else {
+    placed = await ownIndexes(cwd, outDir)
   }
-  const plan = await planAggregate(cwd, await readPackageName(cwd), config.aggregate, outDir)
-  if (plan.problems.length > 0) throw new Error(plan.problems.map((p) => p.message).join('\n'))
 
   // Node key: `<published spec>:<id>`.
   const keys = new Map<string, { spec: string; id: string }>()
   const downstream = new Map<string, string[]>()
-  for (const p of plan.placed) {
+  for (const p of placed) {
     for (const fact of p.index.facts) keys.set(`${p.spec}:${fact.id}`, { spec: p.spec, id: fact.id })
   }
-  for (const p of plan.placed) {
+  for (const p of placed) {
     for (const fact of p.index.facts) {
       for (const ref of fact.derivedFrom ?? []) {
         const upstream = ref.includes(':') ? ref : `${p.spec}:${ref}`
@@ -200,12 +250,26 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
   const lookup = (reference: string): string | undefined => byKey.get(reference) ?? byId.get(reference)
 
   const docs: Impact['docs'] = []
+  const custom = new Map<string, ImpactExtractor>(registered)
+  for (const e of options.extractors ?? []) custom.set(e.name, e)
+  const extractors = [...custom.values()]
+  const replaced = (name: string): boolean => custom.has(name)
   let oxc: OxcModule | undefined
   for (const dir of config.docsDirs ?? []) {
     const root = resolve(cwd, dir)
     for await (const file of walkFiles(root)) {
       const shown = relative(cwd, file).split(sep).join('/')
-      if (MARKDOWN.test(file)) {
+      const extension = extname(file)
+      const matching = extractors.filter((e) => e.extensions.includes(extension))
+      if (matching.length > 0) {
+        const text = await readFile(file, 'utf8')
+        for (const e of matching) {
+          for (const found of await e.extract({ file: shown, text, lookup })) {
+            docs.push({ file: shown, line: found.line, id: found.id })
+          }
+        }
+      }
+      if (MARKDOWN.test(file) && !replaced('markdown')) {
         const lines = (await readFile(file, 'utf8')).split('\n')
         for (const [i, text] of lines.entries()) {
           for (const m of text.matchAll(/fact:([^\s`'"()[\]<>,;]+)/g)) {
@@ -213,7 +277,7 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
             if (found !== undefined) docs.push({ file: shown, line: i + 1, id: found })
           }
         }
-      } else if (TYPESCRIPT.test(file) && !file.endsWith('.d.ts')) {
+      } else if (TYPESCRIPT.test(file) && !file.endsWith('.d.ts') && !replaced('typescript')) {
         const source = await readFile(file, 'utf8')
         // Skip the parser for a file that neither imports anything nor names any of the facts.
         const wanted = [...seen].map((k) => keys.get(k)?.id ?? k)
@@ -232,7 +296,7 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
           let hits = [...seen].filter((k) => keys.get(k)?.id === value.id)
           if (hits.length > 1) {
             const same = hits.filter((k) => {
-              const owner = plan.placed.find((p) => p.spec === keys.get(k)?.spec)
+              const owner = placed.find((p) => p.spec === keys.get(k)?.spec)
               return (
                 JSON.stringify(owner?.index.facts.find((f) => f.id === value.id)?.title) === JSON.stringify(value.title)
               )
@@ -245,7 +309,7 @@ export async function impactOf(id: string, options: ImpactOptions = {}): Promise
     }
   }
   const examples: Impact['examples'] = []
-  for (const placed of plan.examples) {
+  for (const placed of placedExamples) {
     for (const group of placed.file.examples) {
       if (typeof group !== 'object' || group === null) continue
       const g = group as Partial<ExampleGroup>
