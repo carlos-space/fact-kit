@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-py/v0.5.0-alpha.1...fact-kit-py/v0.5.0) (2026-11-02)
+
+
+### chore
+
+* **release/v0.7:** fact-kit-py 0.5.0 ([bea69f3](https://github.com/carlos-space/fact-kit/commit/bea69f395fe397ad8c61198212d246306abe1645))
+
 ## [0.5.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-py/v0.4.0...fact-kit-py/v0.5.0-alpha.1) (2026-11-02)
 
 
