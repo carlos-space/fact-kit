@@ -225,6 +225,7 @@ export const indexSchema = {
     entry: nonEmptyString,
     component: nonEmptyString,
     formatVersion: nonEmptyString,
+    dataFormatVersion: nonEmptyString,
     describes: { type: 'object', additionalProperties: nonEmptyString },
     publish: publishSchema,
     facts: { type: 'array', items: { $ref: FACT_SCHEMA_ID } },

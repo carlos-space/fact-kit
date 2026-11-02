@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
 import { buildFacts, readFacts, validateIndex } from '../src/index.ts'
@@ -139,5 +139,53 @@ describe('c002 aggregate build', () => {
     linkPackage(join(repo, 'agg'), '@npm/c', join(repo, 'c'))
     const result = await buildFacts({ cwd: join(repo, 'agg') })
     expect(result.problems[0]?.message).toContain('"@npm/c" has no built index under dist/. Build it first.')
+  })
+})
+
+describe('c003 aggregate and index format', () => {
+  async function aggregateOf(rewrite?: (index: Record<string, unknown>) => Record<string, unknown>) {
+    const repo = makeTmp('aggregate-format')
+    writeTree(repo, {
+      ...Object.fromEntries(
+        Object.entries(componentTree('@npm/c', { c: [{ id: 'c.one' }] })).map(([k, v]) => [`c/${k}`, v]),
+      ),
+      'agg/package.json': { name: 'agg-facts', version: '1.0.0', type: 'module' },
+      'agg/fact-kit.config.json': { aggregate: { '.': '@npm/c' } },
+    })
+    await buildFacts({ cwd: join(repo, 'c') })
+    if (rewrite) {
+      const file = join(repo, 'c/dist/c/index.json')
+      writeFileSync(file, JSON.stringify(rewrite(readJson(file))))
+    }
+    linkPackage(join(repo, 'agg'), '@npm/c', join(repo, 'c'))
+    const result = await buildFacts({ cwd: join(repo, 'agg') })
+    expect(result.problems).toEqual([])
+    return readJson(join(repo, 'agg/dist/index.json'))
+  }
+
+  test('a 2.0 component keeps both format keys, in the order of the format', async () => {
+    const out = await aggregateOf()
+    expect(Object.keys(out)).toEqual([
+      'indexFormat',
+      'formatVersion',
+      'package',
+      'entry',
+      'component',
+      'describes',
+      'facts',
+    ])
+    expect(out).toMatchObject({ indexFormat: '2.0', formatVersion: '2.0', component: '@npm/c' })
+  })
+
+  test('a 1.2 component is copied as it is: indexFormat and formatVersion are not changed', async () => {
+    const out = await aggregateOf(({ formatVersion: _drop, ...rest }) => ({
+      ...rest,
+      indexFormat: '1.2',
+      formatVersion: '4',
+    }))
+    expect(out.indexFormat).toBe('1.2')
+    expect(out.formatVersion).toBe('4')
+    expect(out.dataFormatVersion).toBeUndefined()
+    expect(out.component).toBe('@npm/c')
   })
 })

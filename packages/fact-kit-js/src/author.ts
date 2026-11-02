@@ -231,13 +231,23 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
     module: {
       describes: e.source.describes,
       ...(e.source.publish !== undefined ? { publish: e.source.publish } : {}),
-      ...(e.source.formatVersion !== undefined ? { formatVersion: e.source.formatVersion } : {}),
+      ...(e.source.dataFormatVersion !== undefined ? { dataFormatVersion: e.source.dataFormatVersion } : {}),
       facts: [],
     },
     problems: [],
     subsets: [],
     refs: [],
   }))
+  // The entry module has no `formatVersion` since index format 2.0: the build writes it from `indexFormat`.
+  for (const [ei, e] of entries.entries()) {
+    if ((e.source as unknown as Record<string, unknown>).formatVersion !== undefined) {
+      ;(out[ei] as ResolvedEntry).problems.push({
+        code: 'format',
+        message: '`formatVersion` is not a key of the entry module any more. Write `dataFormatVersion` instead',
+        location: at(e.origin, '/formatVersion'),
+      })
+    }
+  }
   // What each declared object ends up as, and where it lives.
   const registry = new Map<object, { entry: string; id: string }>()
   const decls: { entryIndex: number; at: string; decl: FactDecl }[] = []

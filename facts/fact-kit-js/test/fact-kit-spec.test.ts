@@ -103,9 +103,9 @@ describe('fact-kit.fact and fact-kit.index', () => {
       Object.keys(implIndexSchema.properties).sort(),
     )
     expect(Object.keys(content('fact-kit.entry-module').properties).sort()).toEqual([
+      'dataFormatVersion',
       'describes',
       'facts',
-      'formatVersion',
       'publish',
     ])
   })
@@ -483,9 +483,15 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.1-alpha.1').length, fact.id).toBe(
         in0111.includes(fact.id) ? 1 : 0,
       )
-      // A `next` row is allowed only while it is pending. These two read the 2.0 format already, and the `fact-kit pin`
-      // that runs at release time turns their `next` into the released version.
-      const nextAllowed = ['fact-kit.index-format-detection', 'fact-kit.read-facts']
+      // A `next` row is allowed only while it is pending. These facts describe the 2.0 format, which the readers and
+      // the build both have now, and the `fact-kit pin` that runs at release time turns their `next` into the released version.
+      const nextAllowed = [
+        'fact-kit.index-format-detection',
+        'fact-kit.read-facts',
+        'fact-kit.index',
+        'fact-kit.entry-module',
+        'fact-kit.index-format-boundaries',
+      ]
       expect(
         (fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending && !nextAllowed.includes(fact.id)).length,
         fact.id,
@@ -713,13 +719,8 @@ describe('fact-kit.facts-package-naming', () => {
   })
 })
 
-describe('index format 2.0 (pending index-v2)', () => {
-  const withPending = new Map(selectFacts(specIndex, { version: 'head', include: ['index-v2'] }).map((f) => [f.id, f]))
-  const pendingContent = (id: string): any => {
-    const f = withPending.get(id)
-    if (!f) throw new Error(`no fact ${id}`)
-    return 'schema' in f.content ? f.content.schema : (f.content as { value: unknown }).value
-  }
+describe('index format 2.0', () => {
+  const pendingContent = content
 
   it('writes the top-level keys of the index in the order of the build', () => {
     const schema = pendingContent('fact-kit.index')
@@ -741,10 +742,10 @@ describe('index format 2.0 (pending index-v2)', () => {
     expect(Object.keys(entry.properties)).toEqual(['describes', 'dataFormatVersion', 'publish', 'facts'])
   })
 
-  it('shows the reader rules to a reader on head without the label, and keeps the build rows behind it', () => {
-    expect(Object.keys(content('fact-kit.index').properties)).not.toContain('dataFormatVersion')
+  it('shows the reader rules and the build rows to a reader on head', () => {
+    expect(Object.keys(content('fact-kit.index').properties)).toContain('dataFormatVersion')
     expect(byId.has('fact-kit.index-format-detection')).toBe(true)
-    expect(byId.has('fact-kit.index-format-boundaries')).toBe(false)
+    expect(byId.has('fact-kit.index-format-boundaries')).toBe(true)
     expect(JSON.stringify(content('fact-kit.read-facts'))).not.toContain('index format other than 1.x')
     expect(JSON.stringify(content('fact-kit.read-facts'))).toContain('another major version than 1 and 2')
   })

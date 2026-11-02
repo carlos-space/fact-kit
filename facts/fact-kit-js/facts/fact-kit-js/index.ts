@@ -274,7 +274,7 @@ const entryModuleSchema = {
   },
 }
 
-// Index format 2.0 (pending `index-v2`). The keys are in the order `build` writes them.
+// Index format 2.0. The keys are in the order `build` writes them.
 const indexV2Keys = {
   indexFormat: {
     type: 'string',
@@ -1745,7 +1745,7 @@ const facts: FactDecl[] = [
           '/properties/publish': publishSchema,
         },
       },
-      { since: 'next', pending: 'index-v2', schema: indexSchemaV2 },
+      { since: 'next', schema: indexSchemaV2 },
     ),
   }),
   fact({
@@ -1758,7 +1758,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', schema: entryModuleSchema },
       { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
-      { since: 'next', pending: 'index-v2', schema: entryModuleSchemaV2 },
+      { since: 'next', schema: entryModuleSchemaV2 },
     ),
   }),
   fact({
@@ -1777,7 +1777,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'What an aggregate does with a 1.x component index, and what happens to a source that still writes `formatVersion`. Which key a reader takes when the two format keys differ is in `fact-kit.index-format-detection`.',
     },
-    variants: history({ since: 'next', pending: 'index-v2', value: indexFormatBoundaries }),
+    variants: history({ since: 'next', value: indexFormatBoundaries }),
   }),
   fact({
     id: 'fact-kit.config-file',

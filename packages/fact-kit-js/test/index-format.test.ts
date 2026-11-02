@@ -15,14 +15,15 @@ const pkg = { name: '@demo/tool-facts', version: '1.0.0', type: 'module' }
 const readIndex = (dir: string, entryName: string): any =>
   JSON.parse(readFileSync(join(dir, 'dist', entryName, 'index.json'), 'utf8'))
 
-describe('c001 index format 1.2 is written', () => {
-  test('the built index has indexFormat 1.2, and no ac', async () => {
+describe('c001 index format 2.0 is written', () => {
+  test('the built index has indexFormat 2.0 and the same formatVersion, and no ac', async () => {
     const dir = makeTmp('format')
     writeTree(dir, { 'package.json': pkg, 'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [fact('demo.a')]) })
     expect((await buildFacts({ cwd: dir })).problems).toEqual([])
     const index = readIndex(dir, 'cli')
-    expect(index.indexFormat).toBe('1.2')
-    expect(Object.keys(index)[0]).toBe('indexFormat')
+    expect(index.indexFormat).toBe('2.0')
+    expect(index.formatVersion).toBe('2.0')
+    expect(Object.keys(index).slice(0, 2)).toEqual(['indexFormat', 'formatVersion'])
     expect(JSON.stringify(index)).not.toContain('"ac"')
     expect(validateIndex(index)).toEqual([])
   })
@@ -272,5 +273,42 @@ describe('check: rows', () => {
     const r = await cli(['check', '--cwd', dir])
     expect(r.code).toBe(0)
     expect(r.stderr).toContain('warning top-level-content')
+  })
+})
+
+describe('c002 data format version and old source key', () => {
+  test('dataFormatVersion of the source is written under that name, between component and describes', async () => {
+    const dir = makeTmp('data-format')
+    writeTree(dir, {
+      'package.json': pkg,
+      'facts/cli/index.ts': `export default { describes: { demo: '1.2.0' }, dataFormatVersion: '4', facts: [${fact('demo.a')}] }\n`,
+    })
+    expect((await buildFacts({ cwd: dir })).problems).toEqual([])
+    const index = readIndex(dir, 'cli')
+    expect(Object.keys(index)).toEqual([
+      'indexFormat',
+      'formatVersion',
+      'package',
+      'entry',
+      'dataFormatVersion',
+      'describes',
+      'facts',
+    ])
+    expect(index.formatVersion).toBe('2.0')
+    expect(index.dataFormatVersion).toBe('4')
+    expect(validateIndex(index)).toEqual([])
+  })
+
+  test('a source that still writes formatVersion is reported as format by build and check', async () => {
+    const dir = makeTmp('old-source-key')
+    writeTree(dir, {
+      'package.json': pkg,
+      'facts/cli/index.ts': `export default { describes: { demo: '1.2.0' }, formatVersion: '4', facts: [${fact('demo.a')}] }\n`,
+    })
+    const built = await buildFacts({ cwd: dir })
+    expect(built.problems.map((p) => p.code)).toContain('format')
+    expect(built.problems.find((p) => p.code === 'format')?.location).toBe('facts/cli/index.ts#/formatVersion')
+    const checked = await checkProject({ cwd: dir })
+    expect(checked.problems.map((p) => p.code)).toContain('format')
   })
 })
