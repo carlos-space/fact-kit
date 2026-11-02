@@ -2085,6 +2085,8 @@ const facts: FactDecl[] = [
       {
         since: 'next',
         set: {
+          '/impl-imports-facts/basis':
+            'The specifier of an `import` or `export ... from`, a dynamic `import()` and a `require()` call in a code file of `implDirs`. It is reported when the package name ends in `-facts`, with the publish target suffix `.<target>` allowed, or when it matches one of `violations`. A specifier is reported once. `node:` specifiers are never reported, and a relative or absolute specifier that holds `facts/dist` as path parts is left to `impl-reads-facts-dist`.',
           '/impl-imports-facts/violations': [
             { kind: 'facts-file', rule: 'The specifier ends in `.facts.ts`.' },
             { kind: 'doc-file', rule: 'The specifier ends in `.doc.ts`.' },
