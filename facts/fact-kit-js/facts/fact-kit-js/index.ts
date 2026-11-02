@@ -1129,11 +1129,6 @@ const factsPackageNaming = {
   },
 }
 
-/** The label of the rows that plan the sources-checks work. The tasks that implement a row take its label off. */
-const sourcesChecks = 'sources-checks'
-/** A planned row starts in the release that is not out yet. A fact has at most one, so a reader can choose. */
-const planned = { since: 'next', pending: sourcesChecks } as const
-
 /** How `pin` and `merge-since` choose their files today. Both commands read these files since 0.7.0. */
 const inputFiles = {
   pin: {
