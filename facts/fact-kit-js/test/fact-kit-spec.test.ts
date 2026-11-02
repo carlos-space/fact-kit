@@ -484,13 +484,15 @@ describe('fact-kit.module-api', () => {
         in0111.includes(fact.id) ? 1 : 0,
       )
       // A `next` row is allowed only while it is pending. These facts describe the 2.0 format, which the readers and
-      // the build both have now, and the `fact-kit pin` that runs at release time turns their `next` into the released version.
+      // the build both have now, or are in the next release with their code, and the `fact-kit pin` that runs at
+      // release time turns their `next` into the released version.
       const nextAllowed = [
         'fact-kit.index-format-detection',
         'fact-kit.read-facts',
         'fact-kit.index',
         'fact-kit.entry-module',
         'fact-kit.index-format-boundaries',
+        'fact-kit.impl-rules-basis',
       ]
       expect(
         (fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending && !nextAllowed.includes(fact.id)).length,
@@ -841,7 +843,7 @@ describe('pending sources-checks', () => {
       pending: true,
       task: 't002',
     },
-    'impl-imports-facts file rules': { ids: ['fact-kit.impl-rules-basis'], pending: true, task: 't003' },
+    'impl-imports-facts file rules': { ids: ['fact-kit.impl-rules-basis'], pending: false },
     'package entry exports': { ids: ['fact-kit.module-api'], pending: true, task: 't004' },
     'pin data keys': { ids: ['fact-kit.row-data-keys'], pending: true, task: 't004' },
     'impactOf extractors': { ids: ['fact-kit.impact-extractors', 'fact-kit.module-api'], pending: true, task: 't004' },
@@ -950,7 +952,9 @@ describe('pending sources-checks', () => {
     expect(rule.violations[2].rule).toContain('extension')
     expect(rule.violations[3].rule).toContain('relative')
     expect(rule.violations[4].rule).toContain('absolute')
-    expect(content('fact-kit.impl-rules-basis')['impl-imports-facts'].violations).toBeUndefined()
+    // A reader of 0.11.0 does not get the rows of the next release.
+    const released = selectFacts(specIndex, { version: '0.11.0' }).find((f) => f.id === 'fact-kit.impl-rules-basis')
+    expect((released?.content as any).value['impl-imports-facts'].violations).toBeUndefined()
     const check = (read('fact-kit.check-rules') as any[]).find((r) => r.code === 'impl-imports-facts')
     expect(check.violations).toBeUndefined()
   })
@@ -1043,12 +1047,10 @@ describe('current behavior of check, pin and merge-since', () => {
     ]) {
       expect(sinceOf(id), id).toBe('0.7.0')
       const f = specIndex.facts.find((x) => x.id === id)
-      // The only pending row here is the t003 row of impl-rules-basis, which a reader gets only with the label.
-      const allowed = id === 'fact-kit.impl-rules-basis' ? 1 : 0
       expect(
         (f?.variants ?? []).filter((v) => v.pending !== undefined),
         id,
-      ).toHaveLength(allowed)
+      ).toHaveLength(0)
       expect(
         selectFacts(specIndex, { version: '0.7.0' }).map((x) => x.id),
         id,

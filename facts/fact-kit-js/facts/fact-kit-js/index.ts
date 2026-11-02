@@ -2083,7 +2083,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        ...planned,
+        since: 'next',
         set: {
           '/impl-imports-facts/violations': [
             { kind: 'facts-file', rule: 'The specifier ends in `.facts.ts`.' },

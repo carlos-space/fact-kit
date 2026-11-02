@@ -210,6 +210,45 @@ describe('c004 check: the rules of m149/d011', () => {
     expect(ok.code).toBe(0)
   })
 
+  test('impl-imports-facts: five violations judged by file extension and path (relative one as in i758)', async () => {
+    const base = { 'facts/a/index.ts': entry([fact('one')]), 'fact-kit.config.json': { implDirs: ['src'] } }
+    const samples: Record<string, string> = {
+      'facts-file': "import x from './spec/a.facts.ts'\nexport { x }\n",
+      'doc-file': "import x from './spec/a.doc.ts'\nexport { x }\n",
+      'no-extension': "import x from './spec/a.facts'\nimport y from './spec/b.doc'\nexport { x, y }\n",
+      'relative-facts-dir': "import x from '../facts/a/index'\nexport { x }\n",
+    }
+    for (const [kind, text] of Object.entries(samples)) {
+      const r = await check({ ...base, 'src/x.ts': text })
+      const want = kind === 'no-extension' ? 2 : 1
+      expect([kind, r.code, codes(r)]).toEqual([kind, 1, Array(want).fill('impl-imports-facts')])
+    }
+    // An absolute path into the facts directory of the checked package.
+    const dir = makeTmp('abs-pkg')
+    writeTree(dir, { 'package.json': pkg, ...base, 'src/x.ts': `import x from '${dir}/facts/a/index'\nexport { x }\n` })
+    const abs = await cli(['check', '--cwd', dir, '--json'])
+    expect([abs.code, (JSON.parse(abs.stdout).problems as { code: string }[]).map((p) => p.code)]).toEqual([
+      1,
+      ['impl-imports-facts'],
+    ])
+    // The i758 wording: climbs out of src and into the facts directory of a unit.
+    const i758 = await check({ ...base, 'src/deep/x.ts': "import x from '../../facts/a/index'\nexport { x }\n" })
+    expect([i758.code, codes(i758)]).toEqual([1, ['impl-imports-facts']])
+    expect(i758.problems[0]?.location).toBe('src/deep/x.ts:1')
+  })
+
+  test('impl-imports-facts: a plain .ts, a path outside factsDir and node: stay unreported; a -facts public entry still reports', async () => {
+    const base = { 'facts/a/index.ts': entry([fact('one')]), 'fact-kit.config.json': { implDirs: ['src'] } }
+    const ok = await check({
+      ...base,
+      'src/x.ts':
+        "import a from './util.ts'\nimport b from '../other/facts/a/index'\nimport c from './facts-helper'\nimport d from './a.facts.json'\nimport e from 'node:fs'\nexport { a, b, c, d, e }\n",
+    })
+    expect([ok.code, ok.problems]).toEqual([0, []])
+    const bad = await check({ ...base, 'src/x.ts': "import a from 'demo-facts'\nexport { a }\n" })
+    expect([bad.code, codes(bad)]).toEqual([1, ['impl-imports-facts']])
+  })
+
   test('impl-imports-facts: a facts package name with a publish target suffix (d002) is still a -facts package', async () => {
     const files = {
       'facts/a/index.ts': entry([fact('one')]),

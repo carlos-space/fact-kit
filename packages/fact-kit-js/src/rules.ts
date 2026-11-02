@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
-import { dirname, extname, join, relative, sep } from 'node:path'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { loadOxc } from './oxc.ts'
 import type { Problem } from './types.ts'
 
@@ -157,6 +157,16 @@ function packageOfSpecifier(specifier: string): string | undefined {
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]
 }
 
+/** A specifier that names a `.facts.ts` or `.doc.ts` file, or one without its extension: `.facts` or `.doc`. */
+const FACTS_FILE = /\.(?:facts|doc)(?:\.ts)?$/
+
+/** Whether a relative or absolute specifier, resolved from the directory of the importing file, is inside `dir`. */
+function insideDir(dir: string, specifier: string, from: string): boolean {
+  if (!specifier.startsWith('.') && !isAbsolute(specifier)) return false
+  const rel = relative(resolve(dir), resolve(from, specifier))
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
+}
+
 /** Every package.json under `root`, outside node_modules and build output. */
 async function packageFiles(root: string): Promise<string[]> {
   return walk(root, (name) => name === 'package.json')
@@ -167,7 +177,12 @@ async function packageFiles(root: string): Promise<string[]> {
  * two. So a package that is not a facts package does not list a `-facts` package in `dependencies`, and the code in
  * `implDirs` does not import one. The package.json files are found under `root`, the directories under `base`.
  */
-export async function implProblems(root: string, base: string, implDirs: readonly string[]): Promise<Problem[]> {
+export async function implProblems(
+  root: string,
+  base: string,
+  implDirs: readonly string[],
+  factsDir: string = join(base, 'facts'),
+): Promise<Problem[]> {
   const problems: Problem[] = []
   for (const file of await packageFiles(root)) {
     let pkg: { name?: unknown; dependencies?: Record<string, unknown> }
@@ -219,10 +234,19 @@ export async function implProblems(root: string, base: string, implDirs: readonl
         }
         if (typeof specifier !== 'string') return
         const name = packageOfSpecifier(specifier)
-        if (name && isFactsPackage(name)) {
+        const reason =
+          name && isFactsPackage(name)
+            ? 'a facts package'
+            : FACTS_FILE.test(specifier)
+              ? 'a facts or doc file'
+              : // A path in facts/dist is already reported as impl-reads-facts-dist.
+                !FACTS_DIST.test(specifier) && insideDir(factsDir, specifier, dirname(file))
+                ? 'a path in the facts directory'
+                : undefined
+        if (reason) {
           problems.push({
             code: 'impl-imports-facts',
-            message: `the implementation imports ${specifier}. The facts are the spec, so only tests and docs read them`,
+            message: `the implementation imports ${specifier}, ${reason}. The facts are the spec, so only tests and docs read them`,
             location: where(base, file, source, n.start),
           })
         }
