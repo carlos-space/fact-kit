@@ -286,7 +286,7 @@ const indexV2Keys = {
     type: 'string',
     pattern: '^[0-9]+\\.[0-9]+$',
     description:
-      'Written with the same value as `indexFormat` (`2.0`), so a reader of 0.11.x, which reads this key as data, still sees a plain string. A reader of 2.0 does not read it, and when it differs from `indexFormat` only `indexFormat` counts.',
+      'Written with the same value as `indexFormat` (`2.0`), so that a tool that reads the outputs of several kits finds the format under one key name. The readers of fact-kit do not read it, and when it differs from `indexFormat` only `indexFormat` counts.',
   },
   package: nonEmpty,
   entry: indexSchema.properties.entry,
@@ -382,8 +382,6 @@ const indexFormatBoundaries = {
     code: 'format',
     rule: 'A `FactsSource` or entry module that still writes `formatVersion` makes `build` and `check` report `format`, because the entry module has no such key any more. Write `dataFormatVersion` instead.',
   },
-  differingFormatKeys:
-    'When `indexFormat` and the top-level `formatVersion` have different values, a reader takes the format from `indexFormat` only (case 6 of `fact-kit.index-format-detection`).',
 }
 
 const configSchema = {
@@ -1469,10 +1467,10 @@ const facts: FactDecl[] = [
   }),
   fact({
     id: 'fact-kit.index-format-boundaries',
-    topics: ['read', 'build'],
-    title: { en: 'Edge cases of index format 2.0' },
+    topics: ['build'],
+    title: { en: 'Edge cases of building index format 2.0' },
     description: {
-      en: 'What an aggregate does with a 1.x component index, what happens to a source that still writes `formatVersion`, and which key wins when the two format keys differ.',
+      en: 'What an aggregate does with a 1.x component index, and what happens to a source that still writes `formatVersion`. Which key a reader takes when the two format keys differ is in `fact-kit.index-format-detection`.',
     },
     variants: history({ since: 'next', pending: 'index-v2', value: indexFormatBoundaries }),
   }),

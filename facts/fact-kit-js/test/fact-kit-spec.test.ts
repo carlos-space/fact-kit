@@ -751,12 +751,15 @@ describe('index format 2.0 (pending index-v2)', () => {
       expect(cell(n).old, `case ${n}`).toBe(old)
     }
     expect(d.rule.join(' ')).toContain('`indexFormat` only')
+    expect(d.rule.join(' ')).toContain(
+      'When `indexFormat` and the top-level `formatVersion` differ, only `indexFormat` counts.',
+    )
   })
 
-  it('writes the three edge cases, and the error code of an old source key is a known one', () => {
+  it('writes the edge cases of the build, and the error code of an old source key is a known one', () => {
     const b = pendingContent('fact-kit.index-format-boundaries')
+    expect(Object.keys(b)).toEqual(['aggregate', 'oldSourceKey'])
     expect(b.aggregate).toContain('copies a component index of format 1.x as it is')
-    expect(b.differingFormatKeys).toContain('`indexFormat` only')
     expect(content('fact-kit.problem-codes')).toContain(b.oldSourceKey.code)
     expect(b.oldSourceKey.rule).toContain('formatVersion')
   })
