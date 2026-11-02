@@ -1125,6 +1125,289 @@ const factsPackageNaming = {
   },
 }
 
+/** The label of the rows that plan the sources-checks work. The tasks that implement a row take its label off. */
+const sourcesChecks = 'sources-checks'
+/** A planned row starts in the release that is not out yet. A fact has at most one, so a reader can choose. */
+const planned = { since: 'next', pending: sourcesChecks } as const
+
+/** How `pin` and `merge-since` choose their files today. Both commands read these files since 0.7.0. */
+const inputFiles = {
+  pin: {
+    reads:
+      'Every code file (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`) under the facts directory, except `<facts-dir>/_lib` and everything below it.',
+  },
+  'merge-since': {
+    unmerged:
+      'The files that `git diff --name-only --diff-filter=U` lists, only those under `--cwd`. Of these, a file that has conflict markers gets its conflict blocks settled, whatever its extension.',
+    changed:
+      'The code files under `--cwd` that differ from our side (`HEAD`, or the first parent when the merge is already committed), except `.d.ts`. A row that only the merged-in side has is rewritten in them.',
+    not: 'It does not read every code file under `--cwd`, and it does not read a file outside it.',
+  },
+}
+
+/** What `check --index` reads. The same since 0.7.0. */
+const checkIndexInput = {
+  repeatable:
+    '`--index <path>` may be given any number of times, and `check` reads every path in one run. In the config the same paths are `indexFiles`.',
+  reads:
+    'A path that is a directory is read as `<dir>/index.json`, and any other path is read as the index file itself. The `schemas/` directory next to the index file is read too.',
+  unreadable: 'A file that can not be read or parsed as JSON exits with 2.',
+}
+
+/** How `check` keeps fact ids apart across the sources and the indexes it reads. The same since 0.7.0. */
+const checkIdTable = {
+  table:
+    'One table of fact ids serves the whole run. The facts built from the sources come first, then the facts of each `--index` in the order given.',
+  duplicate:
+    'The second time an id appears in that table, wherever it comes from, `check` reports `duplicate-id` at the later one and names the first with "also in". The first is kept.',
+  sourceAndBuild:
+    'So a run that reads the sources and also the built output of the same package (`--index dist/<entry>`) reports every fact of the output.',
+  twoIndexes: 'Two `--index` that hold the same id report it too, once for each extra copy.',
+}
+
+/** What `impl-imports-facts` and `impl-reads-facts-dist` judge by. */
+const implRulesBasis = {
+  'impl-imports-facts': {
+    basis:
+      'The package name of an `import` or `export ... from` specifier, a dynamic `import()` and a `require()` call in a code file of `implDirs`. The name ends in `-facts`. Relative and absolute specifiers, and `node:` ones, have no package name and are never reported.',
+  },
+  'impl-reads-facts-dist': {
+    basis:
+      'A string, or the fixed part of a template, in a code file of `implDirs` that holds `facts/dist` as path parts (bounded by the start, the end, `/` or `\\`). It matches the literal text.',
+  },
+}
+
+const factsFileCollection = {
+  entryFile:
+    'The `index.ts` of a directory under the facts directory declares the entry, as before. Its default export holds the fields of the entry (`describes`, `publish`, `formatVersion`), and `facts` is optional. The facts directory itself is not an entry.',
+  entryName:
+    'The path of the directory of `index.ts` relative to the facts directory, as before. A `_` or `.` directory is not searched for entries.',
+  exportPath:
+    '`<entry>/index.json`, as before, so a reader of the built package, such as the `factSet` of prompt-kit, changes nothing.',
+  collectedFiles:
+    'Every `*.facts.ts` in the directory of the entry and in its subdirectories. A subdirectory that has an `index.ts` of its own is another entry, and the files below it belong to that entry.',
+  fileExport: 'The default export of a `*.facts.ts` is an array of facts, the same items as `facts` of `index.ts`.',
+  order: [
+    'the `facts` of `index.ts`, when it has any',
+    'the facts of the `*.facts.ts` files, the files sorted by their path relative to the directory of the entry in code-unit order, so the built index is the same on every machine',
+  ],
+  reported: {
+    code: 'facts-file-orphan',
+    when: [
+      'A `*.facts.ts` that is under no entry, including one directly in the facts directory.',
+      'A `*.facts.ts` in a directory whose name starts with `_`, or below one, because such a directory is not searched.',
+    ],
+  },
+  duplicates:
+    'A fact that `index.ts` imports and a file also gives is two facts with one id, and the existing `duplicate-id` reports it.',
+}
+
+const splitRules = {
+  enabledBy: {
+    setting: 'splitRules',
+    default: false,
+    summary: 'The four rules are off. They run only when `fact-kit.config.json` sets `splitRules` to `true`.',
+  },
+  scope:
+    'Only the entries that have a `*.facts.ts`. `split-topic`, `split-size` and `split-tool` read those `*.facts.ts` files only, and `split-index` reads the `index.ts` of the same entry.',
+  limit: { setting: 'maxFactsPerFile', default: 40, summary: 'The most facts one `*.facts.ts` may hold.' },
+  rules: [
+    {
+      code: 'split-topic',
+      rule: 'The facts of one `*.facts.ts` have more than one value of `topics[0]`.',
+    },
+    {
+      code: 'split-size',
+      rule: 'A `*.facts.ts` holds more facts than `maxFactsPerFile` (40 unless the config says otherwise).',
+    },
+    {
+      code: 'split-index',
+      rule: 'The `index.ts` of an entry holds a fact object (an object literal with `id` and `content`) instead of leaving the facts to the `*.facts.ts` files.',
+    },
+    {
+      code: 'split-tool',
+      rule: 'A `tool` is written anywhere in a `*.facts.ts` except in the argument of `factsOf(`.',
+    },
+  ],
+}
+
+/** What the config setting `splitRules` switches on, as it is told in `fact-kit.check-rules`. */
+const splitRule = (code: string, rule: string) => ({
+  code,
+  rule: `${rule} Runs only when \`splitRules\` is \`true\` in the config. See \`fact-kit.split-rules\`.`,
+  reads: '`*.facts.ts` files and `index.ts`, parsed with oxc',
+})
+
+const rowDataKeys = {
+  setting: 'dataKeys',
+  defaultKeys: ['content', 'value', 'schema', 'statement', 'add', 'replace', 'remove', 'set'],
+  summary:
+    'The property names whose object value is data, not a row, so `pin` and `merge-since` do not read a `since` inside it. `dataKeys` in the config replaces the default list, it does not add to it, and without the setting the default list applies.',
+  readBy: ['pin', 'merge-since'],
+  api: ['findRows(program, { dataKeys? })', 'PinOptions.dataKeys', 'MergeSinceOptions.dataKeys'],
+}
+
+const impactExtractors = {
+  scope:
+    'The extractors apply to `impactOf` and `diff --impact` in a package, aggregate or not (with or without `aggregate` in the config). Without `aggregate`, `impactOf` reads the indexes the package built itself in `<outDir>/<entry>/index.json` instead of failing.',
+  register: {
+    name: 'registerImpactExtractor',
+    signature: 'registerImpactExtractor(extractor: ImpactExtractor) => () => void',
+    summary:
+      'Adds an extractor for the rest of the process and returns a function that removes it. An extractor with the name of one already registered replaces it.',
+  },
+  extractor: {
+    type: 'ImpactExtractor',
+    fields: {
+      name: 'A string. The built-in extractors are `markdown` and `typescript`.',
+      extensions:
+        'File extensions with the dot, such as `.mdx`. The extractor reads the files of `docsDirs` that end in one.',
+      extract:
+        '(input: { file: string; text: string; lookup(reference: string): string | undefined }) => { line: number; id: string }[]. `lookup` returns the id to report for a reference to the fact asked about or to a fact computed from it, and `undefined` for any other.',
+    },
+  },
+  options: {
+    extractors:
+      '`impactOf(id, { extractors })` takes extractors for that call only. They run after the registered ones, and a name given twice keeps the last.',
+  },
+  result: 'Each `{ line, id }` becomes an item `{ file, line, id }` of `docs`, as the built-in extractors do.',
+}
+
+const fnExport = (name: string, signature: string, summary: string) => ({
+  name,
+  kind: 'function',
+  signature,
+  summary,
+})
+
+/** The new names of the package entry, with the kind of each: `function`, `symbol`, `constant` or `type`. */
+const entryExports = [
+  fnExport(
+    'registerBuilderCheck',
+    'registerBuilderCheck(name: string, check: BuilderCheck, about?: BuilderAbout) => void',
+    'Registers the check of a builder: `check(root)` returns a message that names the key at fault, or undefined. `history` runs it again after every row of a fact whose content carries the mark of that builder. `about` gives the kind of content the builder makes and the topic `mf.*` adds.',
+  ),
+  fnExport(
+    'setMark',
+    'setMark(target: object, mark: symbol, value: unknown) => void',
+    'Puts a tag on `target` as a non-enumerable property under the symbol `mark`, so it is not written to the index.',
+  ),
+  fnExport(
+    'makeBuilt',
+    'makeBuilt(text: unknown, relates: readonly object[], builder?: string) => BuiltStatement',
+    'A statement a builder made: the text plus the fact objects it relates to. With `builder`, it carries the `BUILDER` mark of that name.',
+  ),
+  fnExport(
+    'isText',
+    'isText(value: unknown) => boolean',
+    'True for a non-empty string, or an object with at least one language.',
+  ),
+  fnExport(
+    'isObject',
+    'isObject(value: unknown) => value is Record<string, unknown>',
+    'True for an object that is not null and not an array.',
+  ),
+  fnExport(
+    'parseVersion',
+    'parseVersion(text: string) => Semver | undefined',
+    'Parses a semver 2.0.0 version into `{ major, minor, patch, pre }`, or returns undefined. Build metadata is accepted and ignored.',
+  ),
+  fnExport(
+    'mustParse',
+    'mustParse(text: string, what: string) => Semver',
+    'Like `parseVersion`, and throws `FactReadError` with code `invalid-version` that names `what` when the text is not semver.',
+  ),
+  fnExport(
+    'compareSemver',
+    'compareSemver(a: Semver, b: Semver) => -1 | 0 | 1',
+    'The semver 2.0.0 precedence of `a` against `b`, a pre-release below its release.',
+  ),
+  fnExport(
+    'sinceIssue',
+    'sinceIssue(since: Since) => SinceIssue | undefined',
+    'Why a `since` is not one of the three allowed forms (`since-format`) or has two versions on one release line (`same-line`), or undefined when it is fine.',
+  ),
+  fnExport(
+    'findRows',
+    'findRows(program: unknown, options?: { dataKeys?: readonly string[] }) => SinceRow[]',
+    'Every object with a `since` in a parsed program, in source order, each with the position of the `since` text and whether it has a `pending` label. Fact content is not searched. `options.dataKeys` is described in `fact-kit.row-data-keys`.',
+  ),
+  fnExport(
+    'applyEdits',
+    'applyEdits(source: string, edits: readonly Edit[]) => string',
+    'Applies text edits `{ start, end, text }` that do not overlap, from the last to the first, so the offsets stay right.',
+  ),
+  fnExport(
+    'splitSpec',
+    'splitSpec(spec: string) => { packageName: string; entry: string }',
+    'Splits `@scope/name/path` or `name/path` into the package name and the sub-path, which is empty when the spec names only the package. Throws `FactReadError` with code `not-found` for a spec that is not of that form.',
+  ),
+  fnExport(
+    'loadInstalledJson',
+    'loadInstalledJson(spec: string, root: string) => InstalledJson',
+    'Finds and parses the installed `<package>[/<entry>]/index.json` as installed under `root`, and does not check what is in it. Returns `{ data: unknown, file, packageName, entry, packageVersion }`. Throws `FactReadError` with code `not-found` when the file can not be resolved, and with code `not-an-index` when it is not JSON, with the same messages as `loadInstalledIndex` has today. Use it when the caller checks the contents itself.',
+  ),
+  fnExport(
+    'loadInstalledIndex',
+    'loadInstalledIndex(spec: string, root: string) => InstalledIndex',
+    'Finds and parses the built `index.json` of `<package>` or `<package>/<path>` as installed under `root`, and returns it with the file, the package name, the entry and the package version. It is `loadInstalledJson` followed by `assertIndex`, and its behavior and messages do not change. Throws `FactReadError` when it can not be found or is not an index.',
+  ),
+  fnExport(
+    'installedVersion',
+    'installedVersion(root: string, name: string) => string | undefined',
+    'The version in the `package.json` of the first `node_modules/<name>` found going up from `root`, or undefined.',
+  ),
+  fnExport(
+    'assertIndex',
+    'assertIndex(index: unknown, label?: string) => readonly Fact[]',
+    'Checks the top of a parsed index and returns its facts. Throws `FactReadError` with code `not-an-index` or `unsupported-index-format`.',
+  ),
+  fnExport(
+    'factRows',
+    'factRows(fact: Fact) => Row[]',
+    'The rows of a fact. Without `variants` the whole fact is one row that starts at `when.since`.',
+  ),
+  fnExport(
+    'registerImpactExtractor',
+    'registerImpactExtractor(extractor: ImpactExtractor) => () => void',
+    'Registers a reference extractor for `impactOf`. See `fact-kit.impact-extractors`.',
+  ),
+  {
+    name: 'InstalledJson',
+    kind: 'type',
+    signature:
+      'interface InstalledJson { data: unknown; file: string; packageName: string; entry: string; packageVersion: string }',
+    summary: 'What `loadInstalledJson` returns. A type, exported with `export type`, with no runtime value.',
+  },
+  {
+    name: 'BUILDER',
+    kind: 'symbol',
+    signature: "const BUILDER: symbol (Symbol.for('fact-kit.builder'))",
+    summary:
+      'The tag that holds the name of the builder that made a value. It is a Symbol, so `typeof` gives `symbol`, and `Symbol.for` makes it the same one in every copy of the package.',
+  },
+  {
+    name: 'Row',
+    kind: 'type',
+    signature: 'interface Row { since, content, pending?, stability?, platforms?, os? }',
+    summary: 'A row of a fact as `factRows` returns it. A type, exported with `export type`, with no runtime value.',
+  },
+  {
+    name: 'ImpactExtractor',
+    kind: 'type',
+    signature: 'interface ImpactExtractor { name, extensions, extract }',
+    summary: 'The shape of an extractor in `fact-kit.impact-extractors`. A type, exported with `export type`.',
+  },
+]
+
+/** The four kinds of `entryExports`, for a reader that checks each name against the module. */
+const exportKinds = {
+  function: 'A function. `typeof` gives `function`.',
+  symbol: 'A Symbol. `typeof` gives `symbol`.',
+  constant: 'A string constant, such as `DRAFT_2020_12`. `typeof` gives `string`.',
+  type: 'A type or interface, exported with `export type`. It has no runtime value.',
+}
+
 const fact = (f: Omit<FactDecl, 'tool' | 'source'>): FactDecl => ({ ...f, tool: 'fact-kit', source: published })
 
 /**
@@ -1388,6 +1671,53 @@ const facts: FactDecl[] = [
           ],
         },
       },
+      {
+        ...planned,
+        replace: {
+          '': [
+            {
+              code: 'impl-imports-facts',
+              rule: 'Code in `implDirs` imports a `-facts` package, with or without the publish target suffix, or imports a file that holds facts of this package. The five violations are in `violations`. The code stays `impl-imports-facts` for all of them.',
+              reads: '`implDirs`, parsed with oxc',
+              violations: [
+                { kind: 'facts-file', rule: 'The specifier ends in `.facts.ts`.' },
+                { kind: 'doc-file', rule: 'The specifier ends in `.doc.ts`.' },
+                {
+                  kind: 'no-extension',
+                  rule: 'The specifier names such a file without the extension: it ends in `.facts` or `.doc`.',
+                },
+                {
+                  kind: 'relative-facts-dir',
+                  rule: 'A relative specifier that resolves to a path inside the `factsDir` of this package.',
+                },
+                {
+                  kind: 'absolute-facts-dir',
+                  rule: 'An absolute specifier that points to a path inside the `factsDir` of this package.',
+                },
+              ],
+            },
+          ],
+        },
+        add: {
+          '': [
+            {
+              code: 'facts-file-orphan',
+              rule: 'A `*.facts.ts` is under no entry (no `index.ts` in its directory or above it, below the facts directory), or is in a directory whose name starts with `_` or below one. See `fact-kit.facts-file-collection`.',
+              reads: 'the files under `factsDir`',
+            },
+            splitRule('split-topic', 'The facts of one `*.facts.ts` have more than one value of `topics[0]`.'),
+            splitRule(
+              'split-size',
+              'A `*.facts.ts` holds more facts than `maxFactsPerFile`, 40 unless the config says otherwise.',
+            ),
+            splitRule('split-index', 'The `index.ts` of an entry that has `*.facts.ts` files holds a fact object.'),
+            splitRule(
+              'split-tool',
+              'A `tool` is written in a `*.facts.ts` anywhere but in the argument of `factsOf(`.',
+            ),
+          ],
+        },
+      },
     ),
   }),
   fact({
@@ -1490,6 +1820,36 @@ const facts: FactDecl[] = [
             'Built `index.json` files (or directories holding one) that `check` reads as well. `build` reads them too, to find the facts the examples name.',
         },
       },
+      {
+        ...planned,
+        add: {
+          '/properties': {
+            splitRules: {
+              type: 'boolean',
+              default: false,
+              description:
+                'Switches on the four split rules (`split-topic`, `split-size`, `split-index`, `split-tool`) of `check`. They are off unless this is `true`. See `fact-kit.split-rules`.',
+            },
+            maxFactsPerFile: {
+              type: 'integer',
+              minimum: 1,
+              default: 40,
+              description:
+                'The most facts one `*.facts.ts` may hold. Only `split-size` reads it, and only when `splitRules` is `true`.',
+            },
+            dataKeys: {
+              ...list,
+              default: rowDataKeys.defaultKeys,
+              description:
+                'The property names whose object value `pin` and `merge-since` treat as data, not as a row. It replaces the default list. See `fact-kit.row-data-keys`.',
+            },
+          },
+        },
+        set: {
+          '/properties/factsDir/description':
+            'Directory of fact sources, relative to the package. `build`, `check` and `pin` read it, and `--facts-dir` wins over it.',
+        },
+      },
     ),
   }),
   fact({
@@ -1523,6 +1883,13 @@ const facts: FactDecl[] = [
           ],
         },
       },
+      {
+        ...planned,
+        set: {
+          '/build/factsDir':
+            'The fact sources directory. `--facts-dir` wins, then `factsDir` of the config file, then `facts`.',
+        },
+      },
     ),
   }),
   fact({
@@ -1534,6 +1901,10 @@ const facts: FactDecl[] = [
       { since: since070, value: problemCodes },
       { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
       { since: '0.11.0', add: { '': ['policy-scope', 'facts-name'] } },
+      {
+        ...planned,
+        add: { '': ['facts-file-orphan', 'split-topic', 'split-size', 'split-index', 'split-tool'] },
+      },
     ),
   }),
   fact({
@@ -1633,6 +2004,7 @@ const facts: FactDecl[] = [
         add: { '/exports': newApi },
       },
       { since: '0.10.0-alpha.1', add: { '/exports': converterLibApi } },
+      { ...planned, add: { '/exports': entryExports }, set: { '/kinds': exportKinds } },
     ),
   }),
   fact({
@@ -1701,6 +2073,81 @@ const facts: FactDecl[] = [
         },
       },
     ),
+  }),
+  fact({
+    id: 'fact-kit.input-files',
+    topics: ['pin', 'merge-since'],
+    title: { en: 'The files that pin and merge-since read' },
+    description: {
+      en: 'How the code works today, which a reader of the source needs to tell a mistake from a rule.',
+    },
+    when: { since: since070 },
+    content: { value: inputFiles },
+  }),
+  fact({
+    id: 'fact-kit.check-index-input',
+    topics: ['check', 'cli'],
+    title: { en: 'What check --index reads' },
+    description: { en: 'The paths `--index` takes, and how each is read.' },
+    when: { since: since070 },
+    content: { value: checkIndexInput },
+  }),
+  fact({
+    id: 'fact-kit.check-id-table',
+    topics: ['check'],
+    title: { en: 'One table of fact ids for the sources and every index of a check run' },
+    description: { en: 'Where `duplicate-id` comes from when `check` reads more than one index.' },
+    when: { since: since070 },
+    content: { value: checkIdTable },
+  }),
+  fact({
+    id: 'fact-kit.impl-rules-basis',
+    topics: ['check'],
+    title: { en: 'What impl-imports-facts and impl-reads-facts-dist judge by' },
+    variants: history(
+      { since: since070, value: implRulesBasis },
+      {
+        since: '0.11.0',
+        set: {
+          '/impl-imports-facts/basis':
+            'The package name of an `import` or `export ... from` specifier, a dynamic `import()` and a `require()` call in a code file of `implDirs`. The name ends in `-facts`, with the publish target suffix `.<target>` allowed. Relative and absolute specifiers, and `node:` ones, have no package name and are never reported.',
+        },
+      },
+    ),
+  }),
+  fact({
+    id: 'fact-kit.facts-file-collection',
+    topics: ['build', 'authoring'],
+    title: { en: 'How build collects *.facts.ts into an entry' },
+    description: {
+      en: 'The facts of an entry may be split into `*.facts.ts` files that the build collects, so `index.ts` does not import them.',
+    },
+    variants: [{ ...planned, content: { value: factsFileCollection } }],
+  }),
+  fact({
+    id: 'fact-kit.split-rules',
+    topics: ['check', 'config'],
+    title: { en: 'Split rules for *.facts.ts, off by default' },
+    description: {
+      en: 'Four rules of `check` on how the facts of an entry are split into files and how `tool` is written. A package turns them on with `splitRules` in `fact-kit.config.json`.',
+    },
+    variants: [{ ...planned, content: { value: splitRules } }],
+  }),
+  fact({
+    id: 'fact-kit.row-data-keys',
+    topics: ['pin', 'merge-since', 'config'],
+    title: { en: 'Keys that pin and merge-since treat as data' },
+    description: { en: 'The setting that decides which property names `pin` and `merge-since` do not read rows in.' },
+    variants: [{ ...planned, content: { value: rowDataKeys } }],
+  }),
+  fact({
+    id: 'fact-kit.impact-extractors',
+    topics: ['diff', 'authoring'],
+    title: { en: 'Reference extractors of impactOf' },
+    description: {
+      en: 'How a package adds the way `impactOf` finds references to a fact in a kind of file the built-in extractors do not read.',
+    },
+    variants: [{ ...planned, content: { value: impactExtractors } }],
   }),
 ]
 
