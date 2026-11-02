@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.1...fact-kit-js/v0.12.0-alpha.1) (2026-11-02)
+
+
+### Added
+
+* **check:** impl-imports-facts 依副檔名與路徑判斷 ([#101](https://github.com/carlos-space/fact-kit/issues/101)) ([e3c4efd](https://github.com/carlos-space/fact-kit/commit/e3c4efd1116323292fffce1c90edda9e8a9eff6e))
+* **fact-kit-js:** build 寫出 index 格式 2.0 ([#100](https://github.com/carlos-space/fact-kit/issues/100)) ([a5511a5](https://github.com/carlos-space/fact-kit/commit/a5511a55ab1c693838001ec61ca6a7af6d7946de))
+* **kit:** build 自動收集 *.facts.ts、讀設定檔的 factsDir，並加上預設關閉的拆檔規則 ([#102](https://github.com/carlos-space/fact-kit/issues/102)) ([dca86f4](https://github.com/carlos-space/fact-kit/commit/dca86f41f9815973b7a903b0f2728e04021ff311))
+* **kit:** 套件入口匯出擴充點，pin 資料鍵可設定，impactOf 可註冊抽取器 ([#103](https://github.com/carlos-space/fact-kit/issues/103)) ([02c9a8b](https://github.com/carlos-space/fact-kit/commit/02c9a8b7cc2c3163d223e3809f3a84458a6d7e02))
+* **readers:** 五種語言的讀取端讀得懂 index 格式 2.0 ([#98](https://github.com/carlos-space/fact-kit/issues/98)) ([f9df206](https://github.com/carlos-space/fact-kit/commit/f9df206403d9645034b4a8fb10ded3df3dd7f0c0))
+
+
+### Fixed
+
+* **js:** interfaceToJsonSchema 轉得出遞迴型別、方法與函式型別屬性 ([#92](https://github.com/carlos-space/fact-kit/issues/92)) ([76e280d](https://github.com/carlos-space/fact-kit/commit/76e280dd4dd429814d7904d730476a8ccb3f619e))
+
 ## [0.11.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.11.1-alpha.1...fact-kit-js/v0.11.1) (2026-10-29)
 
 
