@@ -27,6 +27,14 @@ facts 套件用 `^` 範圍依賴 fact-kit，0.x 時等於鎖住 minor。規則�
 | `.github/workflows/`                                                                      | CI、一致性測試、release-please、發布與安裝驗證的 workflow                                                                                       | 不發布                                 |
 | `release-please-config.json`、`.release-please-manifest.json`、`release-policy.json`      | 版號設定、各單元目前的版號，以及各單元經過的發布階段                                                                                            | 不發布                                 |
 
+## index 格式
+
+讀取端只用 `indexFormat` 判斷 index 的格式，缺了就當 1.0。主版號 1 與 2 都讀，其他主版號回報 `unsupported-index-format`。
+
+新 index 同時寫 `indexFormat` 與頂層 `formatVersion` 兩個欄位，兩者同值，目前都是 `"2.0"`。這樣做是讓跨 kit 的工具用同一個鍵名讀格式版號。讀取端不讀 `formatVersion`，兩者不同時只算 `indexFormat`。
+
+原本的資料版號改名為 `dataFormatVersion`，由源碼 `facts/<entry>/index.ts` 的 `dataFormatVersion` 寫入。源碼仍寫 `formatVersion` 時，`build` 與 `check` 回報 `format`。
+
 ## 開發
 
 需要 Node.js 24 以上與 pnpm。

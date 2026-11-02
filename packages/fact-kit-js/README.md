@@ -63,7 +63,7 @@ the fact locations a fact is computed from.
 the top-level `content` has to be a guess. The rules are in [`conformance/README.md`](../conformance/README.md).
 
 `build` writes `dist/<entry>/index.json` and `dist/<entry>/schemas/`, and reports the `exports` entries
-package.json needs (`--write-exports` adds them). The index has `indexFormat: "1.2"`, and a fact with `variants`
+package.json needs (`--write-exports` adds them). The index has `indexFormat: "2.0"` and `formatVersion: "2.0"`, and a fact with `variants`
 gets the latest published row as its top-level `content`, which is what a reader of format 1.0 uses. `build` validates format and ids only; it does not scan
 for local paths or domains, so run `check` before publishing.
 
