@@ -86,7 +86,9 @@ written whole. It takes `--version` once: none, two, or a value that is not semv
 A second run changes nothing, because a pinned `since` is no longer `next`. A row that spreads another object
 (`{ ...shared, since: 'next' }`) may get its `pending` from it, so `pin` leaves it and warns on stderr. Only objects
 that are not fact content count as rows, so an object inside `content`, `value`, `schema`, `statement`, `add`,
-`replace`, `remove` or `set` is data and is not changed.
+`replace`, `remove` or `set` is data and is not changed. `dataKeys` in `fact-kit.config.json` (a list of strings)
+replaces that list for both commands, and `PinOptions.dataKeys`, `MergeSinceOptions.dataKeys` and
+`findRows(program, { dataKeys })` do the same for one call. The setting replaces the list, it does not add to it.
 
 `fact-kit merge-since` runs after `git merge` (while the merge is open, or once it is committed), in a directory of
 the repository. Only files under that directory are read.
@@ -135,6 +137,28 @@ fact named, and `in` is `facts` for `facts` of the scenario or its group, `outco
 in TypeScript the string argument of `get`, `value` and `has` calls and imports of a fact object. An import counts when its relative module, loaded the way `build` loads fact sources,
 exports a fact object with the id, whatever name it is imported under; a module that fails to load is skipped. Scanning TypeScript needs the optional peer dependency `oxc-parser`, which is
 loaded only then.
+
+A package without `aggregate` in its config works too: `impactOf` reads the indexes it built itself in
+`<outDir>/<entry>/index.json`. To read another kind of file in `docsDirs`, register an extractor:
+
+```ts
+import { registerImpactExtractor } from 'fact-kit'
+
+const remove = registerImpactExtractor({
+  name: 'mdx-curly',
+  extensions: ['.mdx'],
+  // `lookup` returns the id to report for a reference to the fact, or undefined for any other.
+  extract: ({ text, lookup }) =>
+    text.split('\n').flatMap((line, i) => {
+      const id = lookup(line.match(/\{\{([^}]+)\}\}/)?.[1] ?? '')
+      return id === undefined ? [] : [{ line: i + 1, id }]
+    }),
+})
+```
+
+It stays registered for the process until `remove()` is called, and a name registered twice replaces the first.
+`impactOf(id, { extractors })` takes extractors for one call, after the registered ones. An extractor named
+`markdown` or `typescript` replaces that built-in one.
 
 ### History, keys and relations
 
@@ -738,6 +762,13 @@ for the component `fact-kit-js`. The check against the installed version follows
 accepted. Errors are `FactReadError` with a stable `code`: `not-an-index`, `unsupported-index-format`
 (the major of `indexFormat` is neither 1 nor 2),
 `not-found`, `invalid-version` and `describes-behind` (the installed component is newer than `describes`).
+
+`loadInstalledJson(spec, root)` finds and parses the installed `index.json` the same way and returns
+`{ data, file, packageName, entry, packageVersion }` without checking `data`, for a caller that checks the contents
+itself. `loadInstalledIndex` is `loadInstalledJson` followed by `assertIndex`. The helpers for a package that extends
+fact-kit (`registerBuilderCheck`, `setMark`, `BUILDER`, `makeBuilt`, `isText`, `isObject`, `parseVersion`,
+`compareSemver`, `findRows`, `applyEdits`, `splitSpec`, `installedVersion`, `assertIndex`, `factRows`) are exported
+from the package entry.
 
 `get(id)` and `value(id)` throw for an unknown id, so a misspelled id fails the build; `has(id)` tests for
 one. `version` is the installed fact package's version, for citing where a fact came from.

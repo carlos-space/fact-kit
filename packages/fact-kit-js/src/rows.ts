@@ -104,8 +104,14 @@ function idOf(object: Node): string | undefined {
   return undefined
 }
 
-/** Every row in the program, in source order. Fact content is not searched. */
-export function findRows(program: unknown): SinceRow[] {
+export interface FindRowsOptions {
+  /** Property names whose object value is data, not a row. Replaces the default list. */
+  dataKeys?: readonly string[]
+}
+
+/** Every row in the program, in source order. Data under a data key is not searched. */
+export function findRows(program: unknown, options: FindRowsOptions = {}): SinceRow[] {
+  const dataKeys = options.dataKeys ? new Set(options.dataKeys) : DATA_KEYS
   const rows: SinceRow[] = []
   const visit = (node: unknown, factId: string): void => {
     if (Array.isArray(node)) {
@@ -120,7 +126,7 @@ export function findRows(program: unknown): SinceRow[] {
       if (row) rows.push(row)
       for (const p of n.properties as Node[]) {
         if (p.type === 'Property') {
-          if (p.computed !== true && DATA_KEYS.has(nameOf(p.key) ?? '')) continue
+          if (p.computed !== true && dataKeys.has(nameOf(p.key) ?? '')) continue
           visit(p.value, id)
         } else visit(p, id)
       }

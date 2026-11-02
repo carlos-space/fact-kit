@@ -8,6 +8,7 @@ import { loadOxc } from './oxc.ts'
 import type { OxcModule } from './oxc.ts'
 import { applyEdits, findRows } from './rows.ts'
 import type { Edit, SinceRow } from './rows.ts'
+import { readConfig } from './project.ts'
 import { CODE, lineOf } from './rules.ts'
 import { compareVersions, parseVersion, releaseLine } from './version.ts'
 
@@ -16,6 +17,8 @@ const exec = promisify(execFile)
 export interface MergeSinceOptions {
   /** A directory inside the repository, normally the component package. Only files under it are read. */
   cwd?: string
+  /** Property names whose object value is data, not a row. Replaces the default list. Defaults to the config in `cwd`, then the built-in list. */
+  dataKeys?: readonly string[]
 }
 
 export interface MergeSinceResult {
@@ -223,25 +226,27 @@ function parseOrReason(oxc: OxcModule, file: string, source: string): { program:
  * it, so it becomes `[version, 'next']`. A row `HEAD` already had (same fact, same `since`) stays.
  */
 function normalize(
+  dataKeys: readonly string[] | undefined,
   oxc: OxcModule,
   file: string,
   source: string,
   before: string | undefined,
 ): { text: string; changes: { line: number; from: string; to: string }[] } | string {
+  const rowOptions = dataKeys ? { dataKeys } : {}
   const now = parseOrReason(oxc, file, source)
   if (typeof now === 'string') return now
   const had = new Set<string>()
   if (before !== undefined) {
     const old = parseOrReason(oxc, file, before)
     if (typeof old === 'string') return `the version in HEAD: ${old}`
-    for (const row of findRows(old.program)) {
+    for (const row of findRows(old.program, rowOptions)) {
       const key = rowKey(row)
       if (key) had.add(key)
     }
   }
   const edits: Edit[] = []
   const changes: { line: number; from: string; to: string }[] = []
-  for (const row of findRows(now.program)) {
+  for (const row of findRows(now.program, rowOptions)) {
     if (row.since?.kind !== 'string' || row.pending !== 'none') continue
     const { item } = row.since
     const v = parseVersion(item.text)
@@ -270,6 +275,7 @@ export async function mergeSince(options: MergeSinceOptions = {}): Promise<Merge
     throw new InputError(`${given} is not a directory`)
   }
   const cwd = realpathSync(given)
+  const dataKeys = options.dataKeys ?? (await readConfig(cwd)).dataKeys
   const oxc = await loadOxc()
   const top = (await git(cwd, ['rev-parse', '--show-toplevel'])).trim()
   const inside = (path: string): string | undefined => {
@@ -312,7 +318,7 @@ export async function mergeSince(options: MergeSinceOptions = {}): Promise<Merge
     } catch {
       before = undefined // a file the merge added
     }
-    const n = normalize(oxc, rel, source, before)
+    const n = normalize(dataKeys, oxc, rel, source, before)
     if (typeof n === 'string') {
       result.unresolved.push({ file: rel, line: 1, reason: n })
       continue

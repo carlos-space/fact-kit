@@ -37,6 +37,8 @@ export interface ProjectConfig {
   splitRules?: boolean
   /** The most facts one `*.facts.ts` may hold, read by `split-size`. Defaults to 40. */
   maxFactsPerFile?: number
+  /** Property names whose object value is data, not a row, for `pin` and `merge-since`. Replaces the built-in list. */
+  dataKeys?: string[]
 }
 
 export interface CheckProjectOptions extends ProjectConfig {
@@ -51,7 +53,7 @@ export interface CheckProjectOptions extends ProjectConfig {
 export const CONFIG_FILE = 'fact-kit.config.json'
 
 const STRING_SETTINGS = ['factsDir', 'examplesDir', 'repoRoot'] as const
-const LIST_SETTINGS = ['indexFiles', 'allowedDomains', 'testDirs', 'docsDirs', 'implDirs'] as const
+const LIST_SETTINGS = ['indexFiles', 'allowedDomains', 'testDirs', 'docsDirs', 'implDirs', 'dataKeys'] as const
 
 function validateConfig(config: unknown, file: string): ProjectConfig {
   if (typeof config !== 'object' || config === null || Array.isArray(config)) {

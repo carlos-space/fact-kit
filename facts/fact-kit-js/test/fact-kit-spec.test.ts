@@ -425,6 +425,8 @@ describe('fact-kit.module-api', () => {
     'sourceUrl',
     'readPinned',
   ]
+  // The names the extension-exports row adds, at the end of the list. They start at `next`.
+  const entryExportCount = 22
   const namesAt = (version?: string): string[] => {
     const f = selectFacts(specIndex, version === undefined ? {} : { version }).find(
       (fact) => fact.id === 'fact-kit.module-api',
@@ -439,12 +441,16 @@ describe('fact-kit.module-api', () => {
       expect(typeof (kitModule as Record<string, unknown>)[name], name).toBe('function')
     }
     for (const name of converterLib) expect(head, name).toContain(name)
+    const entryNames = (api.exports as { name: string }[]).slice(-entryExportCount).map((e) => e.name)
     const old = namesAt('0.7.0')
-    expect(old.filter((name) => added.includes(name) || converterLib.includes(name))).toEqual([])
-    expect(head.filter((name: string) => !added.includes(name) && !converterLib.includes(name))).toEqual(old)
+    const later = (name: string) => added.includes(name) || converterLib.includes(name) || entryNames.includes(name)
+    expect(old.filter(later)).toEqual([])
+    expect(head.filter((name: string) => !later(name))).toEqual(old)
     // A reader that names no version gets the latest published rows, which now include the 0.10.0-alpha.1 row.
-    expect(namesAt()).toEqual(head)
-    expect(namesAt('0.9.0')).toEqual(head.filter((name: string) => !converterLib.includes(name)))
+    expect(namesAt()).toEqual(head.filter((name: string) => !entryNames.includes(name)))
+    expect(namesAt('0.9.0')).toEqual(
+      head.filter((name: string) => !converterLib.includes(name) && !entryNames.includes(name)),
+    )
     expect(namesAt('head')).toEqual(head)
   })
 
@@ -499,6 +505,9 @@ describe('fact-kit.module-api', () => {
         'fact-kit.check-rules',
         'fact-kit.facts-file-collection',
         'fact-kit.split-rules',
+        'fact-kit.module-api',
+        'fact-kit.row-data-keys',
+        'fact-kit.impact-extractors',
       ]
       expect(
         (fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending && !nextAllowed.includes(fact.id)).length,
@@ -842,9 +851,10 @@ describe('pending sources-checks', () => {
       pending: false,
     },
     'impl-imports-facts file rules': { ids: ['fact-kit.impl-rules-basis'], pending: false },
-    'package entry exports': { ids: ['fact-kit.module-api'], pending: true, task: 't004' },
-    'pin data keys': { ids: ['fact-kit.row-data-keys'], pending: true, task: 't004' },
-    'impactOf extractors': { ids: ['fact-kit.impact-extractors', 'fact-kit.module-api'], pending: true, task: 't004' },
+    // Applied by the extension-exports work: these rows have no pending label any more.
+    'package entry exports': { ids: ['fact-kit.module-api'], pending: false },
+    'pin data keys': { ids: ['fact-kit.row-data-keys'], pending: false },
+    'impactOf extractors': { ids: ['fact-kit.impact-extractors', 'fact-kit.module-api'], pending: false },
   }
 
   it('has every fact id of the table in the built index, with pending rows only where the table says', () => {
@@ -855,16 +865,9 @@ describe('pending sources-checks', () => {
     }
   })
 
-  it('gives every fact with a sources-checks row to exactly one task', () => {
-    const owners = new Map<string, Set<string>>()
-    for (const t of Object.values(table)) {
-      if (!t.task) continue
-      for (const id of t.ids) owners.set(id, (owners.get(id) ?? new Set()).add(t.task))
-    }
-    const withRows = specIndex.facts.filter((f) => pendingRows(f.id).length > 0).map((f) => f.id)
-    expect(withRows.length).toBeGreaterThan(0)
-    for (const id of withRows) expect([...(owners.get(id) ?? [])], id).toHaveLength(1)
-    for (const id of owners.keys()) expect(withRows, id).toContain(id)
+  it('leaves no sources-checks row once every task has applied its rows', () => {
+    expect(specIndex.facts.filter((f) => pendingRows(f.id).length > 0).map((f) => f.id)).toEqual([])
+    expect(Object.values(table).filter((t) => t.pending || t.task)).toEqual([])
   })
 
   it('starts every new row in the next release, with one pending row for each fact', () => {
@@ -872,14 +875,6 @@ describe('pending sources-checks', () => {
       const rows = pendingRows(f.id)
       expect(rows.length, f.id).toBeLessThanOrEqual(1)
       for (const row of rows) expect(row.since, f.id).toBe('next')
-    }
-  })
-
-  it('keeps a pending-only fact away from a reader that does not include the label', () => {
-    const ids = selectFacts(specIndex, { version: 'head' }).map((f) => f.id)
-    for (const id of ['fact-kit.row-data-keys', 'fact-kit.impact-extractors']) {
-      expect(ids, id).not.toContain(id)
-      expect(plannedById.has(id), id).toBe(true)
     }
   })
 
@@ -988,7 +983,7 @@ describe('pending sources-checks', () => {
     expect(json).toContain('does not check what is in it')
     expect(named.has('assertIndexFormat')).toBe(false)
     expect(Object.keys(read('fact-kit.module-api').kinds)).toEqual(['function', 'symbol', 'constant', 'type'])
-    expect(content('fact-kit.module-api').kinds).toBeUndefined()
+    expect(content('fact-kit.module-api').kinds).toEqual(read('fact-kit.module-api').kinds)
     // The kinds follow the source: BUILDER is a symbol, Row is an interface, the rest are functions.
     expect(readFileSync(join(kitSrc, 'markers.ts'), 'utf8')).toMatch(/export const BUILDER = Symbol\./)
     expect(readFileSync(join(kitSrc, 'select.ts'), 'utf8')).toMatch(/export interface Row\b/)
@@ -1004,7 +999,8 @@ describe('pending sources-checks', () => {
     expect(d.defaultKeys).toEqual(keys)
     expect(d.setting).toBe('dataKeys')
     expect(d.readBy).toEqual(['pin', 'merge-since'])
-    expect(read('fact-kit.config-file').properties.dataKeys).toBeUndefined()
+    // The setting is a property of the config file, in the row that `fact-kit.config-file` plans for this release.
+    expect(read('fact-kit.config-file').properties.dataKeys).toMatchObject({ type: 'array' })
   })
 
   it('registers a reference extractor for impactOf, in a package with or without aggregate', () => {
