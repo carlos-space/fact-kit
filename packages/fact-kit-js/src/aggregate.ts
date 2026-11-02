@@ -230,8 +230,12 @@ export async function planAggregate(
         ? text.replace(inText, (_m, key: string) => (published.get(key) === p.spec ? '' : `${published.get(key)}:`))
         : text
     const { indexFormat, package: _package, entry: _entry, ...rest } = p.index
+    // A 2.x index keeps the order of `indexV2Keys`: `formatVersion` follows `indexFormat`. A 1.x index is copied as it is.
+    const v2 = indexFormat !== undefined && indexFormat.startsWith('2.')
+    if (v2) delete rest.formatVersion
     p.index = {
       ...(indexFormat !== undefined ? { indexFormat } : {}),
+      ...(v2 && p.index.formatVersion !== undefined ? { formatVersion: p.index.formatVersion } : {}),
       package: aggregateName,
       entry: p.dir || '.',
       component: p.component,

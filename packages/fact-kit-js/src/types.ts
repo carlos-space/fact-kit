@@ -117,7 +117,8 @@ export interface PublishInfo {
 export interface FactsSource {
   describes: Record<string, string>
   publish?: PublishInfo
-  formatVersion?: string
+  /** Version of the data format this entry declares for itself. Written to `dataFormatVersion` of the index. */
+  dataFormatVersion?: string
   facts: (FactDecl | DerivedFact)[]
 }
 
@@ -127,14 +128,17 @@ export interface FactsModule {
   describes: Record<string, string>
   /** Where the component is published, when the entry says so. Index format 1.2 and later. */
   publish?: PublishInfo
-  formatVersion?: string
+  dataFormatVersion?: string
   facts: Fact[]
 }
 
 /** The built `dist/<entry>/index.json`. */
 export interface FactIndex extends FactsModule {
-  /** `1.2` for what this version writes. A missing field reads as `1.0`. */
+  /** `2.0` for what this version writes. A missing field reads as `1.0`. */
   indexFormat?: string
+  /** Written with the same value as `indexFormat` by 2.0. In a 1.x index it may be a data format version. Readers do not use it. */
+  formatVersion?: string
+  component?: string
   package: string
   entry: string
 }

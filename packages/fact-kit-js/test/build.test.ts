@@ -19,7 +19,7 @@ const fixture = {
     '',
     'const module: FactsModule = {',
     "  describes: { demo: '1.2.0' },",
-    "  formatVersion: '2',",
+    "  dataFormatVersion: '2',",
     '  facts: [',
     "    { id: 'demo.status', tool: 'demo', topics: ['status'], title: 'Statuses', content: { value: [...STATUSES] }, source: { kind: 'published' } },",
     "    { id: 'demo.config', tool: 'demo', topics: ['config'], title: 'Config', content: { schema: { $ref: 'schemas/config.schema.json' } }, source: { kind: 'published' } },",
@@ -52,12 +52,21 @@ describe('c003 build', () => {
 
     // Read without fact-kit's own reader, as any other language would.
     const cliIndex = JSON.parse(readFileSync(join(dir, 'dist/cli/index.json'), 'utf8'))
-    expect(Object.keys(cliIndex)).toEqual(['indexFormat', 'package', 'entry', 'formatVersion', 'describes', 'facts'])
+    expect(Object.keys(cliIndex)).toEqual([
+      'indexFormat',
+      'formatVersion',
+      'package',
+      'entry',
+      'dataFormatVersion',
+      'describes',
+      'facts',
+    ])
     expect(cliIndex).toMatchObject({
-      indexFormat: '1.2',
+      indexFormat: '2.0',
+      formatVersion: '2.0',
       package: '@demo/tool-facts',
       entry: 'cli',
-      formatVersion: '2',
+      dataFormatVersion: '2',
       describes: { demo: '1.2.0' },
     })
     expect(cliIndex.facts.map((f: { id: string }) => f.id)).toEqual(['demo.status', 'demo.config'])
@@ -66,7 +75,7 @@ describe('c003 build', () => {
 
     const nested = JSON.parse(readFileSync(join(dir, 'dist/hooks/events/index.json'), 'utf8'))
     expect(nested).toMatchObject({ entry: 'hooks/events' })
-    expect(Object.keys(nested)).toEqual(['indexFormat', 'package', 'entry', 'describes', 'facts'])
+    expect(Object.keys(nested)).toEqual(['indexFormat', 'formatVersion', 'package', 'entry', 'describes', 'facts'])
     expect(validateIndex(nested)).toEqual([])
 
     expect(readJson(join(dir, 'dist/cli/schemas/config.schema.json')).properties.model['x-since']).toBe('1.0.0')
