@@ -54,11 +54,13 @@ if let Some(value) = reader.value("demo.limit") {
 | 代碼                       | 變體                                    | 意思                                                                              |
 | :------------------------- | :-------------------------------------- | :-------------------------------------------------------------------------------- |
 | `not-an-index`             | `FactReadError::NotAnIndex`             | 檔案不是 JSON，頂層不是物件，`facts` 不是陣列，或 `package` 不是字串              |
-| `unsupported-index-format` | `FactReadError::UnsupportedIndexFormat` | `indexFormat` 的 major 不是 1，或不是 `<數字>.<數字>` 的字串                      |
+| `unsupported-index-format` | `FactReadError::UnsupportedIndexFormat` | `indexFormat` 的 major 不是 1 也不是 2，或不是 `<數字>.<數字>` 的字串             |
 | `not-found`                | `FactReadError::NotFound`               | 找不到套件、套件沒有 export 那個 `index.json`、檔案不存在，或 `spec` 的寫法不合格 |
 | `invalid-version`          | `FactReadError::InvalidVersion`         | 查詢的 `version` 不是 `"head"` 也不是 semver 版號，或 index 裡的 `since` 不是版號 |
 
 所有解析失敗都歸為 `not-found`，不分原因。
+
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
 
 ## 和 JS 版的差異
 

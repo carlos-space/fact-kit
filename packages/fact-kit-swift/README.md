@@ -47,9 +47,11 @@ let value = try reader.value("fact-kit-swift.package")  // content.value，型�
 | `code`                     | Swift                                  | 何時回                                                                                              |
 | :------------------------- | :------------------------------------- | :-------------------------------------------------------------------------------------------------- |
 | `not-an-index`             | `FactReadError.notAnIndex`             | 檔案不是 JSON，頂層不是物件，`facts` 不是陣列，或 `package` 不是字串                                |
-| `unsupported-index-format` | `FactReadError.unsupportedIndexFormat` | `indexFormat` 的 major 不是 1，或不是 `<數字>.<數字>` 的字串                                        |
+| `unsupported-index-format` | `FactReadError.unsupportedIndexFormat` | `indexFormat` 的 major 不是 1 也不是 2，或不是 `<數字>.<數字>` 的字串                               |
 | `not-found`                | `FactReadError.notFound`               | 在 `node_modules` 找不到套件，套件沒有 export 那個 `index.json`，檔案不存在，或 `spec` 的寫法不合格 |
 | `invalid-version`          | `FactReadError.invalidVersion`         | 查詢的 `version` 不是 `"head"` 也不是完整的 `X.Y.Z`，或 index 裡的 `since` 不是版號                 |
+
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
 
 ## 和 JS 版的差異
 

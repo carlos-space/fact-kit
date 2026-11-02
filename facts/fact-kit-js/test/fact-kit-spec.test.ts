@@ -472,8 +472,13 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.1-alpha.1').length, fact.id).toBe(
         in0111.includes(fact.id) ? 1 : 0,
       )
-      // A `next` row is allowed only while it is pending.
-      expect((fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending).length, fact.id).toBe(0)
+      // A `next` row is allowed only while it is pending. These two read the 2.0 format already, and the `fact-kit pin`
+      // that runs at release time turns their `next` into the released version.
+      const nextAllowed = ['fact-kit.index-format-detection', 'fact-kit.read-facts']
+      expect(
+        (fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending && !nextAllowed.includes(fact.id)).length,
+        fact.id,
+      ).toBe(0)
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -725,15 +730,16 @@ describe('index format 2.0 (pending index-v2)', () => {
     expect(Object.keys(entry.properties)).toEqual(['describes', 'dataFormatVersion', 'publish', 'facts'])
   })
 
-  it('does not show the 2.0 rows to a reader on head without the label', () => {
+  it('shows the reader rules to a reader on head without the label, and keeps the build rows behind it', () => {
     expect(Object.keys(content('fact-kit.index').properties)).not.toContain('dataFormatVersion')
-    expect(byId.has('fact-kit.index-format-detection')).toBe(false)
+    expect(byId.has('fact-kit.index-format-detection')).toBe(true)
     expect(byId.has('fact-kit.index-format-boundaries')).toBe(false)
-    expect(JSON.stringify(content('fact-kit.read-facts'))).toContain('index format other than 1.x')
+    expect(JSON.stringify(content('fact-kit.read-facts'))).not.toContain('index format other than 1.x')
+    expect(JSON.stringify(content('fact-kit.read-facts'))).toContain('another major version than 1 and 2')
   })
 
   it('gives the result of the seven kinds of index', () => {
-    const d = pendingContent('fact-kit.index-format-detection')
+    const d = content('fact-kit.index-format-detection')
     const cell = (n: number) => d.cases.find((c: { case: number }) => c.case === n)
     expect(d.cases).toHaveLength(7)
     const expected: [number, object, string, string][] = [
@@ -765,8 +771,8 @@ describe('index format 2.0 (pending index-v2)', () => {
   })
 
   it('changes the unsupported-index-format line of readFacts', () => {
-    const throws: string[] = pendingContent('fact-kit.read-facts').throws
+    const throws: string[] = content('fact-kit.read-facts').throws
     expect(throws[2]).toContain('another major version than 1 and 2')
-    expect(throws).toHaveLength(content('fact-kit.read-facts').throws.length)
+    expect(throws).toHaveLength(5)
   })
 })

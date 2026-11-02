@@ -164,13 +164,13 @@ export function assertIndex(index: unknown, label = 'the index'): readonly Fact[
     throw new FactReadError('not-an-index', `${label} is not a fact index`)
   }
   const raw = index as Partial<FactIndex>
-  // A missing field is format 1.0. Readers take any 1.x and ignore fields they do not know.
+  // A missing field is format 1.0. Readers take any 1.x or 2.x and ignore fields they do not know.
   const format = raw.indexFormat === undefined ? '1.0' : raw.indexFormat
   const m = typeof format === 'string' ? /^(\d+)\.\d+$/.exec(format) : null
-  if (!m || Number(m[1]) !== 1) {
+  if (!m || (Number(m[1]) !== 1 && Number(m[1]) !== 2)) {
     throw new FactReadError(
       'unsupported-index-format',
-      `${label} has index format ${JSON.stringify(format)}, and this reader takes 1.x`,
+      `${label} has index format ${JSON.stringify(format)}, and this reader takes 1.x and 2.x`,
     )
   }
   if (!Array.isArray(raw.facts) || typeof raw.package !== 'string') {

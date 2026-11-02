@@ -155,10 +155,10 @@ def assert_index(index: Any, label: str = "the index") -> list[Any]:
         raise FactReadError("not-an-index", f"{label} is not a fact index")
     fmt = index["indexFormat"] if "indexFormat" in index else "1.0"
     m = re.fullmatch(r"([0-9]+)\.[0-9]+", fmt, re.ASCII) if isinstance(fmt, str) else None
-    if m is None or int(m[1]) != 1:
+    if m is None or int(m[1]) not in (1, 2):
         raise FactReadError(
             "unsupported-index-format",
-            f"{label} has index format {json.dumps(fmt)}, and this reader takes 1.x",
+            f"{label} has index format {json.dumps(fmt)}, and this reader takes 1.x and 2.x",
         )
     facts = index.get("facts")
     if not isinstance(facts, list) or not isinstance(index.get("package"), str):

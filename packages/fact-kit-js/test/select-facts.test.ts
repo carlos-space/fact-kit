@@ -188,7 +188,8 @@ describe('c003 selectFacts: index format', () => {
     const { indexFormat: _drop, ...v10 } = index([plain('demo.a', 1)])
     expect(ids(selectFacts(v10 as FactIndex))).toEqual(['demo.a'])
     expect(ids(selectFacts(index([plain('demo.a', 1)], { indexFormat: '1.7' })))).toEqual(['demo.a'])
-    for (const format of ['2.0', '0.9', 'x', 1]) {
+    expect(ids(selectFacts(index([plain('demo.a', 1)], { indexFormat: '2.0' })))).toEqual(['demo.a'])
+    for (const format of ['3.0', '0.9', 'x', 1]) {
       expect(() => selectFacts(index([], { indexFormat: format })), String(format)).toThrow(/unsupported-index-format/)
     }
   })

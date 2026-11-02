@@ -309,14 +309,14 @@ pub(crate) fn assert_index<'a>(
     let Value::Object(raw) = index else {
         return Err(not_an_index());
     };
-    // A missing field is format 1.0. Readers take any 1.x and ignore fields they do not know.
+    // A missing field is format 1.0. Readers take any 1.x or 2.x and ignore fields they do not know.
     let format = raw
         .get("indexFormat")
         .cloned()
         .unwrap_or_else(|| Value::String("1.0".into()));
-    if !is_format_1(&format) {
+    if !is_supported_format(&format) {
         return Err(FactReadError::UnsupportedIndexFormat(format!(
-            "{label} has index format {format}, and this reader takes 1.x"
+            "{label} has index format {format}, and this reader takes 1.x and 2.x"
         )));
     }
     match (raw.get("facts"), raw.get("package")) {
@@ -325,8 +325,8 @@ pub(crate) fn assert_index<'a>(
     }
 }
 
-/// Matches `^(\d+)\.\d+$` with a major that reads as 1, so `"01.0"` counts like JS does.
-fn is_format_1(format: &Value) -> bool {
+/// Matches `^(\d+)\.\d+$` with a major that reads as 1 or 2, so `"01.0"` counts like JS does.
+fn is_supported_format(format: &Value) -> bool {
     let Some(text) = format.as_str() else {
         return false;
     };
@@ -334,7 +334,7 @@ fn is_format_1(format: &Value) -> bool {
         return false;
     };
     let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
-    digits(major) && digits(minor) && major.trim_start_matches('0') == "1"
+    digits(major) && digits(minor) && matches!(major.trim_start_matches('0'), "1" | "2")
 }
 
 fn reader_of(version: Option<&str>) -> Result<Reader, FactReadError> {
@@ -402,7 +402,7 @@ fn removed(fact: &Map<String, Value>, reader: &Reader, latest: Option<&Version>)
     current.is_some_and(|c| c.cmp_precedence(&gone) != Ordering::Less)
 }
 
-/// The facts one reader sees. A pure function over a parsed `index.json` of format 1.x.
+/// The facts one reader sees. A pure function over a parsed `index.json` of format 1.x or 2.x.
 ///
 /// Each fact has rows (`variants`, or the whole fact as one row). A row applies to the reader when its
 /// `since` has been reached, its `pending` label is included, and its `platforms` and `os` conditions list
