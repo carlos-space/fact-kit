@@ -1463,7 +1463,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The rule of the readers, with the result of seven kinds of index for a new reader (fact-kit with index 2.0) and an old one (JS 0.11.x, Python, Rust, Go and Swift 0.4.x).',
     },
-    variants: history({ since: 'next', pending: 'index-v2', value: indexFormatDetection }),
+    variants: history({ since: 'next', value: indexFormatDetection }),
   }),
   fact({
     id: 'fact-kit.index-format-boundaries',
@@ -1595,7 +1595,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', value: readFactsBefore },
       { since: '0.9.0-alpha.1', value: readFactsSpec },
-      { since: 'next', pending: 'index-v2', set: { '/throws': readFactsThrowsV2 } },
+      { since: 'next', set: { '/throws': readFactsThrowsV2 } },
     ),
   }),
   fact({
