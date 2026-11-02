@@ -402,7 +402,7 @@ fn removed(fact: &Map<String, Value>, reader: &Reader, latest: Option<&Version>)
     current.is_some_and(|c| c.cmp_precedence(&gone) != Ordering::Less)
 }
 
-/// The facts one reader sees. A pure function over a parsed `index.json` of format 1.x.
+/// The facts one reader sees. A pure function over a parsed `index.json` of format 1.x or 2.x.
 ///
 /// Each fact has rows (`variants`, or the whole fact as one row). A row applies to the reader when its
 /// `since` has been reached, its `pending` label is included, and its `platforms` and `os` conditions list

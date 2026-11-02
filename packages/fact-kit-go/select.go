@@ -362,7 +362,7 @@ func removed(fact object, rd reader, latest *semver.Version) bool {
 	return current != nil && current.Compare(gone) >= 0
 }
 
-// SelectFacts returns the facts one reader sees, from the bytes of an index.json of format 1.x.
+// SelectFacts returns the facts one reader sees, from the bytes of an index.json of format 1.x or 2.x.
 //
 // Each fact has rows (its variants, or the whole fact as one row). A row applies to the reader when its since
 // has been reached, its pending label is included, and its platforms and os conditions list the reader's
