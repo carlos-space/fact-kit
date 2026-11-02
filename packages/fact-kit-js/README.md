@@ -51,8 +51,15 @@ fact-kit merge-since [--cwd dir]
 `check` validates every fact against the meta-schema, rejects duplicate ids, local absolute paths and
 domains that are not in the allowed list, and checks that examples only reference existing fact ids. The other
 rules are in [Check rules](#check-rules). Settings can live in `fact-kit.config.json` (`factsDir`, `examplesDir`,
-`indexFiles`, `allowedDomains`, `repoRoot`, `testDirs`, `docsDirs`, `implDirs`, and for the aggregate package below, `aggregate`). The three directory lists are
-relative to the package, and `repoRoot` defaults to the nearest parent that holds `.git`.
+`indexFiles`, `allowedDomains`, `repoRoot`, `testDirs`, `docsDirs`, `implDirs`, `splitRules`, `maxFactsPerFile`, and for the aggregate package below, `aggregate`). The three directory lists are
+relative to the package, and `repoRoot` defaults to the nearest parent that holds `.git`. `build` reads `factsDir` from the
+config file too, and `--facts-dir` wins over it.
+
+An entry is a directory under the facts directory with an `index.ts` whose default export holds `describes` (and
+`publish`, `formatVersion`). Its `facts` is optional. Every `*.facts.ts` in the entry's directory and below it (but not in a
+subdirectory that has its own `index.ts`) default-exports an array of facts that `build` appends to the `facts` of
+`index.ts`, the files sorted by their path relative to the entry. A `*.facts.ts` under no entry, or in a `_` directory, is
+reported as `facts-file-orphan`.
 
 A fact whose content changes over versions, or differs by platform, lists rows in `variants`
 (`{ since, content, pending?, stability?, platforms?, os? }`). `since` is a version, `'next'`, or one version per
@@ -679,6 +686,8 @@ work on a release branch.
 | `impl-imports-facts`, `impl-reads-facts-dist`, `impl-depends-on-facts`                                               | The implementation does not import a `-facts` package, a `.facts.ts` or `.doc.ts` file (with or without the extension), or a path inside the `factsDir` of the package (a relative one is resolved from the importing file), and does not name a `facts/dist` path in `implDirs` (a literal string match: `join('facts', 'dist')` is not found, and other languages are out of scope). A package that is not a facts package does not list one in `dependencies` | `implDirs`, every package.json under `repoRoot`                                                    |
 | `policy-scope`                                                                                                       | `release-policy.json` at `repoRoot` that has a restricted `access`, at the top or in a unit, also has a top-level `scope`                                                                                                                                                                                                                                                                                                                                        | `release-policy.json`                                                                              |
 | `facts-name`                                                                                                         | In an aggregate package, the names of the aggregate and of its components follow the policy: `@<scope>/` when the aggregate's unit is restricted, `.<publish target>` when the base name is shared. Nothing is checked without a `release-policy.json`. A component is found in `node_modules` or through the `packages` of `pnpm-workspace.yaml`, and one that is not found or whose facts do not load is a warning with code `facts-name`                      | `release-policy.json`, `release-please-config.json`, `pnpm-workspace.yaml`, the component packages |
+| `facts-file-orphan`                                                                                                  | A `*.facts.ts` belongs to no entry, or is in a `_` directory                                                                                                                                                                                                                                                                                                                                                                                                     | the files under `factsDir`                                                                         |
+| `split-topic`, `split-size`, `split-index`, `split-tool`                                                             | Off unless `splitRules` is `true`. One `topics[0]` per `*.facts.ts`, at most `maxFactsPerFile` (40) facts in it, no fact object in the `index.ts` of an entry that has `*.facts.ts`, and `tool` written only inside `factsOf(...)`                                                                                                                                                                                                                               | `*.facts.ts` files and `index.ts`                                                                  |
 
 The rules that read code use `oxc-parser`, an optional peer dependency. Add it (`pnpm add -D oxc-parser`) to a
 package whose `check` uses `testDirs`, `implDirs` or `facts/_lib`. `--train` is for the release flow: a component

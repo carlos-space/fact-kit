@@ -483,9 +483,9 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.1-alpha.1').length, fact.id).toBe(
         in0111.includes(fact.id) ? 1 : 0,
       )
-      // A `next` row is allowed only while it is pending. These facts describe the 2.0 format, which the readers and
-      // the build both have now, or are in the next release with their code, and the `fact-kit pin` that runs at
-      // release time turns their `next` into the released version.
+      // A `next` row is allowed only while it is pending. These facts are applied in code that is not released yet,
+      // such as the 2.0 format the readers and the build both have now, and the `fact-kit pin` that runs at release
+      // time turns their `next` into the released version.
       const nextAllowed = [
         'fact-kit.index-format-detection',
         'fact-kit.read-facts',
@@ -493,6 +493,12 @@ describe('fact-kit.module-api', () => {
         'fact-kit.entry-module',
         'fact-kit.index-format-boundaries',
         'fact-kit.impl-rules-basis',
+        'fact-kit.cli',
+        'fact-kit.config-file',
+        'fact-kit.problem-codes',
+        'fact-kit.check-rules',
+        'fact-kit.facts-file-collection',
+        'fact-kit.split-rules',
       ]
       expect(
         (fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending && !nextAllowed.includes(fact.id)).length,
@@ -828,20 +834,12 @@ describe('pending sources-checks', () => {
     'pin reads the code under factsDir except _lib': { ids: ['fact-kit.input-files'], pending: false },
     'merge-since reads unmerged files and changed code files': { ids: ['fact-kit.input-files'], pending: false },
     'impl-imports-facts and impl-reads-facts-dist basis': { ids: ['fact-kit.impl-rules-basis'], pending: false },
-    'build reads factsDir of the config': {
-      ids: ['fact-kit.cli', 'fact-kit.config-file'],
-      pending: true,
-      task: 't002',
-    },
-    '*.facts.ts collection': {
-      ids: ['fact-kit.facts-file-collection', 'fact-kit.problem-codes'],
-      pending: true,
-      task: 't002',
-    },
+    // Applied by the code, so the rows have no label any more. The tests below read them as part of `head`.
+    'build reads factsDir of the config': { ids: ['fact-kit.cli', 'fact-kit.config-file'], pending: false },
+    '*.facts.ts collection': { ids: ['fact-kit.facts-file-collection', 'fact-kit.problem-codes'], pending: false },
     'split rules': {
       ids: ['fact-kit.split-rules', 'fact-kit.check-rules', 'fact-kit.config-file'],
-      pending: true,
-      task: 't002',
+      pending: false,
     },
     'impl-imports-facts file rules': { ids: ['fact-kit.impl-rules-basis'], pending: false },
     'package entry exports': { ids: ['fact-kit.module-api'], pending: true, task: 't004' },
@@ -879,12 +877,7 @@ describe('pending sources-checks', () => {
 
   it('keeps a pending-only fact away from a reader that does not include the label', () => {
     const ids = selectFacts(specIndex, { version: 'head' }).map((f) => f.id)
-    for (const id of [
-      'fact-kit.facts-file-collection',
-      'fact-kit.split-rules',
-      'fact-kit.row-data-keys',
-      'fact-kit.impact-extractors',
-    ]) {
+    for (const id of ['fact-kit.row-data-keys', 'fact-kit.impact-extractors']) {
       expect(ids, id).not.toContain(id)
       expect(plannedById.has(id), id).toBe(true)
     }
@@ -906,11 +899,12 @@ describe('pending sources-checks', () => {
     expect(c.reported.when[0]).toContain('no entry')
     expect(c.reported.when[1]).toContain('starts with `_`')
     expect(c.duplicates).toContain('duplicate-id')
-    expect(content('fact-kit.problem-codes')).not.toContain('facts-file-orphan')
+    expect(content('fact-kit.problem-codes')).toContain('facts-file-orphan')
     expect(read('fact-kit.problem-codes')).toContain('facts-file-orphan')
-    // `facts` of `index.ts` stays required in `fact-kit.entry-module` until this fact is applied: the row there is for
-    // index 2.0 (`index-v2`), and one fact can not carry two pending rows that start at `next`.
-    expect(content('fact-kit.entry-module').required).toEqual(['describes', 'facts'])
+    expect(pendingRows('fact-kit.facts-file-collection')).toHaveLength(0)
+    expect(content('fact-kit.facts-file-collection').order).toEqual(c.order)
+    // `facts` of `index.ts` is optional from the same release, in the 2.0 row of `fact-kit.entry-module`.
+    expect(content('fact-kit.entry-module').required).toEqual(['describes'])
   })
 
   it('adds the split rules off by default, switched on by splitRules, and a rule for each code', () => {
@@ -927,7 +921,8 @@ describe('pending sources-checks', () => {
     const config = read('fact-kit.config-file').properties
     expect(config.splitRules).toMatchObject({ type: 'boolean', default: false })
     expect(config.maxFactsPerFile).toMatchObject({ type: 'integer', default: 40 })
-    expect(content('fact-kit.config-file').properties.splitRules).toBeUndefined()
+    expect(content('fact-kit.config-file').properties.splitRules).toBeDefined()
+    expect(content('fact-kit.split-rules')).toEqual(s)
     const rules = read('fact-kit.check-rules') as { code: string; rule: string }[]
     const problems = read('fact-kit.problem-codes') as string[]
     for (const code of [...codes, 'facts-file-orphan']) {
@@ -936,6 +931,7 @@ describe('pending sources-checks', () => {
     }
     for (const code of codes) expect(rules.find((r) => r.code === code)?.rule, code).toContain('splitRules')
     expect(rules.map((r) => r.code).sort()).toEqual([...problems].sort())
+    expect(content('fact-kit.check-rules').map((r: { code: string }) => r.code)).toContain('split-tool')
   })
 
   it('lists five violations of impl-imports-facts, and keeps the code', () => {
@@ -1024,7 +1020,7 @@ describe('pending sources-checks', () => {
   it('says build reads factsDir of the config file, and --facts-dir wins', () => {
     expect(read('fact-kit.cli').build.factsDir).toContain('--facts-dir')
     expect(read('fact-kit.cli').build.factsDir).toContain('`factsDir`')
-    expect(content('fact-kit.cli').build.factsDir).toBeUndefined()
+    expect(content('fact-kit.cli').build.factsDir).toContain('--facts-dir')
     expect(read('fact-kit.config-file').properties.factsDir.description).toContain('`build`')
   })
 })

@@ -6,6 +6,7 @@ import { InputError, LoadError, loadEntries, loadExampleGroups, readIndexInput, 
 import type { FactIds } from './author.ts'
 import { buildIndex } from './build.ts'
 import { policyProblems } from './naming.ts'
+import { splitProblems } from './split.ts'
 import { docRefProblems, findRepoRoot, implProblems, libRowProblems, testIncludes } from './rules.ts'
 import type { KnownFacts } from './rules.ts'
 import type { FactIndex, Problem } from './types.ts'
@@ -32,6 +33,10 @@ export interface ProjectConfig {
   docsDirs?: string[]
   /** Directories of the implementation, relative to the package. Code there must not import a `-facts` package. */
   implDirs?: string[]
+  /** Switches on the split rules (`split-topic`, `split-size`, `split-index`, `split-tool`). Off by default. */
+  splitRules?: boolean
+  /** The most facts one `*.facts.ts` may hold, read by `split-size`. Defaults to 40. */
+  maxFactsPerFile?: number
 }
 
 export interface CheckProjectOptions extends ProjectConfig {
@@ -60,6 +65,12 @@ function validateConfig(config: unknown, file: string): ProjectConfig {
     if (c[key] !== undefined && !(Array.isArray(c[key]) && (c[key] as unknown[]).every((v) => typeof v === 'string'))) {
       throw new InputError(`${file}: "${key}" must be a list of strings`)
     }
+  }
+  if (c.splitRules !== undefined && typeof c.splitRules !== 'boolean') {
+    throw new InputError(`${file}: "splitRules" must be true or false`)
+  }
+  if (c.maxFactsPerFile !== undefined && !(Number.isInteger(c.maxFactsPerFile) && (c.maxFactsPerFile as number) >= 1)) {
+    throw new InputError(`${file}: "maxFactsPerFile" must be an integer of 1 or more`)
   }
   return c as ProjectConfig
 }
@@ -133,10 +144,12 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
     }
   }
 
+  const splits: Problem[] = []
   let ids: FactIds = new Map()
   await guard(async () => {
     const entries = await loadEntries(join(cwd, factsDir), { cwd })
     ids = entries.ids
+    problems.push(...entries.orphans)
     if (entries.length === 0) return
     let packageName: string
     try {
@@ -155,6 +168,7 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
         refs: e.refs,
       })
     }
+    if (config.splitRules === true) splits.push(...(await splitProblems(entries, cwd, config.maxFactsPerFile)))
   })
 
   for (const path of config.indexFiles ?? []) {
@@ -188,6 +202,7 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
 
   const extra: Problem[] = []
   if (indexes.some((i) => i.source)) extra.push(...(await libRowProblems(join(cwd, factsDir, '_lib'), cwd)))
+  extra.push(...splits)
   extra.push(...(await implProblems(root, cwd, config.implDirs ?? [], join(cwd, factsDir))))
   const policy = await policyProblems(root, cwd, config.aggregate)
   extra.push(...policy.problems)
