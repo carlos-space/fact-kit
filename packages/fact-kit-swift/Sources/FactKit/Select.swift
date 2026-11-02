@@ -204,10 +204,10 @@ private func chooseRow(_ rows: [Row], _ reader: Reader, _ ctx: Context, _ id: St
 /// Checks the top of an index and returns its facts. Throws `notAnIndex` or `unsupportedIndexFormat`.
 private func assertIndex(_ index: JSONValue) throws -> [JSONValue] {
   guard case .object(let top) = index else { throw FactReadError.notAnIndex("the index is not a fact index") }
-  // A missing field is format 1.0. Readers take any 1.x and ignore fields they do not know.
+  // A missing field is format 1.0. Readers take any 1.x or 2.x and ignore fields they do not know.
   let format = top["indexFormat"] ?? .string("1.0")
-  guard case .string(let text) = format, let major = majorOf(text), major == "1" else {
-    throw FactReadError.unsupportedIndexFormat("the index has index format \(format), and this reader takes 1.x")
+  guard case .string(let text) = format, let major = majorOf(text), major == "1" || major == "2" else {
+    throw FactReadError.unsupportedIndexFormat("the index has index format \(format), and this reader takes 1.x and 2.x")
   }
   guard case .array(let facts)? = top["facts"], case .string? = top["package"] else {
     throw FactReadError.notAnIndex("the index is not a fact index")

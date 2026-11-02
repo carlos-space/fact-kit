@@ -725,7 +725,9 @@ for the component `fact-kit-js`. The check against the installed version follows
 
 `selectFacts(index, { version, include, platform, os })` is the same selection as a pure function over a parsed
 `index.json`. Each fact in the result is flattened to the row that applies, with that row's `since` and
-`stability`. Errors are `FactReadError` with a stable `code`: `not-an-index`, `unsupported-index-format`,
+`stability`. A reader judges the format by `indexFormat` alone: a missing field reads as 1.0, and any 1.x or 2.x is
+accepted. Errors are `FactReadError` with a stable `code`: `not-an-index`, `unsupported-index-format`
+(the major of `indexFormat` is neither 1 nor 2),
 `not-found`, `invalid-version` and `describes-behind` (the installed component is newer than `describes`).
 
 `get(id)` and `value(id)` throw for an unknown id, so a misspelled id fails the build; `has(id)` tests for

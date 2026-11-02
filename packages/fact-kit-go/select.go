@@ -269,7 +269,7 @@ func parseIndex(data []byte, label string) ([]gjson.Result, string, error) {
 		return nil, "", newError(CodeNotAnIndex, "%s is not a fact index", label)
 	}
 	o := objectOf(top)
-	// A missing field is format 1.0. Readers take any 1.x and ignore fields they do not know.
+	// A missing field is format 1.0. Readers take any 1.x or 2.x and ignore fields they do not know.
 	format := o["indexFormat"]
 	major := ""
 	if !format.Exists() {
@@ -279,9 +279,9 @@ func parseIndex(data []byte, label string) ([]gjson.Result, string, error) {
 			major = m[1]
 		}
 	}
-	if trimZeros(major) != "1" {
+	if trimZeros(major) != "1" && trimZeros(major) != "2" {
 		return nil, "", newError(CodeUnsupportedIndexFormat,
-			"%s has index format %s, and this reader takes 1.x", label, format.Raw)
+			"%s has index format %s, and this reader takes 1.x and 2.x", label, format.Raw)
 	}
 	if !o["facts"].IsArray() || o["package"].Type != gjson.String {
 		return nil, "", newError(CodeNotAnIndex, "%s is not a fact index", label)
