@@ -1673,31 +1673,6 @@ const facts: FactDecl[] = [
       },
       {
         ...planned,
-        replace: {
-          '': [
-            {
-              code: 'impl-imports-facts',
-              rule: 'Code in `implDirs` imports a `-facts` package, with or without the publish target suffix, or imports a file that holds facts of this package. The five violations are in `violations`. The code stays `impl-imports-facts` for all of them.',
-              reads: '`implDirs`, parsed with oxc',
-              violations: [
-                { kind: 'facts-file', rule: 'The specifier ends in `.facts.ts`.' },
-                { kind: 'doc-file', rule: 'The specifier ends in `.doc.ts`.' },
-                {
-                  kind: 'no-extension',
-                  rule: 'The specifier names such a file without the extension: it ends in `.facts` or `.doc`.',
-                },
-                {
-                  kind: 'relative-facts-dir',
-                  rule: 'A relative specifier that resolves to a path inside the `factsDir` of this package.',
-                },
-                {
-                  kind: 'absolute-facts-dir',
-                  rule: 'An absolute specifier that points to a path inside the `factsDir` of this package.',
-                },
-              ],
-            },
-          ],
-        },
         add: {
           '': [
             {
@@ -1836,12 +1811,6 @@ const facts: FactDecl[] = [
               default: 40,
               description:
                 'The most facts one `*.facts.ts` may hold. Only `split-size` reads it, and only when `splitRules` is `true`.',
-            },
-            dataKeys: {
-              ...list,
-              default: rowDataKeys.defaultKeys,
-              description:
-                'The property names whose object value `pin` and `merge-since` treat as data, not as a row. It replaces the default list. See `fact-kit.row-data-keys`.',
             },
           },
         },
@@ -2111,6 +2080,27 @@ const facts: FactDecl[] = [
         set: {
           '/impl-imports-facts/basis':
             'The package name of an `import` or `export ... from` specifier, a dynamic `import()` and a `require()` call in a code file of `implDirs`. The name ends in `-facts`, with the publish target suffix `.<target>` allowed. Relative and absolute specifiers, and `node:` ones, have no package name and are never reported.',
+        },
+      },
+      {
+        ...planned,
+        set: {
+          '/impl-imports-facts/violations': [
+            { kind: 'facts-file', rule: 'The specifier ends in `.facts.ts`.' },
+            { kind: 'doc-file', rule: 'The specifier ends in `.doc.ts`.' },
+            {
+              kind: 'no-extension',
+              rule: 'The specifier names such a file without the extension: it ends in `.facts` or `.doc`.',
+            },
+            {
+              kind: 'relative-facts-dir',
+              rule: 'A relative specifier that resolves to a path inside the `factsDir` of this package.',
+            },
+            {
+              kind: 'absolute-facts-dir',
+              rule: 'An absolute specifier that points to a path inside the `factsDir` of this package.',
+            },
+          ],
         },
       },
     ),

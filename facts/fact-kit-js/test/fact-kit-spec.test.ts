@@ -813,30 +813,51 @@ describe('pending sources-checks', () => {
     (specIndex.facts.find((f) => f.id === id)?.variants ?? []).filter((v) => v.pending === label)
 
   // Behavior -> fact ids. A fact with `pending` is new work, one without is how the code works today.
-  const table: Record<string, { ids: string[]; pending: boolean }> = {
+  const table: Record<string, { ids: string[]; pending: boolean; task?: string }> = {
     'check --index reads <dir>/index.json, and may repeat': { ids: ['fact-kit.check-index-input'], pending: false },
     'one id table for sources and every --index (duplicate-id)': { ids: ['fact-kit.check-id-table'], pending: false },
     'pin reads the code under factsDir except _lib': { ids: ['fact-kit.input-files'], pending: false },
     'merge-since reads unmerged files and changed code files': { ids: ['fact-kit.input-files'], pending: false },
     'impl-imports-facts and impl-reads-facts-dist basis': { ids: ['fact-kit.impl-rules-basis'], pending: false },
-    'build reads factsDir of the config': { ids: ['fact-kit.cli', 'fact-kit.config-file'], pending: true },
+    'build reads factsDir of the config': {
+      ids: ['fact-kit.cli', 'fact-kit.config-file'],
+      pending: true,
+      task: 't002',
+    },
     '*.facts.ts collection': {
       ids: ['fact-kit.facts-file-collection', 'fact-kit.problem-codes'],
       pending: true,
+      task: 't002',
     },
-    'split rules': { ids: ['fact-kit.split-rules', 'fact-kit.check-rules', 'fact-kit.config-file'], pending: true },
-    'impl-imports-facts file rules': { ids: ['fact-kit.check-rules'], pending: true },
-    'package entry exports': { ids: ['fact-kit.module-api'], pending: true },
-    'pin data keys': { ids: ['fact-kit.row-data-keys', 'fact-kit.config-file'], pending: true },
-    'impactOf extractors': { ids: ['fact-kit.impact-extractors'], pending: true },
+    'split rules': {
+      ids: ['fact-kit.split-rules', 'fact-kit.check-rules', 'fact-kit.config-file'],
+      pending: true,
+      task: 't002',
+    },
+    'impl-imports-facts file rules': { ids: ['fact-kit.impl-rules-basis'], pending: true, task: 't003' },
+    'package entry exports': { ids: ['fact-kit.module-api'], pending: true, task: 't004' },
+    'pin data keys': { ids: ['fact-kit.row-data-keys'], pending: true, task: 't004' },
+    'impactOf extractors': { ids: ['fact-kit.impact-extractors', 'fact-kit.module-api'], pending: true, task: 't004' },
   }
 
   it('has every fact id of the table in the built index, with pending rows only where the table says', () => {
     const missing = Object.values(table).flatMap((t) => t.ids.filter((id) => !specIndex.facts.some((f) => f.id === id)))
     expect(missing).toEqual([])
     for (const [name, t] of Object.entries(table)) {
-      for (const id of t.ids) expect(pendingRows(id).length > 0, `${name}: ${id}`).toBe(t.pending)
+      if (t.pending) for (const id of t.ids) expect(pendingRows(id).length > 0, `${name}: ${id}`).toBe(true)
     }
+  })
+
+  it('gives every fact with a sources-checks row to exactly one task', () => {
+    const owners = new Map<string, Set<string>>()
+    for (const t of Object.values(table)) {
+      if (!t.task) continue
+      for (const id of t.ids) owners.set(id, (owners.get(id) ?? new Set()).add(t.task))
+    }
+    const withRows = specIndex.facts.filter((f) => pendingRows(f.id).length > 0).map((f) => f.id)
+    expect(withRows.length).toBeGreaterThan(0)
+    for (const id of withRows) expect([...(owners.get(id) ?? [])], id).toHaveLength(1)
+    for (const id of owners.keys()) expect(withRows, id).toContain(id)
   })
 
   it('starts every new row in the next release, with one pending row for each fact', () => {
@@ -909,7 +930,7 @@ describe('pending sources-checks', () => {
   })
 
   it('lists five violations of impl-imports-facts, and keeps the code', () => {
-    const rule = (read('fact-kit.check-rules') as any[]).find((r) => r.code === 'impl-imports-facts')
+    const rule = read('fact-kit.impl-rules-basis')['impl-imports-facts']
     expect(rule.violations.map((v: { kind: string }) => v.kind)).toEqual([
       'facts-file',
       'doc-file',
@@ -922,8 +943,9 @@ describe('pending sources-checks', () => {
     expect(rule.violations[2].rule).toContain('extension')
     expect(rule.violations[3].rule).toContain('relative')
     expect(rule.violations[4].rule).toContain('absolute')
-    const now = (content('fact-kit.check-rules') as any[]).find((r) => r.code === 'impl-imports-facts')
-    expect(now.violations).toBeUndefined()
+    expect(content('fact-kit.impl-rules-basis')['impl-imports-facts'].violations).toBeUndefined()
+    const check = (read('fact-kit.check-rules') as any[]).find((r) => r.code === 'impl-imports-facts')
+    expect(check.violations).toBeUndefined()
   })
 
   it('lists the exports of the package entry in four kinds, with BUILDER a symbol', () => {
@@ -975,7 +997,7 @@ describe('pending sources-checks', () => {
     expect(d.defaultKeys).toEqual(keys)
     expect(d.setting).toBe('dataKeys')
     expect(d.readBy).toEqual(['pin', 'merge-since'])
-    expect(read('fact-kit.config-file').properties.dataKeys.default).toEqual(keys)
+    expect(read('fact-kit.config-file').properties.dataKeys).toBeUndefined()
   })
 
   it('registers a reference extractor for impactOf, in a package with or without aggregate', () => {
@@ -1014,10 +1036,12 @@ describe('current behavior of check, pin and merge-since', () => {
     ]) {
       expect(sinceOf(id), id).toBe('0.7.0')
       const f = specIndex.facts.find((x) => x.id === id)
+      // The only pending row here is the t003 row of impl-rules-basis, which a reader gets only with the label.
+      const allowed = id === 'fact-kit.impl-rules-basis' ? 1 : 0
       expect(
         (f?.variants ?? []).filter((v) => v.pending !== undefined),
         id,
-      ).toEqual([])
+      ).toHaveLength(allowed)
       expect(
         selectFacts(specIndex, { version: '0.7.0' }).map((x) => x.id),
         id,
