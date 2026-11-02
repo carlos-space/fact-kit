@@ -1671,7 +1671,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.0-alpha.1',
         replace: {
           '': [
             {
@@ -1753,7 +1753,7 @@ const facts: FactDecl[] = [
           '/properties/publish': publishSchema,
         },
       },
-      { since: 'next', schema: indexSchemaV2 },
+      { since: '0.12.0-alpha.1', schema: indexSchemaV2 },
     ),
   }),
   fact({
@@ -1766,7 +1766,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', schema: entryModuleSchema },
       { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
-      { since: 'next', schema: entryModuleSchemaV2 },
+      { since: '0.12.0-alpha.1', schema: entryModuleSchemaV2 },
     ),
   }),
   fact({
@@ -1776,7 +1776,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The rule of the readers, with the result of seven kinds of index for a new reader (fact-kit with index 2.0) and an old one (JS 0.11.x, Python, Rust, Go and Swift 0.4.x).',
     },
-    variants: history({ since: 'next', value: indexFormatDetection }),
+    variants: history({ since: '0.12.0-alpha.1', value: indexFormatDetection }),
   }),
   fact({
     id: 'fact-kit.index-format-boundaries',
@@ -1785,7 +1785,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'What an aggregate does with a 1.x component index, and what happens to a source that still writes `formatVersion`. Which key a reader takes when the two format keys differ is in `fact-kit.index-format-detection`.',
     },
-    variants: history({ since: 'next', value: indexFormatBoundaries }),
+    variants: history({ since: '0.12.0-alpha.1', value: indexFormatBoundaries }),
   }),
   fact({
     id: 'fact-kit.config-file',
@@ -1804,7 +1804,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.0-alpha.1',
         add: {
           '/properties': {
             splitRules: {
@@ -1867,7 +1867,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.0-alpha.1',
         set: {
           '/build/factsDir':
             'The fact sources directory. `--facts-dir` wins, then `factsDir` of the config file, then `facts`.',
@@ -1885,7 +1885,7 @@ const facts: FactDecl[] = [
       { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
       { since: '0.11.0', add: { '': ['policy-scope', 'facts-name'] } },
       {
-        since: 'next',
+        since: '0.12.0-alpha.1',
         add: { '': ['facts-file-orphan', 'split-topic', 'split-size', 'split-index', 'split-tool'] },
       },
     ),
@@ -1949,7 +1949,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', value: readFactsBefore },
       { since: '0.9.0-alpha.1', value: readFactsSpec },
-      { since: 'next', set: { '/throws': readFactsThrowsV2 } },
+      { since: '0.12.0-alpha.1', set: { '/throws': readFactsThrowsV2 } },
     ),
   }),
   fact({
@@ -1987,7 +1987,7 @@ const facts: FactDecl[] = [
         add: { '/exports': newApi },
       },
       { since: '0.10.0-alpha.1', add: { '/exports': converterLibApi } },
-      { since: 'next', add: { '/exports': entryExports }, set: { '/kinds': exportKinds } },
+      { since: '0.12.0-alpha.1', add: { '/exports': entryExports }, set: { '/kinds': exportKinds } },
     ),
   }),
   fact({
@@ -2097,7 +2097,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.0-alpha.1',
         set: {
           '/impl-imports-facts/basis':
             'The specifier of an `import` or `export ... from`, a dynamic `import()` and a `require()` call in a code file of `implDirs`. It is reported when the package name ends in `-facts`, with the publish target suffix `.<target>` allowed, or when it matches one of `violations`. A specifier is reported once. `node:` specifiers are never reported, and a relative or absolute specifier that holds `facts/dist` as path parts is left to `impl-reads-facts-dist`.',
@@ -2128,7 +2128,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The facts of an entry may be split into `*.facts.ts` files that the build collects, so `index.ts` does not import them.',
     },
-    variants: [{ since: 'next', content: { value: factsFileCollection } }],
+    variants: [{ since: '0.12.0-alpha.1', content: { value: factsFileCollection } }],
   }),
   fact({
     id: 'fact-kit.split-rules',
@@ -2137,14 +2137,14 @@ const facts: FactDecl[] = [
     description: {
       en: 'Four rules of `check` on how the facts of an entry are split into files and how `tool` is written. A package turns them on with `splitRules` in `fact-kit.config.json`.',
     },
-    variants: [{ since: 'next', content: { value: splitRules } }],
+    variants: [{ since: '0.12.0-alpha.1', content: { value: splitRules } }],
   }),
   fact({
     id: 'fact-kit.row-data-keys',
     topics: ['pin', 'merge-since', 'config'],
     title: { en: 'Keys that pin and merge-since treat as data' },
     description: { en: 'The setting that decides which property names `pin` and `merge-since` do not read rows in.' },
-    variants: [{ since: 'next', content: { value: rowDataKeys } }],
+    variants: [{ since: '0.12.0-alpha.1', content: { value: rowDataKeys } }],
   }),
   fact({
     id: 'fact-kit.impact-extractors',
@@ -2153,7 +2153,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'How a package adds the way `impactOf` finds references to a fact in a kind of file the built-in extractors do not read.',
     },
-    variants: [{ since: 'next', content: { value: impactExtractors } }],
+    variants: [{ since: '0.12.0-alpha.1', content: { value: impactExtractors } }],
   }),
 ]
 
