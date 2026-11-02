@@ -66,6 +66,8 @@ for item in reader.facts:  # 這個讀者看得到的所有 fact，順序同 ind
 | `not-found`                | 找不到套件，套件沒有 export 那個 `index.json`，檔案不存在，或 `spec` 的寫法不合格 |
 | `invalid-version`          | `version` 不是 `"head"` 也不是完整的 `X.Y.Z`，或 index 裡的 `since` 不是版號      |
 
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
+
 ## 和 JS 版的差異
 
 - 不比對 `describes` 與已安裝產品的版本。`reader.describes` 會原樣回傳，但不會因為已安裝的產品比較新而丟錯，也不會用已安裝的版本當預設的 `version`。

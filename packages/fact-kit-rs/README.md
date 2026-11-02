@@ -60,6 +60,8 @@ if let Some(value) = reader.value("demo.limit") {
 
 所有解析失敗都歸為 `not-found`，不分原因。
 
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
+
 ## 和 JS 版的差異
 
 - 不比對 `describes` 和已安裝的產品版本。`describes` 只原樣回傳。

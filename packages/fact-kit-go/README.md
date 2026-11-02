@@ -59,6 +59,8 @@ limit, err := reader.Value("demo.limit") // content.value，沒有這筆 fact �
 | `CodeNotFound`               | `not-found`                | 找不到套件、套件沒有 export 那個 `index.json`、檔案不存在，或 `spec` 寫法不合格 |
 | `CodeInvalidVersion`         | `invalid-version`          | 查詢的 `Version` 不是 `"head"` 也不是 semver，或 index 裡的 `since` 不是版號    |
 
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
+
 ## 和 JS 版不同的地方
 
 - 不比對 `describes` 和已安裝的產品版本，所以不會因為產品比 facts 新而報錯，也不會自動挑版本。要讀特定版本時自己傳 `Version`。

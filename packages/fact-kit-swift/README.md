@@ -51,6 +51,8 @@ let value = try reader.value("fact-kit-swift.package")  // content.value，型�
 | `not-found`                | `FactReadError.notFound`               | 在 `node_modules` 找不到套件，套件沒有 export 那個 `index.json`，檔案不存在，或 `spec` 的寫法不合格 |
 | `invalid-version`          | `FactReadError.invalidVersion`         | 查詢的 `version` 不是 `"head"` 也不是完整的 `X.Y.Z`，或 index 裡的 `since` 不是版號                 |
 
+讀取端只用 `indexFormat` 判斷格式，缺這個欄位時當 1.0。頂層的 `formatVersion` 與 `dataFormatVersion` 不讀，也不回傳。
+
 ## 和 JS 版的差異
 
 - **`root` 必填。** JS 版預設用目前的工作目錄。Swift 版不這樣做，因為工作目錄在 Xcode 與測試主機下不固定，容易讀到錯的地方。
