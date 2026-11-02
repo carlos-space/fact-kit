@@ -14,7 +14,7 @@ import { LOCK_FILE, derivedSources, lockProblems, lockText, readLock } from './u
 export interface BuildOptions {
   /** Package directory, holding package.json. Defaults to `process.cwd()`. */
   cwd?: string
-  /** Source directory, relative to `cwd`. Defaults to `facts`. */
+  /** Source directory, relative to `cwd`. Defaults to `factsDir` of the config file, then `facts`. */
   factsDir?: string
   /** Output directory, relative to `cwd`. Defaults to `dist`. */
   outDir?: string
@@ -112,11 +112,13 @@ export function exportsCover(exports: Record<string, unknown> | undefined, key: 
  */
 export async function buildFacts(options: BuildOptions = {}): Promise<BuildResult> {
   const cwd = resolve(options.cwd ?? process.cwd())
-  const factsDir = options.factsDir ?? 'facts'
   const outDir = options.outDir ?? 'dist'
   const result: BuildResult = { problems: [], entries: [], files: [], missingExports: [], exportsUpdated: false }
 
-  const { aggregate, examplesDir = 'examples', indexFiles = [] } = await readConfig(cwd)
+  const config = await readConfig(cwd)
+  const { aggregate, examplesDir = 'examples', indexFiles = [] } = config
+  // `--facts-dir` wins, then `factsDir` of the config file, then `facts`.
+  const factsDir = options.factsDir ?? config.factsDir ?? 'facts'
   if (aggregate) return buildAggregate(cwd, aggregate, outDir, options.writeExports)
 
   const packageName = await readPackageName(cwd)
@@ -138,6 +140,7 @@ export async function buildFacts(options: BuildOptions = {}): Promise<BuildResul
       ? [...indexes, ...(await Promise.all(indexFiles.map((path) => readIndexInput(cwd, path))))]
       : indexes
   result.problems = [
+    ...loaded.orphans.map((p) => ({ ...p })),
     ...loaded.flatMap((e) => e.problems.map((p) => ({ ...p }))),
     ...exampleSet.problems,
     ...checkFacts({ indexes: withIndexFiles, examples: exampleSet.examples, scan: false, strict: false }).problems,

@@ -20,10 +20,21 @@ export interface LoadedEntry {
   refs: RefDecl[]
   /** JSON Schema files under `<entry>/schemas/`, keyed by path relative to that directory. */
   schemas: { file: string; schema: unknown }[]
+  /** The `*.facts.ts` files the entry collected, in the order their facts follow those of `index.ts`. */
+  factsFiles: LoadedFactsFile[]
 }
 
-/** What `loadEntries` returns: the entries, and `ids` for every fact object of them. */
-export type LoadedEntries = LoadedEntry[] & { ids: FactIds }
+/** One collected `*.facts.ts`. `file` is relative to the package directory, with `/`. */
+export interface LoadedFactsFile {
+  file: string
+  /** How many facts the file holds. */
+  count: number
+  /** The distinct values of `topics[0]` its facts have, in the order they first appear. */
+  topics: string[]
+}
+
+/** What `loadEntries` returns: the entries, `ids` for every fact object of them, and `orphans` (`facts-file-orphan`). */
+export type LoadedEntries = LoadedEntry[] & { ids: FactIds; orphans: Problem[] }
 
 /** Raised when a source file cannot be loaded. The CLI reports it as a `load` problem. */
 export class LoadError extends Error {
@@ -57,10 +68,23 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-/** Directories under `factsDir` that hold an `index.ts`. Directories starting with `_` or `.` are helpers. */
-async function findEntryDirs(factsDir: string): Promise<string[]> {
-  const found: string[] = []
-  async function walk(dir: string): Promise<void> {
+const FACTS_FILE = '.facts.ts'
+
+interface Scanned {
+  /** Entry directories, in walk order. */
+  entryDirs: string[]
+  /** `*.facts.ts` files, with the entry directory they belong to, or none when they are orphans. */
+  files: { file: string; entryDir?: string }[]
+}
+
+/**
+ * Walks `factsDir`. A directory under it that holds an `index.ts` is an entry, unless a `_` directory is on the way.
+ * A `*.facts.ts` belongs to the nearest entry above it. One under no entry, or inside a `_` directory, has none.
+ * Directories starting with `.` and `node_modules` and `schemas` are not walked.
+ */
+async function scanFactsDir(factsDir: string): Promise<Scanned> {
+  const out: Scanned = { entryDirs: [], files: [] }
+  async function walk(dir: string, entryDir: string | undefined, hidden: boolean): Promise<void> {
     let items
     try {
       items = await readdir(dir, { withFileTypes: true })
@@ -68,15 +92,22 @@ async function findEntryDirs(factsDir: string): Promise<string[]> {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
       throw error
     }
-    if (dir !== factsDir && (await exists(join(dir, 'index.ts')))) found.push(dir)
+    let current = entryDir
+    if (dir !== factsDir && !hidden && (await exists(join(dir, 'index.ts')))) {
+      out.entryDirs.push(dir)
+      current = dir
+    }
     for (const item of items.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (!item.isDirectory() || item.name.startsWith('_') || item.name.startsWith('.') || SKIPPED_DIRS.has(item.name))
-        continue
-      await walk(join(dir, item.name))
+      if (item.isDirectory()) {
+        if (item.name.startsWith('.') || SKIPPED_DIRS.has(item.name)) continue
+        await walk(join(dir, item.name), current, hidden || item.name.startsWith('_'))
+      } else if (item.name.endsWith(FACTS_FILE)) {
+        out.files.push({ file: join(dir, item.name), ...(hidden || !current ? {} : { entryDir: current }) })
+      }
     }
   }
-  await walk(factsDir)
-  return found
+  await walk(factsDir, undefined, false)
+  return out
 }
 
 export async function readSchemas(dir: string): Promise<LoadedEntry['schemas']> {
@@ -118,41 +149,55 @@ export interface LoadEntriesOptions {
 
 /**
  * Loads every entry under `factsDir`. An entry is a directory holding `index.ts` that default-exports
- * `{ describes, facts }`. The TypeScript is run by Node's built-in type stripping, so it must use erasable
+ * `{ describes, facts? }`. The default export of each `*.facts.ts` below the entry is an array of facts that follows
+ * the `facts` of `index.ts`, the files sorted by their path relative to the entry. The TypeScript is run by Node's built-in type stripping, so it must use erasable
  * syntax only and relative imports must carry the `.ts` extension. A missing `factsDir` yields no entries.
  * `history`, `relates`, `factLink` and `derive` are expanded once every entry is loaded, because a fact may
  * relate to a fact of another entry.
  */
 export async function loadEntries(factsDir: string, options: LoadEntriesOptions = {}): Promise<LoadedEntries> {
+  const cwd = options.cwd ?? dirname(factsDir)
+  const posixRel = (file: string) => relative(cwd, file).split(sep).join('/')
+  const scanned = await scanFactsDir(factsDir)
   const raw: (SourceEntry & { dir: string })[] = []
-  for (const dir of await findEntryDirs(factsDir)) {
+  const filesOf: LoadedFactsFile[][] = []
+  for (const dir of scanned.entryDirs) {
     const file = join(dir, 'index.ts')
-    let mod: Record<string, unknown>
-    try {
-      mod = (await import(pathToFileURL(file).href)) as Record<string, unknown>
-    } catch (error) {
-      // `history` and `keyed` name the key that does not fit, which is the whole message.
-      if ((error as Error | undefined)?.name === 'HistoryError')
-        throw new LoadError(file, (error as Error).message, 'history')
-      // The same for a builder, `mf.*` and the rows of `history` that a builder checks again.
-      if ((error as Error | undefined)?.name === 'BuilderError')
-        throw new LoadError(file, (error as Error).message, 'builder')
-      throw new LoadError(file, `cannot run the module: ${(error as Error).message}`)
-    }
+    const mod = await importSource(file)
     const value = (mod.default ?? mod) as Partial<FactsSource> | undefined
-    if (!value || typeof value !== 'object' || !Array.isArray(value.facts)) {
-      throw new LoadError(file, 'must default-export an object with a `facts` array (and `describes`)')
+    if (!value || typeof value !== 'object' || (value.facts !== undefined && !Array.isArray(value.facts))) {
+      throw new LoadError(file, 'must default-export an object with `describes`, and a `facts` array when it has facts')
     }
+    // Code-unit order of the path relative to the entry, so the index is the same on every machine.
+    const own = scanned.files
+      .filter((f) => f.entryDir === dir)
+      .map((f) => ({ path: f.file, key: relative(dir, f.file).split(sep).join('/') }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    const collected: unknown[] = []
+    const files: LoadedFactsFile[] = []
+    for (const f of own) {
+      const fileMod = await importSource(f.path)
+      if (!Array.isArray(fileMod.default)) {
+        throw new LoadError(f.path, 'must default-export an array of facts')
+      }
+      const items = fileMod.default as unknown[]
+      const topics: string[] = []
+      for (const item of items) {
+        const first = (item as { topics?: unknown } | null)?.topics
+        const topic = Array.isArray(first) ? first[0] : undefined
+        if (typeof topic === 'string' && !topics.includes(topic)) topics.push(topic)
+      }
+      collected.push(...items)
+      files.push({ file: posixRel(f.path), count: items.length, topics })
+    }
+    filesOf.push(files)
     raw.push({
       entry: relative(factsDir, dir).split(sep).join('/'),
       dir,
-      origin: relative(options.cwd ?? dirname(factsDir), file)
-        .split(sep)
-        .join('/'),
-      source: { describes: {}, ...value } as FactsSource,
+      origin: posixRel(file),
+      source: { describes: {}, ...value, facts: [...(value.facts ?? []), ...collected] } as FactsSource,
     })
   }
-  const cwd = options.cwd ?? dirname(factsDir)
   const resolved = resolveEntries(raw, { cwd, packageName: options.packageName ?? (await tryPackageName(cwd)) })
   const entries: LoadedEntry[] = []
   for (const [i, e] of raw.entries()) {
@@ -164,9 +209,32 @@ export async function loadEntries(factsDir: string, options: LoadEntriesOptions 
       subsets: (resolved[i] as (typeof resolved)[number]).subsets,
       refs: (resolved[i] as (typeof resolved)[number]).refs,
       schemas: await readSchemas(e.dir),
+      factsFiles: filesOf[i] as LoadedFactsFile[],
     })
   }
-  return Object.assign(entries, { ids: resolved.ids })
+  const orphans: Problem[] = scanned.files
+    .filter((f) => f.entryDir === undefined)
+    .map((f) => ({
+      code: 'facts-file-orphan',
+      message: `${posixRel(f.file)} belongs to no entry: there is no index.ts in its directory or above it below the facts directory, or it is in a directory starting with "_"`,
+      location: posixRel(f.file),
+    }))
+  return Object.assign(entries, { ids: resolved.ids, orphans })
+}
+
+/** Runs a source file. A failure is a {@link LoadError} with the code that says what failed. */
+async function importSource(file: string): Promise<Record<string, unknown>> {
+  try {
+    return (await import(pathToFileURL(file).href)) as Record<string, unknown>
+  } catch (error) {
+    // `history` and `keyed` name the key that does not fit, which is the whole message.
+    if ((error as Error | undefined)?.name === 'HistoryError')
+      throw new LoadError(file, (error as Error).message, 'history')
+    // The same for a builder, `mf.*` and the rows of `history` that a builder checks again.
+    if ((error as Error | undefined)?.name === 'BuilderError')
+      throw new LoadError(file, (error as Error).message, 'builder')
+    throw new LoadError(file, `cannot run the module: ${(error as Error).message}`)
+  }
 }
 
 async function tryPackageName(cwd: string): Promise<string> {

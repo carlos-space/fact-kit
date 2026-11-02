@@ -309,6 +309,7 @@ const indexSchemaV2 = {
 
 const entryModuleSchemaV2 = {
   ...entryModuleSchema,
+  required: ['describes'],
   properties: {
     describes: entryModuleSchema.properties.describes,
     dataFormatVersion: {
@@ -317,7 +318,10 @@ const entryModuleSchemaV2 = {
         'Written to `dataFormatVersion` of the index. A source that still writes `formatVersion` fails with `format`, because `formatVersion` of the index is now written by the build from `indexFormat`.',
     },
     publish: publishSchema,
-    facts: entryModuleSchema.properties.facts,
+    facts: {
+      ...entryModuleSchema.properties.facts,
+      description: `${entryModuleSchema.properties.facts.description} Optional: the facts of the entry may all be in \`*.facts.ts\` files, which the build collects after these (\`fact-kit.facts-file-collection\`).`,
+    },
   },
 }
 
@@ -1672,7 +1676,16 @@ const facts: FactDecl[] = [
         },
       },
       {
-        ...planned,
+        since: 'next',
+        replace: {
+          '': [
+            {
+              code: 'impl-imports-facts',
+              rule: 'Code in `implDirs` imports a `-facts` package (with or without the publish target suffix), a `.facts.ts` or `.doc.ts` file (with or without the extension), or a path inside the `factsDir` of the package by a relative or absolute specifier. A path that holds `facts/dist` is left to `impl-reads-facts-dist`. See `fact-kit.impl-rules-basis`.',
+              reads: '`implDirs`, parsed with oxc',
+            },
+          ],
+        },
         add: {
           '': [
             {
@@ -1796,7 +1809,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        ...planned,
+        since: 'next',
         add: {
           '/properties': {
             splitRules: {
@@ -1853,7 +1866,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        ...planned,
+        since: 'next',
         set: {
           '/build/factsDir':
             'The fact sources directory. `--facts-dir` wins, then `factsDir` of the config file, then `facts`.',
@@ -1871,7 +1884,7 @@ const facts: FactDecl[] = [
       { since: '0.8.0', add: { '': ['builder', 'subset-of', 'ref', 'schema-property'] } },
       { since: '0.11.0', add: { '': ['policy-scope', 'facts-name'] } },
       {
-        ...planned,
+        since: 'next',
         add: { '': ['facts-file-orphan', 'split-topic', 'split-size', 'split-index', 'split-tool'] },
       },
     ),
@@ -2114,7 +2127,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The facts of an entry may be split into `*.facts.ts` files that the build collects, so `index.ts` does not import them.',
     },
-    variants: [{ ...planned, content: { value: factsFileCollection } }],
+    variants: [{ since: 'next', content: { value: factsFileCollection } }],
   }),
   fact({
     id: 'fact-kit.split-rules',
@@ -2123,7 +2136,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'Four rules of `check` on how the facts of an entry are split into files and how `tool` is written. A package turns them on with `splitRules` in `fact-kit.config.json`.',
     },
-    variants: [{ ...planned, content: { value: splitRules } }],
+    variants: [{ since: 'next', content: { value: splitRules } }],
   }),
   fact({
     id: 'fact-kit.row-data-keys',

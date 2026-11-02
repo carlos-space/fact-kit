@@ -255,7 +255,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
 
   for (const [ei, e] of entries.entries()) {
     const problems = (out[ei] as ResolvedEntry).problems
-    for (const [i, raw] of e.source.facts.entries()) {
+    for (const [i, raw] of (e.source.facts ?? []).entries()) {
       const where = at(e.origin, `/facts/${i}`)
       let decl: FactDecl
       if (isDerived(raw)) {

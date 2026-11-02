@@ -119,7 +119,8 @@ export interface FactsSource {
   publish?: PublishInfo
   /** Version of the data format this entry declares for itself. Written to `dataFormatVersion` of the index. */
   dataFormatVersion?: string
-  facts: (FactDecl | DerivedFact)[]
+  /** Optional: an entry may leave all its facts to `*.facts.ts` files, which the build collects after these. */
+  facts?: (FactDecl | DerivedFact)[]
 }
 
 /** The facts of one entry after the build has expanded `history`, `relates`, `factLink` and `derive`. */
@@ -179,6 +180,11 @@ export interface Problem {
     | 'schema-property'
     | 'policy-scope'
     | 'facts-name'
+    | 'facts-file-orphan'
+    | 'split-topic'
+    | 'split-size'
+    | 'split-index'
+    | 'split-tool'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string

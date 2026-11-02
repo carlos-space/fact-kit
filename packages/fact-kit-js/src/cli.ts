@@ -41,7 +41,7 @@ Options for check
 
 Options for build
   --cwd <dir>           Package directory (default: current directory)
-  --facts-dir <dir>     Fact sources (default: facts)
+  --facts-dir <dir>     Fact sources (default: factsDir of the config file, then facts)
   --out-dir <dir>       Output directory (default: dist)
   --write-exports       Add the missing "exports" entries to package.json
   --accept-upstream     Build facts derived from another upstream version than derived.lock.json records, and rewrite it
