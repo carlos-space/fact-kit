@@ -1,1 +1,1 @@
-{ "allowedDomains": ["json-schema.org"] }
+{ "allowedDomains": ["json-schema.org"], "testDirs": ["test"] }

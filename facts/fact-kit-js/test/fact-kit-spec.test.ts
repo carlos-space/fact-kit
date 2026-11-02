@@ -448,7 +448,7 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11 and 0.11.1 changes, and no next row', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11 and 0.11.1 changes, and no next row that is not pending', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
@@ -472,7 +472,8 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.11.1-alpha.1').length, fact.id).toBe(
         in0111.includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
+      // A `next` row is allowed only while it is pending.
+      expect((fact.variants ?? []).filter((v) => v.since === 'next' && !v.pending).length, fact.id).toBe(0)
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -693,5 +694,79 @@ describe('fact-kit.facts-package-naming', () => {
     const none = makeTmp('naming-spec')
     writeTree(none, { 'fact-kit.config.json': { repoRoot: '.' } })
     expect((await cli(['check', '--cwd', none, '--json'])).code).toBe(0)
+  })
+})
+
+describe('index format 2.0 (pending index-v2)', () => {
+  const withPending = new Map(selectFacts(specIndex, { version: 'head', include: ['index-v2'] }).map((f) => [f.id, f]))
+  const pendingContent = (id: string): any => {
+    const f = withPending.get(id)
+    if (!f) throw new Error(`no fact ${id}`)
+    return 'schema' in f.content ? f.content.schema : (f.content as { value: unknown }).value
+  }
+
+  it('writes the top-level keys of the index in the order of the build', () => {
+    const schema = pendingContent('fact-kit.index')
+    expect(Object.keys(schema.properties)).toEqual([
+      'indexFormat',
+      'formatVersion',
+      'package',
+      'entry',
+      'component',
+      'dataFormatVersion',
+      'describes',
+      'publish',
+      'facts',
+    ])
+    expect(schema.required).toEqual(['indexFormat', 'formatVersion', 'package', 'entry', 'describes', 'facts'])
+    expect(schema.required).not.toContain('dataFormatVersion')
+    expect(schema.properties.dataFormatVersion.description).toContain('index.json')
+    const entry = pendingContent('fact-kit.entry-module')
+    expect(Object.keys(entry.properties)).toEqual(['describes', 'dataFormatVersion', 'publish', 'facts'])
+  })
+
+  it('does not show the 2.0 rows to a reader on head without the label', () => {
+    expect(Object.keys(content('fact-kit.index').properties)).not.toContain('dataFormatVersion')
+    expect(byId.has('fact-kit.index-format-detection')).toBe(false)
+    expect(byId.has('fact-kit.index-format-boundaries')).toBe(false)
+    expect(JSON.stringify(content('fact-kit.read-facts'))).toContain('index format other than 1.x')
+  })
+
+  it('gives the result of the seven kinds of index', () => {
+    const d = pendingContent('fact-kit.index-format-detection')
+    const cell = (n: number) => d.cases.find((c: { case: number }) => c.case === n)
+    expect(d.cases).toHaveLength(7)
+    const expected: [number, object, string, string][] = [
+      [1, { indexFormat: '1.x' }, '1.x', '1.x'],
+      [2, { indexFormat: '2.0', formatVersion: '2.0', dataFormatVersion: '<any>' }, '2.0', 'unsupported-index-format'],
+      [3, { formatVersion: '2.0' }, '1.0', '1.0'],
+      [4, { formatVersion: '3.0' }, '1.0', '1.0'],
+      [5, { formatVersion: '4', note: 'a data format version, not an index format' }, '1.0', '1.0'],
+      [6, { indexFormat: '2.0', formatVersion: '3.0' }, '2.0', 'unsupported-index-format'],
+      [7, { indexFormat: '3.0' }, 'unsupported-index-format', 'unsupported-index-format'],
+    ]
+    for (const [n, top, nu, old] of expected) {
+      expect(cell(n).top, `case ${n}`).toEqual(top)
+      expect(cell(n).new, `case ${n}`).toBe(nu)
+      expect(cell(n).old, `case ${n}`).toBe(old)
+    }
+    expect(d.rule.join(' ')).toContain('`indexFormat` only')
+    expect(d.rule.join(' ')).toContain(
+      'When `indexFormat` and the top-level `formatVersion` differ, only `indexFormat` counts.',
+    )
+  })
+
+  it('writes the edge cases of the build, and the error code of an old source key is a known one', () => {
+    const b = pendingContent('fact-kit.index-format-boundaries')
+    expect(Object.keys(b)).toEqual(['aggregate', 'oldSourceKey'])
+    expect(b.aggregate).toContain('copies a component index of format 1.x as it is')
+    expect(content('fact-kit.problem-codes')).toContain(b.oldSourceKey.code)
+    expect(b.oldSourceKey.rule).toContain('formatVersion')
+  })
+
+  it('changes the unsupported-index-format line of readFacts', () => {
+    const throws: string[] = pendingContent('fact-kit.read-facts').throws
+    expect(throws[2]).toContain('another major version than 1 and 2')
+    expect(throws).toHaveLength(content('fact-kit.read-facts').throws.length)
   })
 })

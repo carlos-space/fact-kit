@@ -274,6 +274,116 @@ const entryModuleSchema = {
   },
 }
 
+// Index format 2.0 (pending `index-v2`). The keys are in the order `build` writes them.
+const indexV2Keys = {
+  indexFormat: {
+    type: 'string',
+    pattern: '^[0-9]+\\.[0-9]+$',
+    description:
+      '`2.0` for what this version builds. The only key a reader uses to tell the format: a missing field reads as `1.0`, any `1.x` and any `2.x` is read, and any other major version is `unsupported-index-format`.',
+  },
+  formatVersion: {
+    type: 'string',
+    pattern: '^[0-9]+\\.[0-9]+$',
+    description:
+      'Written with the same value as `indexFormat` (`2.0`), so that a tool that reads the outputs of several kits finds the format under one key name. The readers of fact-kit do not read it, and when it differs from `indexFormat` only `indexFormat` counts.',
+  },
+  package: nonEmpty,
+  entry: indexSchema.properties.entry,
+  component: indexSchema.properties.component,
+  dataFormatVersion: {
+    ...nonEmpty,
+    description:
+      'Optional version of the data format that an entry declares for itself. It was `formatVersion` before 2.0. The readers do not read it and do not return it, so read it from `index.json` directly.',
+  },
+  describes: indexSchema.properties.describes,
+  publish: publishSchema,
+  facts: indexSchema.properties.facts,
+}
+
+const indexSchemaV2 = {
+  ...indexSchema,
+  required: ['indexFormat', 'formatVersion', 'package', 'entry', 'describes', 'facts'],
+  properties: indexV2Keys,
+}
+
+const entryModuleSchemaV2 = {
+  ...entryModuleSchema,
+  properties: {
+    describes: entryModuleSchema.properties.describes,
+    dataFormatVersion: {
+      ...nonEmpty,
+      description:
+        'Written to `dataFormatVersion` of the index. A source that still writes `formatVersion` fails with `format`, because `formatVersion` of the index is now written by the build from `indexFormat`.',
+    },
+    publish: publishSchema,
+    facts: entryModuleSchema.properties.facts,
+  },
+}
+
+/** What a reader makes of the top-level keys of an index. `new` is fact-kit with index 2.0, `old` is JS 0.11.x and the 0.4.x readers of the other languages. */
+const indexFormatDetection = {
+  rule: [
+    'A reader looks at `indexFormat` only. A missing `indexFormat` reads as `1.0`.',
+    'Major version 1, with any minor version, and major version 2, with any minor version, are read. Any other major version is `unsupported-index-format`.',
+    'A reader never reads the top-level `formatVersion` to tell the format, and does not return a data format version. The version of the data is `dataFormatVersion` in `index.json`.',
+    'When `indexFormat` and the top-level `formatVersion` differ, only `indexFormat` counts.',
+  ],
+  cases: [
+    {
+      case: 1,
+      top: { indexFormat: '1.x' },
+      new: '1.x',
+      old: '1.x',
+    },
+    {
+      case: 2,
+      top: { indexFormat: '2.0', formatVersion: '2.0', dataFormatVersion: '<any>' },
+      new: '2.0',
+      old: 'unsupported-index-format',
+    },
+    {
+      case: 3,
+      top: { formatVersion: '2.0' },
+      new: '1.0',
+      old: '1.0',
+    },
+    {
+      case: 4,
+      top: { formatVersion: '3.0' },
+      new: '1.0',
+      old: '1.0',
+    },
+    {
+      case: 5,
+      top: { formatVersion: '4', note: 'a data format version, not an index format' },
+      new: '1.0',
+      old: '1.0',
+    },
+    {
+      case: 6,
+      top: { indexFormat: '2.0', formatVersion: '3.0' },
+      new: '2.0',
+      old: 'unsupported-index-format',
+    },
+    {
+      case: 7,
+      top: { indexFormat: '3.0' },
+      new: 'unsupported-index-format',
+      old: 'unsupported-index-format',
+    },
+  ],
+}
+
+const indexFormatBoundaries = {
+  aggregate:
+    'An aggregate build copies a component index of format 1.x as it is: `indexFormat` and the top-level `formatVersion` are not changed, and the index is not turned into 2.0. A reader tells the format of each index on its own, and a conversion would have to guess whether the old `formatVersion` was a data format version.',
+  oldSourceKey: {
+    code: 'format',
+    rule: 'A `FactsSource` or entry module that still writes `formatVersion` makes `build` and `check` report `format`, because the entry module has no such key any more. Write `dataFormatVersion` instead.',
+  },
+}
+
 const configSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   title: 'fact-kit.config.json',
@@ -577,6 +687,13 @@ const readFactsSpec = {
     'No `version` is given, and the described component is installed under `root` in a newer version than the facts describe (`describes-behind`). The component is looked up as `publish.name` when the index has `publish` with target `npm`, is not looked up when `publish` has another target, and is looked up by the `describes` key when there is no `publish`.',
   ],
 }
+
+// With index 2.0 a reader takes any 1.x and any 2.x, and reads `indexFormat` only.
+const readFactsThrowsV2 = readFactsSpec.throws.map((t, i) =>
+  i === 2
+    ? 'The resolved file is not a fact index (`not-an-index`) or has an index format of another major version than 1 and 2 (`unsupported-index-format`). Only `indexFormat` is read, and a missing one reads as `1.0`.'
+    : t,
+)
 
 // What readFacts documented before `publish`: no `publish` member, and the version check by the `describes` key only.
 const readFactsBefore = {
@@ -1323,6 +1440,7 @@ const facts: FactDecl[] = [
           '/properties/publish': publishSchema,
         },
       },
+      { since: 'next', pending: 'index-v2', schema: indexSchemaV2 },
     ),
   }),
   fact({
@@ -1335,7 +1453,26 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.0.0', schema: entryModuleSchema },
       { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
+      { since: 'next', pending: 'index-v2', schema: entryModuleSchemaV2 },
     ),
+  }),
+  fact({
+    id: 'fact-kit.index-format-detection',
+    topics: ['read', 'build'],
+    title: { en: 'How a reader tells the index format' },
+    description: {
+      en: 'The rule of the readers, with the result of seven kinds of index for a new reader (fact-kit with index 2.0) and an old one (JS 0.11.x, Python, Rust, Go and Swift 0.4.x).',
+    },
+    variants: history({ since: 'next', pending: 'index-v2', value: indexFormatDetection }),
+  }),
+  fact({
+    id: 'fact-kit.index-format-boundaries',
+    topics: ['build'],
+    title: { en: 'Edge cases of building index format 2.0' },
+    description: {
+      en: 'What an aggregate does with a 1.x component index, and what happens to a source that still writes `formatVersion`. Which key a reader takes when the two format keys differ is in `fact-kit.index-format-detection`.',
+    },
+    variants: history({ since: 'next', pending: 'index-v2', value: indexFormatBoundaries }),
   }),
   fact({
     id: 'fact-kit.config-file',
@@ -1455,7 +1592,11 @@ const facts: FactDecl[] = [
     id: 'fact-kit.read-facts',
     topics: ['read'],
     title: { en: 'readFacts parameters and return value' },
-    variants: history({ since: '0.0.0', value: readFactsBefore }, { since: '0.9.0-alpha.1', value: readFactsSpec }),
+    variants: history(
+      { since: '0.0.0', value: readFactsBefore },
+      { since: '0.9.0-alpha.1', value: readFactsSpec },
+      { since: 'next', pending: 'index-v2', set: { '/throws': readFactsThrowsV2 } },
+    ),
   }),
   fact({
     id: 'fact-kit.module-api',
