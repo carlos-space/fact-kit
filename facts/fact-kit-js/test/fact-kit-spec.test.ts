@@ -461,7 +461,7 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, and a next row only for pin and train-next', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, and no next row', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
@@ -512,10 +512,11 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.12.0-alpha.1').length, fact.id).toBe(
         in012.includes(fact.id) ? 1 : 0,
       )
-      // The next row: `pin` and `train-next` also read `when.deprecatedIn` and `when.removeIn`.
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+      // Released in 0.12.1-alpha.1: `pin` and `train-next` also read `when.deprecatedIn` and `when.removeIn`.
+      expect((fact.variants ?? []).filter((v) => v.since === '0.12.1-alpha.1').length, fact.id).toBe(
         ['fact-kit.cli', 'fact-kit.check-rules'].includes(fact.id) ? 1 : 0,
       )
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)

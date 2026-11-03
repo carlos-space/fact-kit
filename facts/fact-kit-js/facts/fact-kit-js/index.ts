@@ -1702,7 +1702,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.1-alpha.1',
         replace: {
           '': [
             {
@@ -1886,7 +1886,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.12.1-alpha.1',
         set: {
           '/pin/summary':
             'Turn every `next` in the `since` of the rows under the facts directory into one version: a `since` that is `next`, or an array that ends in `next`. It also turns a `next` in `when.deprecatedIn` and `when.removeIn` into that version, so a fact that retires in the release stops being read at the version it is pinned to. A row with a `pending` label stays, so do `describes` and `<facts-dir>/_lib`. Only the text of the literal changes, so a second run changes nothing. Needs oxc-parser.',
