@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.8.0-alpha.1...fact-kit-facts/v0.8.0) (2026-11-03)
+
+
+### chore
+
+* **release/v0.8:** fact-kit-facts 0.8.0 ([594c543](https://github.com/carlos-space/fact-kit/commit/594c54306682fd44ad17c064fcc445d791130f8f))
+
+## [0.8.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.7.1...fact-kit-facts/v0.8.0-alpha.1) (2026-11-03)
+
+
+### Added
+
+* entry 可選填 layer，index 格式升到 2.1 ([#112](https://github.com/carlos-space/fact-kit/issues/112)) ([48a19e1](https://github.com/carlos-space/fact-kit/commit/48a19e14046ae2388c565e3ff6d3b508e1e51145))
+
+
+### Fixed
+
+* pin 也釘 when 裡的 next ([#108](https://github.com/carlos-space/fact-kit/issues/108)) ([c59b39b](https://github.com/carlos-space/fact-kit/commit/c59b39b2ebecaf017b34667b3fc4d4da6bdb88d7))
+
 ## [0.7.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.7.1-alpha.1...fact-kit-facts/v0.7.1) (2026-11-03)
 
 
