@@ -152,6 +152,23 @@ describe('c004 check: the rules of m149/d011', () => {
     expect((await check(files, ['--train', 'other=1.2.0'])).code).toBe(0)
   })
 
+  test('train-next: a next in when.deprecatedIn or when.removeIn is reported until pin', async () => {
+    const files = {
+      'facts/a/index.ts': entry([fact('one', ", when: { deprecatedIn: 'next', removeIn: 'next' }")]),
+    }
+    expect((await check(files)).code).toBe(0)
+    const r = await check(files, ['--train', 'demo=1.2.0'])
+    expect([r.code, codes(r)]).toEqual([1, ['train-next', 'train-next']])
+    expect(r.problems.map((p) => p.location)).toEqual([
+      'facts/a/index.ts#/facts/0/when/deprecatedIn',
+      'facts/a/index.ts#/facts/0/when/removeIn',
+    ])
+    // A version, or another component's train, is fine.
+    const pinned = { 'facts/a/index.ts': entry([fact('one', ", when: { deprecatedIn: '1.2.0', removeIn: '1.3.0' }")]) }
+    expect((await check(pinned, ['--train', 'demo=1.2.0'])).code).toBe(0)
+    expect((await check(files, ['--train', 'other=1.2.0'])).code).toBe(0)
+  })
+
   test('pending-untested: a pending label that no test includes', async () => {
     const facts = {
       'facts/a/index.ts': entry([fact('one', rows(row("'1.0.0'"), row("'next'", ", pending: 'later'")))]),

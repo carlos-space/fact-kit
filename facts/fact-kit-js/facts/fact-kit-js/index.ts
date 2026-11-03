@@ -1701,6 +1701,18 @@ const facts: FactDecl[] = [
           ],
         },
       },
+      {
+        since: 'next',
+        replace: {
+          '': [
+            {
+              code: 'train-next',
+              rule: 'A component named by `--train` still has a row that says `next` and is not pending, or a `when.deprecatedIn` or `when.removeIn` that says `next`. Run `pin` first.',
+              reads: 'sources, `--train`',
+            },
+          ],
+        },
+      },
     ),
   }),
   fact({
@@ -1871,6 +1883,13 @@ const facts: FactDecl[] = [
         set: {
           '/build/factsDir':
             'The fact sources directory. `--facts-dir` wins, then `factsDir` of the config file, then `facts`.',
+        },
+      },
+      {
+        since: 'next',
+        set: {
+          '/pin/summary':
+            'Turn every `next` in the `since` of the rows under the facts directory into one version: a `since` that is `next`, or an array that ends in `next`. It also turns a `next` in `when.deprecatedIn` and `when.removeIn` into that version, so a fact that retires in the release stops being read at the version it is pinned to. A row with a `pending` label stays, so do `describes` and `<facts-dir>/_lib`. Only the text of the literal changes, so a second run changes nothing. Needs oxc-parser.',
         },
       },
     ),
