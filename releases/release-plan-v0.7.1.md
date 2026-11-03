@@ -10,9 +10,9 @@
 
 ## 含哪些工作
 
-| PR                                           | 單元                        | 狀態              |
-| :------------------------------------------- | :-------------------------- | :---------------- |
-| #108 fix: pin 也釘 when 裡的 next            | fact-kit-js、fact-kit-facts | 已合回（c59b39b） |
+| PR                                | 單元                        | 狀態              |
+| :-------------------------------- | :-------------------------- | :---------------- |
+| #108 fix: pin 也釘 when 裡的 next | fact-kit-js、fact-kit-facts | 已合回（c59b39b） |
 
 `fact-kit pin` 原本只釘 `since` 的 `next`。fact 寫 `when: { deprecatedIn: 'next', removeIn: 'next' }` 時，pin 輸出 0 pinned，`when` 裡的 `next` 原樣留著，發版後以該版讀仍讀得到該退場的 fact。#108 讓 pin 也釘 `when.deprecatedIn` 與 `when.removeIn` 的 `next`，筆數算進輸出，`check --train` 對這兩欄的 `next` 報 `train-next`。fact-kit-facts 的 fact 跟著寫出新行為。
 
