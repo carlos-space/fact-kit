@@ -1846,7 +1846,7 @@ const facts: FactDecl[] = [
         },
       },
       { since: '0.12.0-alpha.1', schema: indexSchemaV2 },
-      { since: 'next', schema: indexSchemaV21 },
+      { since: '0.13.0-alpha.1', schema: indexSchemaV21 },
     ),
   }),
   fact({
@@ -1860,7 +1860,7 @@ const facts: FactDecl[] = [
       { since: '0.0.0', schema: entryModuleSchema },
       { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
       { since: '0.12.0-alpha.1', schema: entryModuleSchemaV2 },
-      { since: 'next', schema: entryModuleSchemaV21 },
+      { since: '0.13.0-alpha.1', schema: entryModuleSchemaV21 },
     ),
   }),
   fact({
@@ -1870,7 +1870,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The optional `layer` field of an entry, its four values, and how it gets into the index and out of the readers.',
     },
-    variants: history({ since: 'next', value: entryLayer }),
+    variants: history({ since: '0.13.0-alpha.1', value: entryLayer }),
   }),
   fact({
     id: 'fact-kit.index-format-2-1',
@@ -1879,7 +1879,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'What changes in the index format when `layer` is added, and how readers of 2.0 and older take a 2.1 index.',
     },
-    variants: history({ since: 'next', value: indexFormat21 }),
+    variants: history({ since: '0.13.0-alpha.1', value: indexFormat21 }),
   }),
   fact({
     id: 'fact-kit.index-format-detection',
@@ -2069,7 +2069,7 @@ const facts: FactDecl[] = [
       { since: '0.0.0', value: readFactsBefore },
       { since: '0.9.0-alpha.1', value: readFactsSpec },
       { since: '0.12.0-alpha.1', set: { '/throws': readFactsThrowsV2 } },
-      { since: 'next', set: { '/returns/members': readFactsMembersV21 } },
+      { since: '0.13.0-alpha.1', set: { '/returns/members': readFactsMembersV21 } },
     ),
   }),
   fact({
