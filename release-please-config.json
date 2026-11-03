@@ -42,6 +42,6 @@
   "plugins": [],
   "versioning": "prerelease",
   "prerelease-type": "alpha.1",
-  "prerelease": true,
+  "prerelease": false,
   "last-release-sha": "add7c9a17dad4c871f12b718b4626651f9b45be7"
 }
