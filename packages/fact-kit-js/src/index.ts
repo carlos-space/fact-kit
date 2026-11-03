@@ -11,6 +11,7 @@ export type {
   FactsModule,
   FactsSource,
   JsonSchema,
+  Layer,
   Os,
   Problem,
   Since,

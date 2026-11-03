@@ -4,7 +4,10 @@ import { alignFact, rewriteRootRefs } from './align.ts'
 import type { AlignSlot } from './align.ts'
 import { canonical, factRows, topLevelContent } from './select.ts'
 import { loadInstalledIndex } from './read.ts'
-import type { DerivedFact, Fact, FactDecl, FactLike, FactsModule, FactsSource, Problem } from './types.ts'
+import { LAYERS } from './types.ts'
+import type { DerivedFact, Fact, FactDecl, FactLike, FactsModule, FactsSource, Layer, Problem } from './types.ts'
+
+const isLayer = (v: unknown): v is Layer => typeof v === 'string' && (LAYERS as readonly string[]).includes(v)
 
 /** Marks what `derive` returns. A `Symbol.for` key, so two copies of fact-kit agree. */
 const DERIVE = Symbol.for('fact-kit.derive')
@@ -231,6 +234,7 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
     module: {
       describes: e.source.describes,
       ...(e.source.publish !== undefined ? { publish: e.source.publish } : {}),
+      ...(isLayer(e.source.layer) ? { layer: e.source.layer } : {}),
       ...(e.source.dataFormatVersion !== undefined ? { dataFormatVersion: e.source.dataFormatVersion } : {}),
       facts: [],
     },
@@ -245,6 +249,17 @@ export function resolveEntries(entries: readonly SourceEntry[], ctx: ResolveCont
         code: 'format',
         message: '`formatVersion` is not a key of the entry module any more. Write `dataFormatVersion` instead',
         location: at(e.origin, '/formatVersion'),
+      })
+    }
+  }
+  // `layer` is optional. A value outside the four layers stops the build and `check`.
+  for (const [ei, e] of entries.entries()) {
+    const layer = (e.source as unknown as Record<string, unknown>).layer
+    if (layer !== undefined && !isLayer(layer)) {
+      ;(out[ei] as ResolvedEntry).problems.push({
+        code: 'format',
+        message: `\`layer\` must be one of ${LAYERS.join(', ')}, got ${JSON.stringify(layer)}`,
+        location: at(e.origin, '/layer'),
       })
     }
   }

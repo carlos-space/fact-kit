@@ -228,6 +228,7 @@ export const indexSchema = {
     dataFormatVersion: nonEmptyString,
     describes: { type: 'object', additionalProperties: nonEmptyString },
     publish: publishSchema,
+    layer: { enum: ['org', 'product', 'implementation', 'tool'] },
     facts: { type: 'array', items: { $ref: FACT_SCHEMA_ID } },
   },
 }

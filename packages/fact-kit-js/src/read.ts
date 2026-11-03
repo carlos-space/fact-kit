@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { assertIndex, selectFacts } from './select.ts'
 import type { SelectOptions, SelectedFact } from './select.ts'
-import type { FactIndex, PublishInfo, Since } from './types.ts'
+import type { FactIndex, Layer, PublishInfo, Since } from './types.ts'
 import { FactReadError, compareSemver, parseVersion } from './version.ts'
 
 /** What `onRead` is told: the fact that was read and the fact package it came from. */
@@ -26,6 +26,8 @@ export interface FactReader {
   describes: Readonly<Record<string, string>>
   /** Where the described component is published, as the index says. Undefined when the index has none. */
   publish: Readonly<PublishInfo> | undefined
+  /** The layer the index declares. Undefined for an index that has none, such as one before format 2.1. */
+  layer: Layer | undefined
   /** The facts this reader sees, each flattened to the row that applies. */
   facts: readonly SelectedFact[]
   /** Whether a fact with this id exists. */
@@ -232,6 +234,7 @@ export function readFacts(spec: string, options: ReadFactsOptions = {}): FactRea
     entry: entryName,
     describes,
     publish,
+    layer: index.layer,
     facts: listed,
     has: (id) => {
       const fact = byId.get(id)

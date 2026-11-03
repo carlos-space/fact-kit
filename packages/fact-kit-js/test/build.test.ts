@@ -62,8 +62,8 @@ describe('c003 build', () => {
       'facts',
     ])
     expect(cliIndex).toMatchObject({
-      indexFormat: '2.0',
-      formatVersion: '2.0',
+      indexFormat: '2.1',
+      formatVersion: '2.1',
       package: '@demo/tool-facts',
       entry: 'cli',
       dataFormatVersion: '2',

@@ -31,7 +31,9 @@ facts 套件用 `^` 範圍依賴 fact-kit，0.x 時等於鎖住 minor。規則�
 
 讀取端只用 `indexFormat` 判斷 index 的格式，缺了就當 1.0。主版號 1 與 2 都讀，其他主版號回報 `unsupported-index-format`。
 
-新 index 同時寫 `indexFormat` 與頂層 `formatVersion` 兩個欄位，兩者同值，目前都是 `"2.0"`。這樣做是讓跨 kit 的工具用同一個鍵名讀格式版號。讀取端不讀 `formatVersion`，兩者不同時只算 `indexFormat`。
+新 index 同時寫 `indexFormat` 與頂層 `formatVersion` 兩個欄位，兩者同值，目前都是 `"2.1"`。這樣做是讓跨 kit 的工具用同一個鍵名讀格式版號。讀取端不讀 `formatVersion`，兩者不同時只算 `indexFormat`。
+
+2.1 起 entry 可以在 `facts/<entry>/index.ts` 選填 `layer`，取值是 `org`、`product`、`implementation`、`tool`。`build` 把它寫進 index 頂層的 `layer`，沒宣告時不寫這個鍵。取值不在清單時 `build` 與 `check` 回報 `format`。JS 的 `readFacts` 回傳 `layer`，index 沒有時是 undefined。
 
 原本的資料版號改名為 `dataFormatVersion`，由源碼 `facts/<entry>/index.ts` 的 `dataFormatVersion` 寫入。源碼仍寫 `formatVersion` 時，`build` 與 `check` 回報 `format`。
 

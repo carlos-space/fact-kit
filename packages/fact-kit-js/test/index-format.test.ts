@@ -21,8 +21,8 @@ describe('c001 index format 2.0 is written', () => {
     writeTree(dir, { 'package.json': pkg, 'facts/cli/index.ts': entry("{ demo: '1.2.0' }", [fact('demo.a')]) })
     expect((await buildFacts({ cwd: dir })).problems).toEqual([])
     const index = readIndex(dir, 'cli')
-    expect(index.indexFormat).toBe('2.0')
-    expect(index.formatVersion).toBe('2.0')
+    expect(index.indexFormat).toBe('2.1')
+    expect(index.formatVersion).toBe('2.1')
     expect(Object.keys(index).slice(0, 2)).toEqual(['indexFormat', 'formatVersion'])
     expect(JSON.stringify(index)).not.toContain('"ac"')
     expect(validateIndex(index)).toEqual([])
@@ -294,7 +294,7 @@ describe('c002 data format version and old source key', () => {
       'describes',
       'facts',
     ])
-    expect(index.formatVersion).toBe('2.0')
+    expect(index.formatVersion).toBe('2.1')
     expect(index.dataFormatVersion).toBe('4')
     expect(validateIndex(index)).toEqual([])
   })
