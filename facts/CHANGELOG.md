@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.7.0...fact-kit-facts/v0.7.1-alpha.1) (2026-11-03)
+
+
+### Fixed
+
+* pin 也釘 when 裡的 next ([#108](https://github.com/carlos-space/fact-kit/issues/108)) ([42eb74a](https://github.com/carlos-space/fact-kit/commit/42eb74a7ac808cf68cd591ac7fe85e881bb9ebda))
+
 ## [0.7.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.7.0-alpha.1...fact-kit-facts/v0.7.0) (2026-11-02)
 
 
