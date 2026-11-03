@@ -37,27 +37,11 @@
     "facts": {
       "component": "fact-kit-facts",
       "release-type": "node"
-    },
-    "packages/fact-kit-py": {
-      "component": "fact-kit-py",
-      "release-type": "python"
-    },
-    "packages/fact-kit-rs": {
-      "component": "fact-kit-rs",
-      "release-type": "rust"
-    },
-    "packages/fact-kit-go": {
-      "component": "fact-kit-go",
-      "release-type": "go"
-    },
-    "packages/fact-kit-swift": {
-      "component": "fact-kit-swift",
-      "release-type": "simple"
     }
   },
   "plugins": [],
   "versioning": "prerelease",
   "prerelease-type": "alpha.1",
-  "prerelease": false,
-  "last-release-sha": "6f12702db0c31dacdde409f9b46b0ca4bc59c1ca"
+  "prerelease": true,
+  "last-release-sha": "67191060338f182598bf958ffc1050667a57cfe7"
 }

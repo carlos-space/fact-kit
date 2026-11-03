@@ -107,7 +107,7 @@ check_no_next() { # check_no_next <dir> <what>
     ids="$(jq -r '
       def next: . == "next" or (type == "array" and length > 0 and last == "next");
       (if type == "object" then (.facts // []) else [] end)[] | objects
-      | select((.when.since? | next) or any((.variants // [])[] | objects; (has("pending") | not) and (.since | next)))
+      | select((.when.since? | next) or (.when.deprecatedIn? == "next") or (.when.removeIn? == "next") or any((.variants // [])[] | objects; (has("pending") | not) and (.since | next)))
       | .id' "$f")" || die "$2: $f is not a JSON file jq can read"
     [[ -z "$ids" ]] || die "$2: ${f#"$1"/} still has rows that start at \"next\" ($(paste -sd, - <<<"$ids")). Run fact-kit pin on the release branch before the Release PR merges"
   done < <(find "$1" -name index.json -type f | sort)
