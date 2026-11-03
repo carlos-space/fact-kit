@@ -307,6 +307,37 @@ const indexSchemaV2 = {
   properties: indexV2Keys,
 }
 
+// Index format 2.1: the optional top-level `layer`, after `publish`.
+const layerSchema = {
+  description:
+    'The layer the facts of this entry belong to. `org`, `product` and `implementation` go from the top down. `tool` is the commands, fields and behavior of a tool, and the source declares it itself. Optional: an entry that does not write it has no `layer` in its index.',
+  enum: ['org', 'product', 'implementation', 'tool'],
+}
+
+const indexSchemaV21 = {
+  ...indexSchemaV2,
+  properties: {
+    indexFormat: {
+      ...indexV2Keys.indexFormat,
+      description:
+        '`2.1` for what this version builds. The only key a reader uses to tell the format: a missing field reads as `1.0`, any `1.x` and any `2.x` is read, and any other major version is `unsupported-index-format`.',
+    },
+    formatVersion: {
+      ...indexV2Keys.formatVersion,
+      description:
+        'Written with the same value as `indexFormat` (`2.1`), so that a tool that reads the outputs of several kits finds the format under one key name. The readers of fact-kit do not read it, and when it differs from `indexFormat` only `indexFormat` counts.',
+    },
+    package: indexV2Keys.package,
+    entry: indexV2Keys.entry,
+    component: indexV2Keys.component,
+    dataFormatVersion: indexV2Keys.dataFormatVersion,
+    describes: indexV2Keys.describes,
+    publish: indexV2Keys.publish,
+    layer: layerSchema,
+    facts: indexV2Keys.facts,
+  },
+}
+
 const entryModuleSchemaV2 = {
   ...entryModuleSchema,
   required: ['describes'],
@@ -322,6 +353,14 @@ const entryModuleSchemaV2 = {
       ...entryModuleSchema.properties.facts,
       description: `${entryModuleSchema.properties.facts.description} Optional: the facts of the entry may all be in \`*.facts.ts\` files, which the build collects after these (\`fact-kit.facts-file-collection\`).`,
     },
+  },
+}
+
+const entryModuleSchemaV21 = {
+  ...entryModuleSchemaV2,
+  properties: {
+    layer: layerSchema,
+    ...entryModuleSchemaV2.properties,
   },
 }
 
@@ -707,6 +746,47 @@ const readFactsBefore = {
     ...readFactsSpec.throws.slice(0, -1),
     'No `version` is given, and the described component is installed under `root` in a newer version than the facts describe.',
   ],
+}
+
+// Index format 2.1: `readFacts` also returns the `layer` of the index, after `publish`.
+const readFactsMembersV21 = readFactsSpec.returns.members.flatMap((m) =>
+  m.name === 'publish'
+    ? [
+        m,
+        {
+          name: 'layer',
+          type: '"org" | "product" | "implementation" | "tool" | undefined',
+          summary:
+            'The top-level `layer` of the index, as it is. Undefined for an index that has none, such as every index before format 2.1.',
+        },
+      ]
+    : [m],
+)
+
+const entryLayer = {
+  field: 'layer',
+  where: 'The default export of `facts/<entry>/index.ts`, next to `describes` and `publish`. `defineFacts` takes it.',
+  values: ['org', 'product', 'implementation', 'tool'],
+  required: false,
+  order: '`org`, `product` and `implementation` go from the top down.',
+  tool: '`tool` is the commands, fields and behavior of a tool. The source declares it itself, whether the tool is its own or from a third party.',
+  declared: 'The entry declares its layer. A reader does not work it out from the directory or from `describes`.',
+  index:
+    'The build writes it to the top-level `layer` of the index, after `publish` and before `facts`. An entry that does not write `layer` has no `layer` key in its index.',
+  invalid:
+    'A value that is not one of the four makes `defineFacts`, `build` and `check` fail. The problem code is `format`, its location ends in `/layer`, and the message names `layer`.',
+  readers:
+    '`loadInstalledIndex` returns it as `index.layer`, and `readFacts` returns it as `layer`. Both give undefined when the index has none.',
+}
+
+const indexFormat21 = {
+  indexFormat: '2.1',
+  change:
+    'The minor version goes up by one, from 2.0 to 2.1, because the index may now have a top-level `layer`. The build writes 2.1 for every index, with or without `layer`.',
+  readers:
+    'A reader takes any `1.x` and any `2.x`, so it reads 2.0 and 2.1 alike and skips the top-level keys it does not know. A reader that does not know `layer` ignores it.',
+  conformance:
+    'The cases `index-format-2-1-layer` and `index-format-2-1-layer-other-value` have a top-level `layer` and all five readers read them.',
 }
 
 const moduleApi = {
@@ -1766,6 +1846,7 @@ const facts: FactDecl[] = [
         },
       },
       { since: '0.12.0-alpha.1', schema: indexSchemaV2 },
+      { since: 'next', schema: indexSchemaV21 },
     ),
   }),
   fact({
@@ -1779,7 +1860,26 @@ const facts: FactDecl[] = [
       { since: '0.0.0', schema: entryModuleSchema },
       { since: '0.9.0-alpha.1', set: { '/properties/publish': publishSchema } },
       { since: '0.12.0-alpha.1', schema: entryModuleSchemaV2 },
+      { since: 'next', schema: entryModuleSchemaV21 },
     ),
+  }),
+  fact({
+    id: 'fact-kit.entry-layer',
+    topics: ['authoring', 'build', 'read'],
+    title: { en: 'The layer of an entry' },
+    description: {
+      en: 'The optional `layer` field of an entry, its four values, and how it gets into the index and out of the readers.',
+    },
+    variants: history({ since: 'next', value: entryLayer }),
+  }),
+  fact({
+    id: 'fact-kit.index-format-2-1',
+    topics: ['build', 'read'],
+    title: { en: 'Index format 2.1' },
+    description: {
+      en: 'What changes in the index format when `layer` is added, and how readers of 2.0 and older take a 2.1 index.',
+    },
+    variants: history({ since: 'next', value: indexFormat21 }),
   }),
   fact({
     id: 'fact-kit.index-format-detection',
@@ -1969,6 +2069,7 @@ const facts: FactDecl[] = [
       { since: '0.0.0', value: readFactsBefore },
       { since: '0.9.0-alpha.1', value: readFactsSpec },
       { since: '0.12.0-alpha.1', set: { '/throws': readFactsThrowsV2 } },
+      { since: 'next', set: { '/returns/members': readFactsMembersV21 } },
     ),
   }),
   fact({

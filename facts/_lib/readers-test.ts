@@ -17,6 +17,8 @@ const aggregate = JSON.parse(readFileSync(join(factsDir, 'package.json'), 'utf8'
 const READ_ERROR_CODES: ReadErrorCode[] = ['not-an-index', 'unsupported-index-format', 'not-found', 'invalid-version']
 // Only the JS reader has these (m151/d003).
 const JS_ONLY = new Set(['options.onRead'])
+// Members of the JS `readFacts` result that the other readers do not return yet: `layer` of index format 2.1.
+const JS_ONLY_MEMBERS = new Set(['layer'])
 
 // The newest row of the fact, because `readFacts` has rows by version.
 const jsReadDecl = (kit.facts ?? []).find((f) => (f as { id?: string }).id === 'fact-kit.read-facts') as
@@ -97,7 +99,10 @@ export function readerSpec(
       const jsParams = jsRead.value.parameters.map((p) => p.name).filter((n) => !JS_ONLY.has(n))
       expect(read.parameters.map((p) => p.js).sort()).toEqual([...jsParams].sort())
       expect(read.returns.members.map((m) => m.js).sort()).toEqual(
-        jsRead.value.returns.members.map((m) => m.name).sort(),
+        jsRead.value.returns.members
+          .map((m) => m.name)
+          .filter((n) => !JS_ONLY_MEMBERS.has(n))
+          .sort(),
       )
       const select = reader.value<ReaderApi['select']>(`${tool}.select-facts`)
       expect(select.parameters.map((p) => p.js).sort()).toEqual(

@@ -15,6 +15,7 @@ import {
   factSchema as implFactSchema,
   flattenSchema,
   history,
+  INDEX_FORMAT,
   indexSchema as implIndexSchema,
   readFacts,
   selectFacts,
@@ -106,6 +107,7 @@ describe('fact-kit.fact and fact-kit.index', () => {
       'dataFormatVersion',
       'describes',
       'facts',
+      'layer',
       'publish',
     ])
   })
@@ -461,7 +463,7 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, and no next row', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, and next rows only for the entry layer', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
@@ -516,7 +518,17 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.12.1-alpha.1').length, fact.id).toBe(
         ['fact-kit.cli', 'fact-kit.check-rules'].includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
+      // Planned for index format 2.1: the optional `layer` of an entry.
+      const inNext = [
+        'fact-kit.index',
+        'fact-kit.entry-module',
+        'fact-kit.read-facts',
+        'fact-kit.entry-layer',
+        'fact-kit.index-format-2-1',
+      ]
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+        inNext.includes(fact.id) ? 1 : 0,
+      )
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -754,13 +766,14 @@ describe('index format 2.0', () => {
       'dataFormatVersion',
       'describes',
       'publish',
+      'layer',
       'facts',
     ])
     expect(schema.required).toEqual(['indexFormat', 'formatVersion', 'package', 'entry', 'describes', 'facts'])
     expect(schema.required).not.toContain('dataFormatVersion')
     expect(schema.properties.dataFormatVersion.description).toContain('index.json')
     const entry = pendingContent('fact-kit.entry-module')
-    expect(Object.keys(entry.properties)).toEqual(['describes', 'dataFormatVersion', 'publish', 'facts'])
+    expect(Object.keys(entry.properties)).toEqual(['layer', 'describes', 'dataFormatVersion', 'publish', 'facts'])
   })
 
   it('shows the reader rules and the build rows to a reader on head', () => {
@@ -807,6 +820,48 @@ describe('index format 2.0', () => {
     const throws: string[] = content('fact-kit.read-facts').throws
     expect(throws[2]).toContain('another major version than 1 and 2')
     expect(throws).toHaveLength(5)
+  })
+})
+
+describe('entry layer and index format 2.1', () => {
+  it('shows the new facts to a reader on head and not to the latest published reader', () => {
+    for (const id of ['fact-kit.entry-layer', 'fact-kit.index-format-2-1']) {
+      expect(byId.has(id), id).toBe(true)
+      expect(
+        selectFacts(specIndex, {}).some((f) => f.id === id),
+        id,
+      ).toBe(false)
+    }
+  })
+
+  it('names the four values like the implementation and says the field is optional', () => {
+    const layer = content('fact-kit.entry-layer')
+    expect(layer.values).toEqual(implIndexSchema.properties.layer.enum)
+    expect(layer.required).toBe(false)
+    expect(layer.invalid).toContain('`layer`')
+    expect(content('fact-kit.index').properties.layer.enum).toEqual(layer.values)
+    expect(content('fact-kit.entry-module').properties.layer.enum).toEqual(layer.values)
+    expect(content('fact-kit.entry-module').required).not.toContain('layer')
+    expect(content('fact-kit.index').required).not.toContain('layer')
+  })
+
+  it('writes the format minor the build writes', () => {
+    expect(content('fact-kit.index-format-2-1').indexFormat).toBe(INDEX_FORMAT)
+    expect(content('fact-kit.index').properties.indexFormat.description).toContain(`\`${INDEX_FORMAT}\``)
+    // The 2.0 row stays for a reader of the released version.
+    const released = selectFacts(specIndex, { version: '0.12.1' }).find((f) => f.id === 'fact-kit.index')
+    expect(JSON.stringify(released?.content)).not.toContain('"layer"')
+  })
+
+  it('has the layer in a built index and in the reader result of the head spec', () => {
+    const specAjv = new Ajv2020({ strict: false })
+    specAjv.compile(content('fact-kit.fact'))
+    const index = specAjv.compile(content('fact-kit.index'))
+    const built = buildIndex('demo-facts', { ...spec, module: { ...spec.module, layer: 'tool' } })
+    expect(built.layer).toBe('tool')
+    expect(index(built)).toBe(true)
+    expect(index({ ...built, layer: 'team' })).toBe(false)
+    expect(content('fact-kit.read-facts').returns.members.map((m: { name: string }) => m.name)).toContain('layer')
   })
 })
 
