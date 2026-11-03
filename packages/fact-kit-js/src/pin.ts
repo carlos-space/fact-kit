@@ -3,7 +3,7 @@ import { join, relative, resolve, sep } from 'node:path'
 import { InputError } from './load.ts'
 import { loadOxc } from './oxc.ts'
 import { readConfig } from './project.ts'
-import { applyEdits, findRows } from './rows.ts'
+import { applyEdits, findRows, findWhenNext } from './rows.ts'
 import type { Edit } from './rows.ts'
 import { CODE, lineOf, walk } from './rules.ts'
 import { parseVersion } from './version.ts'
@@ -31,7 +31,7 @@ export interface PinResult {
 /**
  * Pins every `next` in the `since` of the rows under the facts directory to `options.version`: a `since` that is
  * `'next'`, or an array that ends in `'next'`. A row with a `pending` label stays. Only the text of the literal is
- * replaced, so nothing else in the file moves. `<factsDir>/_lib` is not read, `describes` is not touched, and a
+ * replaced, so nothing else in the file moves. A `'next'` in `when.deprecatedIn` or `when.removeIn` is pinned too. `<factsDir>/_lib` is not read, `describes` is not touched, and a
  * second run finds nothing to change. Nothing is written unless every file could be read and parsed.
  */
 export async function pinVersion(options: PinOptions): Promise<PinResult> {
@@ -71,6 +71,9 @@ export async function pinVersion(options: PinOptions): Promise<PinResult> {
       }
       if (row.pending === 'set') continue
       edits.push({ start: last.start + 1, end: last.end - 1, text: options.version })
+    }
+    for (const item of findWhenNext(parsed.program, dataKeys ? { dataKeys } : {})) {
+      edits.push({ start: item.start + 1, end: item.end - 1, text: options.version })
     }
     if (edits.length > 0) plans.push({ file, source, text: applyEdits(source, edits), pinned: edits.length })
   }
