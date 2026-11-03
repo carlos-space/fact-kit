@@ -31,8 +31,8 @@ export interface PinResult {
 /**
  * Pins every `next` in the `since` of the rows under the facts directory to `options.version`: a `since` that is
  * `'next'`, or an array that ends in `'next'`. A row with a `pending` label stays. Only the text of the literal is
- * replaced, so nothing else in the file moves. A `'next'` in `when.deprecatedIn` or `when.removeIn` is pinned too. `<factsDir>/_lib` is not read, `describes` is not touched, and a
- * second run finds nothing to change. Nothing is written unless every file could be read and parsed.
+ * replaced, so nothing else in the file moves. A `'next'` in `when.deprecatedIn` or `when.removeIn` is pinned too.
+ * `<factsDir>/_lib` is not read, `describes` is not touched, and a second run finds nothing to change. Nothing is written unless every file could be read and parsed.
  */
 export async function pinVersion(options: PinOptions): Promise<PinResult> {
   if (!parseVersion(options.version)) {
