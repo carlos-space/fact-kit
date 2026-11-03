@@ -100,6 +100,35 @@ describe('fact-kit pin --version', () => {
     expect(r.stdout).toContain('7 "next" pinned to 0.49.0 in 1 file(s)')
   })
 
+  test("pins a 'next' in when.deprecatedIn and when.removeIn, and leaves other values", async () => {
+    const source = `export default {
+  describes: { demo: 'next' },
+  facts: [
+    { id: 'demo.retire', when: { deprecatedIn: 'next', removeIn: 'next' }, variants: [{ since: 'next', content: { value: 1 } }] },
+    { id: 'demo.retire2', when: { since: 'next', deprecatedIn: "next", removeIn: \`next\` }, content: { value: 2 } },
+    { id: 'demo.fixed', when: { deprecatedIn: '0.40.0', removeIn: '0.60.0' }, content: { value: 3 } },
+    { id: 'demo.plain', content: { value: 4 } },
+    { id: 'demo.outside', content: { value: 5, when: { removeIn: 'next' } } },
+  ],
+}
+`
+    const dir = await sample(source)
+    const r = await cli(['pin', '--version', '0.2.0', '--cwd', dir])
+    expect(r.code, r.stderr).toBe(0)
+    const after = readFileSync(join(dir, 'facts/demo/index.ts'), 'utf8')
+    expect(after).toContain(
+      `when: { deprecatedIn: '0.2.0', removeIn: '0.2.0' }, variants: [{ since: '0.2.0', content: { value: 1 } }]`,
+    )
+    expect(after).toContain('when: { since: \'0.2.0\', deprecatedIn: "0.2.0", removeIn: `0.2.0` }')
+    expect(after).toContain(`when: { deprecatedIn: '0.40.0', removeIn: '0.60.0' }`)
+    expect(after).toContain(`content: { value: 5, when: { removeIn: 'next' } }`)
+    expect(after).toContain(`describes: { demo: 'next' }`)
+    // Row 1: since + 2 when values. Row 2: when.since + 2 when values.
+    expect(r.stdout).toContain('6 "next" pinned to 0.2.0 in 1 file(s)')
+    const again = await cli(['pin', '--version', '0.3.0', '--cwd', dir])
+    expect(again.stdout).toContain('0 "next" pinned')
+  })
+
   test('does not read facts/_lib', async () => {
     const dir = await sample()
     await cli(['pin', '--version', '0.49.0', '--cwd', dir])

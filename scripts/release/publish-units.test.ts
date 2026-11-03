@@ -136,7 +136,7 @@ describe('publish-units.sh same-content check against the tag', () => {
 })
 
 // The facts package at a GA version, with a built index whose facts are the case under test. The rows are those
-// of check's train-next rule: when.since, and variants[].since without pending.
+// of check's train-next rule: when.since, variants[].since without pending, and when.deprecatedIn and when.removeIn.
 function factsPackage(facts: unknown[], entry = 'dist/index.json') {
   const r = repo()
   r.json('facts/package.json', { name: 'fact-kit-facts', version: '0.6.1' })
@@ -160,6 +160,8 @@ describe('publish-units.sh refuses facts rows that still start at "next"', () =>
       fact('fact-kit.a', { variants: [{ since: ['0.10.0', 'next'], content: { value: 2 } }] }),
     ],
     ['a fact whose when.since is "next"', fact('fact-kit.a', { when: { since: 'next' } })],
+    ['a fact whose when.deprecatedIn is "next"', fact('fact-kit.a', { when: { deprecatedIn: 'next' } })],
+    ['a fact whose when.removeIn is "next"', fact('fact-kit.a', { when: { removeIn: 'next' } })],
   ])('%s is refused and named', (_, bad) => {
     const { dir } = factsPackage([fact('fact-kit.ok', {}), bad])
     const r = run(dir, 'ga', 'facts')
@@ -175,6 +177,10 @@ describe('publish-units.sh refuses facts rows that still start at "next"', () =>
   })
 
   test.each([
+    [
+      'pinned when.deprecatedIn and when.removeIn',
+      fact('fact-kit.a', { when: { since: '0.11.0', deprecatedIn: '0.11.0', removeIn: '0.12.0' } }),
+    ],
     ['pinned rows', fact('fact-kit.a', { when: { since: '0.11.0' }, variants: [{ since: '0.11.0', content: {} }] })],
     ['a pending row at "next"', fact('fact-kit.a', { variants: [{ since: 'next', pending: 'x', content: {} }] })],
     ['"next" inside the content, not a row', fact('fact-kit.a', { content: { value: [{ since: 'next' }] } })],

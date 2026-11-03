@@ -140,6 +140,50 @@ export function findRows(program: unknown, options: FindRowsOptions = {}): Since
   return rows
 }
 
+/**
+ * The string literals `'next'` in `when.deprecatedIn` and `when.removeIn` of a `when` object, in source order.
+ * Data under a data key is not searched, as in `findRows`. `when.since` is a row, so `findRows` has it.
+ */
+export function findWhenNext(program: unknown, options: FindRowsOptions = {}): SinceItem[] {
+  const dataKeys = options.dataKeys ? new Set(options.dataKeys) : DATA_KEYS
+  const found: SinceItem[] = []
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item)
+      return
+    }
+    if (typeof node !== 'object' || node === null) return
+    const n = node as Node
+    if (n.type === 'ObjectExpression') {
+      for (const p of n.properties as Node[]) {
+        if (p.type !== 'Property') {
+          visit(p)
+          continue
+        }
+        const name = p.computed === true ? undefined : nameOf(p.key)
+        if (name !== undefined && dataKeys.has(name)) continue
+        const value = p.value as Node
+        if (name === 'when' && value.type === 'ObjectExpression') {
+          for (const w of value.properties as Node[]) {
+            if (w.type !== 'Property' || w.computed === true) continue
+            const key = nameOf(w.key)
+            if (key !== 'deprecatedIn' && key !== 'removeIn') continue
+            const item = stringItem(w.value)
+            if (item?.text === 'next') found.push(item)
+          }
+        }
+        visit(value)
+      }
+      return
+    }
+    for (const [key, value] of Object.entries(n)) {
+      if (key !== 'type' && typeof value === 'object') visit(value)
+    }
+  }
+  visit(program)
+  return found
+}
+
 /** A text change at `[start, end)` of the source. */
 export interface Edit {
   start: number

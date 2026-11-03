@@ -189,6 +189,14 @@ function sinceOfRows(fact: Partial<Fact>): { since: unknown; pointer: string; pe
   return out
 }
 
+/** The `when.deprecatedIn` and `when.removeIn` of a fact that are still `next`, which `pin` turns into a version. */
+function whenNextPointers(fact: Partial<Fact>): string[] {
+  const out: string[] = []
+  if (fact.when?.deprecatedIn === 'next') out.push('/when/deprecatedIn')
+  if (fact.when?.removeIn === 'next') out.push('/when/removeIn')
+  return out
+}
+
 function versionsOf(since: unknown): string[] {
   const list = Array.isArray(since) ? since : [since]
   return list.filter((v): v is string => typeof v === 'string' && v !== 'next' && parseVersion(v) !== undefined)
@@ -237,6 +245,15 @@ function releaseRules(
           code: 'train-next',
           message: `${fact.id}: ${component} is released as ${trainVersion}, but this row still starts at "next". Run pin first`,
           location,
+        })
+      }
+    }
+    if (trainVersion !== undefined) {
+      for (const pointer of whenNextPointers(fact)) {
+        problems.push({
+          code: 'train-next',
+          message: `${fact.id}: ${component} is released as ${trainVersion}, but ${pointer.slice(1).replace('/', '.')} is still "next". Run pin first`,
+          location: at(file, `/facts/${i}${pointer}`),
         })
       }
     }
