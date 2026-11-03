@@ -40,7 +40,7 @@ export interface BuildResult {
 }
 
 /** The index format this version writes. Readers also take 1.0, which has no `indexFormat`. */
-export const INDEX_FORMAT = '2.0'
+export const INDEX_FORMAT = '2.1'
 
 /**
  * A fact as it goes into the index. A fact with `variants` gets the top-level `content` that a reader of format
@@ -68,6 +68,7 @@ export function buildIndex(packageName: string, loaded: LoadedEntry): FactIndex 
     ...(module.dataFormatVersion !== undefined ? { dataFormatVersion: module.dataFormatVersion } : {}),
     describes: module.describes,
     ...(module.publish !== undefined ? { publish: module.publish } : {}),
+    ...(module.layer !== undefined ? { layer: module.layer } : {}),
     facts: module.facts.map(indexFact),
   }
 }

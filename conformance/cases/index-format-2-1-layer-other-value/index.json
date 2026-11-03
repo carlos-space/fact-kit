@@ -1,0 +1,24 @@
+{
+  "indexFormat": "2.1",
+  "formatVersion": "2.1",
+  "package": "demo-facts",
+  "entry": "sdk",
+  "describes": {
+    "demo": "0.50.0"
+  },
+  "layer": "a-layer-no-reader-knows",
+  "facts": [
+    {
+      "id": "demo.a",
+      "tool": "demo",
+      "topics": ["t"],
+      "title": "demo.a",
+      "content": {
+        "value": "a"
+      },
+      "source": {
+        "kind": "published"
+      }
+    }
+  ]
+}

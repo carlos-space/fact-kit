@@ -174,7 +174,7 @@ describe('c003 aggregate and index format', () => {
       'describes',
       'facts',
     ])
-    expect(out).toMatchObject({ indexFormat: '2.0', formatVersion: '2.0', component: '@npm/c' })
+    expect(out).toMatchObject({ indexFormat: '2.1', formatVersion: '2.1', component: '@npm/c' })
   })
 
   test('a 1.2 component is copied as it is: indexFormat and formatVersion are not changed', async () => {

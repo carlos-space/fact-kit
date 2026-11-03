@@ -113,8 +113,14 @@ export interface PublishInfo {
   name: string
 }
 
+/** The layers an entry can declare. The first three go from the top down, `tool` is a tool's commands, fields and behavior. */
+export const LAYERS = ['org', 'product', 'implementation', 'tool'] as const
+export type Layer = (typeof LAYERS)[number]
+
 /** What a `facts/<entry>/index.ts` module default-exports, as written. */
 export interface FactsSource {
+  /** Optional: the layer this entry's facts belong to. Written to `layer` of the index. Index format 2.1 and later. */
+  layer?: Layer
   describes: Record<string, string>
   publish?: PublishInfo
   /** Version of the data format this entry declares for itself. Written to `dataFormatVersion` of the index. */
@@ -125,6 +131,8 @@ export interface FactsSource {
 
 /** The facts of one entry after the build has expanded `history`, `relates`, `factLink` and `derive`. */
 export interface FactsModule {
+  /** The layer the entry declares, when it does. Index format 2.1 and later. */
+  layer?: Layer
   /** The one component this entry describes and the latest published version it covers, e.g. `{ mainflow: '1.2.0' }`. */
   describes: Record<string, string>
   /** Where the component is published, when the entry says so. Index format 1.2 and later. */
@@ -135,7 +143,7 @@ export interface FactsModule {
 
 /** The built `dist/<entry>/index.json`. */
 export interface FactIndex extends FactsModule {
-  /** `2.0` for what this version writes. A missing field reads as `1.0`. */
+  /** `2.1` for what this version writes. A missing field reads as `1.0`. */
   indexFormat?: string
   /** Written with the same value as `indexFormat` by 2.0. In a 1.x index it may be a data format version. Readers do not use it. */
   formatVersion?: string
