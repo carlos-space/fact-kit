@@ -1177,6 +1177,10 @@ const checkRules = keyed(
   ['code'],
 )
 
+/** The base of a component package from the next release: a unit name that already ends in `-facts` gets no second suffix. */
+const factsPackageNamingNextComponentBase =
+  '<the unit name>-facts, where the unit name is <publish.name without @<org>/> when the entry has `publish`, else <the one key of describes>, else <the sub-path of the component in `aggregate`>. A unit name that already ends in `-facts` is the base as it is and gets no second `-facts`, so the unit `blueprint-facts` has the base `blueprint-facts`, the same as an aggregate package of that name. The component at the root sub-path `.` that has none of the three gets a warning and is not checked.'
+
 const factsPackageNaming = {
   policy: {
     file: '`release-policy.json` at `repoRoot`. A repository without it gets neither `policy-scope` nor `facts-name`.',
@@ -2094,6 +2098,13 @@ const facts: FactDecl[] = [
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',
         },
       },
+      {
+        since: 'next',
+        set: {
+          '/componentPackage/name':
+            '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`, but a publish name that already ends in `-facts` is used as it is, e.g. `blueprint-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',
+        },
+      },
     ),
   }),
   fact({
@@ -2103,8 +2114,26 @@ const facts: FactDecl[] = [
     description: {
       en: 'What `check` expects the package names of an aggregate and its component packages to be, and the two problem codes it reports. The names are `<base>`, with a publish target suffix when the base is shared and `@<scope>/` in front when the aggregate unit is restricted.',
     },
-    when: { since: '0.11.0' },
-    content: { value: factsPackageNaming },
+    variants: history(
+      { since: '0.11.0', value: factsPackageNaming },
+      {
+        since: 'next',
+        set: {
+          '/base/component': factsPackageNamingNextComponentBase,
+          '/examples/fact-kit (public)': [
+            'fact-kit-facts',
+            'fact-kit-facts.npm',
+            'fact-kit-facts.pypi',
+            'fact-kit-facts.go',
+          ],
+          '/examples/unit that already ends in -facts': [
+            'blueprint-facts',
+            'blueprint-facts.npm',
+            'blueprint-facts.go',
+          ],
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.read-facts',

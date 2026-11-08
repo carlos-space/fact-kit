@@ -162,7 +162,10 @@ async function factsDirOf(dir: string): Promise<string> {
 interface Part {
   name: string
   dir: string
-  /** `<publish name without @<org>/>-facts`, or `<describes key>-facts` for a component with no publish target. */
+  /**
+   * `<unit name>-facts`, where the unit name is the publish name without `@<org>/`, else the one key of `describes`,
+   * else the sub-path. A unit name that already ends in `-facts` is the base as it is.
+   */
   base: string
   target: string | undefined
 }
@@ -212,7 +215,7 @@ async function readPart(
       part: {
         name,
         dir,
-        base: `${unitName}-facts`,
+        base: unitName.endsWith('-facts') ? unitName : `${unitName}-facts`,
         target: typeof publish?.target === 'string' ? publish.target : undefined,
       },
     }

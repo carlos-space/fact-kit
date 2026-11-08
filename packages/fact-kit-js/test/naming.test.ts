@@ -14,6 +14,8 @@ interface Part {
   dir?: string
   /** `factsDir` of the component's own config. Defaults to `facts`. */
   factsDir?: string
+  /** The sub-path the component hangs on in `aggregate`. Defaults to `.` for the first part and `sub<i>` after it. */
+  subpath?: string
   /** Text of the entry module, for facts that do not load. */
   source?: string
 }
@@ -50,7 +52,7 @@ async function check(repo: Repo, { install = true } = {}): Promise<Run> {
     [`${aggDir}/package.json`]: { name: repo.aggregate, version: '1.0.0', type: 'module' },
     [`${aggDir}/fact-kit.config.json`]: {
       repoRoot: aggDir === '.' ? '.' : '..',
-      aggregate: Object.fromEntries(repo.parts.map((p, i) => [i === 0 ? '.' : `sub${i}`, p.name])),
+      aggregate: Object.fromEntries(repo.parts.map((p, i) => [p.subpath ?? (i === 0 ? '.' : `sub${i}`), p.name])),
     },
   }
   if (repo.releasePlease !== null) {
@@ -364,5 +366,99 @@ describe('c004 check: package names against release-policy.json (m160/d002)', ()
     expect(bad.problems[0]?.message).toContain('sub1-facts')
     const lone = await check({ aggregate: 'demo-facts', policy: pub, parts: [{ name: 'whatever', describes: '' }] })
     expect([lone.code, lone.stderr]).toEqual([0, expect.stringContaining('warning facts-name: whatever')])
+  })
+})
+
+describe('facts-name: a unit name that already ends in -facts gets no second suffix', () => {
+  const unit = (describes: string, publish?: { target: string; name: string }, name = 'x') =>
+    ({ name, describes, publish }) as Part
+
+  test('with the same base as the aggregate, it is the aggregate base plus the publish target', async () => {
+    const part = (name: string) => ({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [unit('demo-facts', { target: 'npm', name: 'demo-facts' }, name)],
+    })
+    const ok = await check(part('demo-facts.npm'))
+    expect([ok.code, ok.problems]).toEqual([0, []])
+    const doubled = await check(part('demo-facts-facts'))
+    expect([doubled.code, codes(doubled)]).toEqual([1, ['facts-name']])
+    expect(doubled.problems[0]?.message).toContain('must be named demo-facts.npm')
+    const plain = await check(part('demo-facts'))
+    expect([plain.code, codes(plain)]).toEqual([1, ['facts-name']])
+    expect(plain.problems[0]?.message).toContain('must be named demo-facts.npm')
+  })
+
+  test('the unit is read from a scoped publish name, the one describes key, or the sub-path', async () => {
+    const scoped = await check({
+      aggregate: '@carlos-space/demo-facts',
+      policy: restricted,
+      parts: [unit('whatever', { target: 'npm', name: '@carlos-space/demo-facts' }, '@carlos-space/demo-facts.npm')],
+    })
+    expect([scoped.code, scoped.problems]).toEqual([0, []])
+    const key = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [{ name: 'git-facts', describes: 'git-facts' }],
+    })
+    expect([key.code, key.problems]).toEqual([0, []])
+    const subpath = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [
+        { name: 'demo-facts.npm', describes: 'demo', publish: npm },
+        { name: 'other-facts', describes: '', subpath: 'other-facts' },
+      ],
+    })
+    expect([subpath.code, subpath.problems]).toEqual([0, []])
+  })
+
+  test('with a base of its own, it keeps its name without a suffix', async () => {
+    const ok = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [
+        { name: 'demo-facts.npm', describes: 'demo', publish: npm },
+        { name: 'other-facts', describes: 'other', publish: { target: 'pypi', name: 'other-facts' } },
+      ],
+    })
+    expect([ok.code, ok.problems]).toEqual([0, []])
+    const doubled = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [
+        { name: 'demo-facts.npm', describes: 'demo', publish: npm },
+        { name: 'other-facts-facts', describes: 'other', publish: { target: 'pypi', name: 'other-facts' } },
+      ],
+    })
+    expect([doubled.code, codes(doubled)]).toEqual([1, ['facts-name']])
+    expect(doubled.problems[0]?.message).toContain('must be named other-facts:')
+  })
+
+  test('a unit name without the suffix still gets one, as before', async () => {
+    const ok = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [{ name: 'demo-facts.npm', describes: 'demo', publish: npm }],
+    })
+    expect([ok.code, ok.problems]).toEqual([0, []])
+    const wrong = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [{ name: 'demo-facts', describes: 'demo', publish: npm }],
+    })
+    expect([wrong.code, codes(wrong)]).toEqual([1, ['facts-name']])
+    expect(wrong.problems[0]?.message).toContain('must be named demo-facts.npm')
+  })
+
+  test('a unit that ends in -facts, shares the base and has no publish target is asked to be renamed', async () => {
+    const r = await check({
+      aggregate: 'demo-facts',
+      policy: pub,
+      parts: [{ name: 'demo-facts', describes: 'demo-facts' }],
+    })
+    expect([r.code, codes(r)]).toEqual([1, ['facts-name']])
+    expect(r.problems[0]?.message).toContain('no publish target')
+    expect(r.problems[0]?.message).toContain('Rename its unit')
   })
 })
