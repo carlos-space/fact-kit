@@ -463,7 +463,7 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, one 0.13.0 row for the entry layer, one 0.14.0 row for validatedBy, and a next row only for the facts-name base', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, one 0.13.0 row for the entry layer, one 0.14.0 row for validatedBy, and one 0.14.1-alpha.1 row for the facts-name base, and no next row', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
@@ -541,10 +541,11 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.14.0-alpha.1').length, fact.id).toBe(
         in014.includes(fact.id) ? 1 : 0,
       )
-      // Not released yet: a unit name that already ends in `-facts` gets no second `-facts` in the base name.
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+      // Released in 0.14.1-alpha.1: a unit name that already ends in `-facts` gets no second `-facts` in the base name.
+      expect((fact.variants ?? []).filter((v) => v.since === '0.14.1-alpha.1').length, fact.id).toBe(
         ['fact-kit.facts-package-naming', 'fact-kit.aggregate-layout'].includes(fact.id) ? 1 : 0,
       )
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -731,7 +732,7 @@ describe('fact-kit.facts-package-naming', () => {
 
   it('is read from 0.11.0 on, and the codes it names have a rule that points back at it', () => {
     const fact = specIndex.facts.find((f) => f.id === 'fact-kit.facts-package-naming')
-    expect(fact?.variants?.map((v) => v.since)).toEqual(['0.11.0', 'next'])
+    expect(fact?.variants?.map((v) => v.since)).toEqual(['0.11.0', '0.14.1-alpha.1'])
     expect(fact?.when?.since).toBeUndefined()
     expect(selectFacts(specIndex, { version: '0.10.0' }).map((f) => f.id)).not.toContain(
       'fact-kit.facts-package-naming',

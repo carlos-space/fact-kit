@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.14.1-alpha.1...fact-kit-js/v0.14.1) (2026-11-08)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-js 0.14.1 ([61cf956](https://github.com/carlos-space/fact-kit/commit/61cf95606f0c92ffcb83d56ff9188f91c695d551))
+
+## [0.14.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.14.0...fact-kit-js/v0.14.1-alpha.1) (2026-11-08)
+
+
+### Fixed
+
+* facts-name 的基底遇到已帶 -facts 的單元名時不再多加後綴 ([#122](https://github.com/carlos-space/fact-kit/issues/122)) ([13c812c](https://github.com/carlos-space/fact-kit/commit/13c812ceb897342bf769dc5ca2c20c60a77ed026))
+
 ## [0.14.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.14.0-alpha.1...fact-kit-js/v0.14.0) (2026-11-08)
 
 
