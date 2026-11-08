@@ -1692,7 +1692,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, schema: factSchema },
       {
-        since: 'next',
+        since: '0.14.0-alpha.1',
         set: {
           '/properties/validatedBy': {
             type: 'string',
@@ -1825,7 +1825,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.14.0-alpha.1',
         add: {
           '': [
             {
@@ -2051,7 +2051,7 @@ const facts: FactDecl[] = [
         since: '0.12.0-alpha.1',
         add: { '': ['facts-file-orphan', 'split-topic', 'split-size', 'split-index', 'split-tool'] },
       },
-      { since: 'next', add: { '': ['validated-by'] } },
+      { since: '0.14.0-alpha.1', add: { '': ['validated-by'] } },
     ),
   }),
   fact({
@@ -2240,7 +2240,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: since070, value: checkIndexInput },
       {
-        since: 'next',
+        since: '0.14.0-alpha.1',
         add: {
           '': {
             validatedByFallback:
@@ -2257,7 +2257,7 @@ const facts: FactDecl[] = [
     description: {
       en: 'The `validatedBy` field of a fact, which schema it names, how `check` finds it, and what it reports.',
     },
-    variants: history({ since: 'next', value: validatedBy }),
+    variants: history({ since: '0.14.0-alpha.1', value: validatedBy }),
   }),
   fact({
     id: 'fact-kit.check-id-table',
