@@ -67,6 +67,8 @@ export interface Fact {
   variants?: FactVariant[]
   /** Fact locations (`<id>` or `<spec>:<id>`) this fact is computed from. */
   derivedFrom?: string[]
+  /** Fact location (`<id>` or `<spec>:<id>`) of a schema fact that every value of this fact must fit. `check` runs it. */
+  validatedBy?: string
   when?: {
     platforms?: string[]
     os?: Os[]
@@ -193,6 +195,7 @@ export interface Problem {
     | 'split-size'
     | 'split-index'
     | 'split-tool'
+    | 'validated-by'
   message: string
   /** File, plus a JSON pointer inside it when there is one. */
   location?: string

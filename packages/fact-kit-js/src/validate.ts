@@ -34,7 +34,7 @@ export interface ValidationIssue {
   message: string
 }
 
-function describe(e: ErrorObject): string {
+export function describe(e: ErrorObject): string {
   const params = e.params as Record<string, unknown>
   switch (e.keyword) {
     case 'required':
@@ -49,7 +49,7 @@ function describe(e: ErrorObject): string {
 }
 
 /** Turns ajv errors into short lines. Unknown `x-` keywords are named, and the noise around them is dropped. */
-function toIssues(errors: ErrorObject[] | null | undefined): ValidationIssue[] {
+export function toIssues(errors: ErrorObject[] | null | undefined): ValidationIssue[] {
   const issues: ValidationIssue[] = []
   const list = errors ?? []
   for (const e of list) {
@@ -98,3 +98,20 @@ export const validateSchemaDocument = (schema: unknown): ValidationIssue[] => ru
 
 /** Validates one example group. */
 export const validateExampleGroup = (group: unknown): ValidationIssue[] => run(EXAMPLE_GROUP_SCHEMA_ID, group)
+
+/**
+ * Validates `value` against any JSON Schema (2020-12), for example one that another package publishes. Uses its own
+ * ajv instance, so the meta-schemas of the shared one are untouched. `files` are the `schemas/<file>` documents the
+ * schema may `$ref`, registered under that relative name. Throws an `Error` when the schema can not be compiled,
+ * for example because it is not a valid schema, or a `$ref` does not resolve.
+ */
+export function validateAgainstSchema(
+  schema: unknown,
+  value: unknown,
+  files: readonly { file: string; schema: unknown }[] = [],
+): ValidationIssue[] {
+  const own = new Ajv2020({ allErrors: true, strict: false })
+  for (const f of files) own.addSchema(f.schema as object, `schemas/${f.file}`)
+  const validate = own.compile(schema as object)
+  return validate(value) ? [] : toIssues(validate.errors)
+}

@@ -1,0 +1,8 @@
+{
+  "name": "@fixture/values-facts",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@fixture/shapes": "file:../shared"
+  }
+}

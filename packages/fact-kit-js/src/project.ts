@@ -5,6 +5,7 @@ import type { CheckResult, ExampleInput, IndexInput } from './check.ts'
 import { InputError, LoadError, loadEntries, loadExampleGroups, readIndexInput, readPackageName } from './load.ts'
 import type { FactIds } from './author.ts'
 import { buildIndex } from './build.ts'
+import { validatedByProblems } from './validated-by.ts'
 import { policyProblems } from './naming.ts'
 import { splitProblems } from './split.ts'
 import { docRefProblems, findRepoRoot, implProblems, libRowProblems, testIncludes } from './rules.ts'
@@ -205,6 +206,7 @@ export async function checkProject(options: CheckProjectOptions = {}): Promise<C
   const extra: Problem[] = []
   if (indexes.some((i) => i.source)) extra.push(...(await libRowProblems(join(cwd, factsDir, '_lib'), cwd)))
   extra.push(...splits)
+  extra.push(...(await validatedByProblems(indexes, cwd)))
   extra.push(...(await implProblems(root, cwd, config.implDirs ?? [], join(cwd, factsDir))))
   const policy = await policyProblems(root, cwd, config.aggregate)
   extra.push(...policy.problems)

@@ -1233,6 +1233,24 @@ const checkIndexInput = {
   unreadable: 'A file that can not be read or parsed as JSON exits with 2.',
 }
 
+/** The optional `validatedBy` of a fact. Read by `check` only. */
+const validatedBy = {
+  field: 'validatedBy',
+  format:
+    'A fact location, `<spec>:<id>`. `<spec>` is `<package name>[/<entry>]`, as in `derivedFrom`. An `<id>` with no `<spec>` names a fact of the same entry. A value with a space or any other shape that is not a fact location is a `format` problem.',
+  target:
+    'The `content.schema` at the top level of the named fact. When the named fact has `variants`, the top-level `content` is read, which is the latest published content.',
+  variants:
+    'When the fact that writes `validatedBy` has `variants`, every row is checked: the `value` of each row must fit the schema. A row with no `value` is skipped.',
+  refs: 'When the named schema uses a relative `$ref` (`schemas/<file>`), `check` reads the `schemas/` directory next to the `index.json` of the named package.',
+  resolution:
+    'Only the packages named by `validatedBy` are read. `check` reads them from the `node_modules` of the current directory. When an `--index` already holds the same spec, `check` uses that one first.',
+  scope:
+    '`check` runs the rule on the facts built from the sources. The facts of an `--index` are not checked, because a published index can not be fixed from here. `build` does not run the rule, although it also calls the check functions, so a `validatedBy` problem never stops a build.',
+  problems:
+    'Four failures, all with the one problem code `validated-by`: the named package is not installed, the named fact does not exist, the named fact is not a schema fact, and a value does not fit the schema.',
+}
+
 /** How `check` keeps fact ids apart across the sources and the indexes it reads. The same since 0.7.0. */
 const checkIdTable = {
   table:
@@ -1671,7 +1689,20 @@ const facts: FactDecl[] = [
     topics: ['fact', 'schema'],
     title: { en: 'Fields of a fact' },
     description: { en: 'The shape of one fact in an `index.json`.' },
-    content: { schema: factSchema },
+    variants: history(
+      { since: since070, schema: factSchema },
+      {
+        since: 'next',
+        set: {
+          '/properties/validatedBy': {
+            type: 'string',
+            pattern: '^(?:[^:\\s]+:)?[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9._-]*$',
+            description:
+              'Optional. The location of a schema fact (`<id>` in the same entry, `<spec>:<id>` in another entry or package) that every value of this fact must fit. Only `check` runs it. See `fact-kit.validated-by`.',
+          },
+        },
+      },
+    ),
   }),
   fact({
     id: 'fact-kit.check-rules',
@@ -1789,6 +1820,19 @@ const facts: FactDecl[] = [
               code: 'train-next',
               rule: 'A component named by `--train` still has a row that says `next` and is not pending, or a `when.deprecatedIn` or `when.removeIn` that says `next`. Run `pin` first.',
               reads: 'sources, `--train`',
+            },
+          ],
+        },
+      },
+      {
+        since: 'next',
+        add: {
+          '': [
+            {
+              code: 'validated-by',
+              rule: 'A fact with `validatedBy` fails one of four ways, all reported with this one code: the package named by `validatedBy` is not installed, the named fact does not exist there, the named fact is not a schema fact, or a value of this fact does not fit the schema. Only `check` runs it, `build` does not.',
+              reads:
+                'sources, and the installed package that `validatedBy` names (or the `--index` that holds the same spec)',
             },
           ],
         },
@@ -2007,6 +2051,7 @@ const facts: FactDecl[] = [
         since: '0.12.0-alpha.1',
         add: { '': ['facts-file-orphan', 'split-topic', 'split-size', 'split-index', 'split-tool'] },
       },
+      { since: 'next', add: { '': ['validated-by'] } },
     ),
   }),
   fact({
@@ -2192,8 +2237,27 @@ const facts: FactDecl[] = [
     topics: ['check', 'cli'],
     title: { en: 'What check --index reads' },
     description: { en: 'The paths `--index` takes, and how each is read.' },
-    when: { since: since070 },
-    content: { value: checkIndexInput },
+    variants: history(
+      { since: since070, value: checkIndexInput },
+      {
+        since: 'next',
+        add: {
+          '': {
+            validatedByFallback:
+              'A fact with `validatedBy` reads the spec it names from `--index` when one of the paths holds that spec. When no `--index` holds it, `check` reads the installed package from the `node_modules` of the current directory.',
+          },
+        },
+      },
+    ),
+  }),
+  fact({
+    id: 'fact-kit.validated-by',
+    topics: ['check', 'fact', 'schema'],
+    title: { en: 'validatedBy: a fact whose value must fit a schema of another fact' },
+    description: {
+      en: 'The `validatedBy` field of a fact, which schema it names, how `check` finds it, and what it reports.',
+    },
+    variants: history({ since: 'next', value: validatedBy }),
   }),
   fact({
     id: 'fact-kit.check-id-table',

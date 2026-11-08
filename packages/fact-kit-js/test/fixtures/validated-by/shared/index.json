@@ -1,0 +1,37 @@
+{
+  "indexFormat": "2.1",
+  "formatVersion": "2.1",
+  "package": "@fixture/shapes",
+  "entry": "shapes",
+  "describes": {},
+  "facts": [
+    {
+      "id": "shapes.person",
+      "tool": "shapes",
+      "topics": [
+        "shape"
+      ],
+      "title": "A person",
+      "content": {
+        "schema": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "$ref": "schemas/name.json"
+            },
+            "age": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "source": {
+        "kind": "published"
+      }
+    }
+  ]
+}
