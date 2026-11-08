@@ -2099,7 +2099,7 @@ const facts: FactDecl[] = [
         },
       },
       {
-        since: 'next',
+        since: '0.14.1-alpha.1',
         set: {
           '/componentPackage/name':
             '<publish name without @<org>/>-facts, e.g. `promptex-macos-facts`, but a publish name that already ends in `-facts` is used as it is, e.g. `blueprint-facts`. When that is also the base of another component package or of the aggregate in the repository, every one of them adds `.<publish target>`, e.g. `fact-kit-facts.npm` and `fact-kit-facts.go`. `@<scope>/` is added to every one of these names when the access of the unit that publishes the aggregate package is restricted, whatever the access of the unit a component describes',
@@ -2117,7 +2117,7 @@ const facts: FactDecl[] = [
     variants: history(
       { since: '0.11.0', value: factsPackageNaming },
       {
-        since: 'next',
+        since: '0.14.1-alpha.1',
         set: {
           '/base/component': factsPackageNamingNextComponentBase,
           '/examples/fact-kit (public)': [
