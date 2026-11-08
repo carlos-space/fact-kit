@@ -463,13 +463,14 @@ describe('fact-kit.module-api', () => {
     expect(api.exports.find((e: { name: string }) => e.name === 'history').signature).toContain('HistoryVariants')
   })
 
-  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, one 0.13.0 row for the entry layer, one 0.14.0 row for validatedBy, and no next row', () => {
+  it('keeps one 0.8.0 row for each fact that changed, one row each for the 0.9, 0.10, 0.11, 0.11.1 and 0.12 changes, one 0.12.1 row for pin and train-next, one 0.13.0 row for the entry layer, one 0.14.0 row for validatedBy, and a next row only for the facts-name base', () => {
     // Released in 0.9.0-alpha.1: the `publish` field (index 1.2) and the component package names of the aggregate layout.
     const in09 = ['fact-kit.index', 'fact-kit.entry-module', 'fact-kit.read-facts', 'fact-kit.aggregate-layout']
     // Released in 0.10.0-alpha.1: the converter helpers with the `prettier` peer dependency.
     const in010 = ['fact-kit.module-api', 'fact-kit.converters']
-    // The package name rules (fact-kit.facts-package-naming has one row and no variants).
+    // The package name rules (fact-kit.facts-package-naming has its own 0.11.0 row).
     const in011 = [
+      'fact-kit.facts-package-naming',
       'fact-kit.problem-codes',
       'fact-kit.check-rules',
       'fact-kit.aggregate-layout',
@@ -540,7 +541,10 @@ describe('fact-kit.module-api', () => {
       expect((fact.variants ?? []).filter((v) => v.since === '0.14.0-alpha.1').length, fact.id).toBe(
         in014.includes(fact.id) ? 1 : 0,
       )
-      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(0)
+      // Not released yet: a unit name that already ends in `-facts` gets no second `-facts` in the base name.
+      expect((fact.variants ?? []).filter((v) => v.since === 'next').length, fact.id).toBe(
+        ['fact-kit.facts-package-naming', 'fact-kit.aggregate-layout'].includes(fact.id) ? 1 : 0,
+      )
       expect(fact.when?.since, fact.id).not.toBe('next')
     }
     const changed = specIndex.facts.filter((f) => f.variants?.some((v) => v.since === '0.8.0')).map((f) => f.id)
@@ -727,7 +731,8 @@ describe('fact-kit.facts-package-naming', () => {
 
   it('is read from 0.11.0 on, and the codes it names have a rule that points back at it', () => {
     const fact = specIndex.facts.find((f) => f.id === 'fact-kit.facts-package-naming')
-    expect(fact?.when?.since).toBe('0.11.0')
+    expect(fact?.variants?.map((v) => v.since)).toEqual(['0.11.0', 'next'])
+    expect(fact?.when?.since).toBeUndefined()
     expect(selectFacts(specIndex, { version: '0.10.0' }).map((f) => f.id)).not.toContain(
       'fact-kit.facts-package-naming',
     )
@@ -739,6 +744,18 @@ describe('fact-kit.facts-package-naming', () => {
     expect(Object.keys(naming).sort()).toEqual(
       ['aggregateUnit', 'base', 'checkedIn', 'examples', 'policy', 'prefix', 'suffix'].sort(),
     )
+  })
+
+  it('says a unit name that already ends in -facts gets no second suffix on head, and keeps the old base for 0.13.0', () => {
+    expect(naming.base.component).toContain('already ends in `-facts`')
+    expect(naming.examples['unit that already ends in -facts']).toContain('blueprint-facts.npm')
+    const old = selectFacts(specIndex, { version: '0.13.0' }).find((f) => f.id === 'fact-kit.facts-package-naming')
+    expect((old?.content as any).value.base.component).not.toContain('already ends in')
+    expect(Object.keys((old?.content as any).value.examples)).toEqual([
+      'fact-kit (public)',
+      'restricted, scope @carlos-space',
+    ])
+    expect(content('fact-kit.aggregate-layout').componentPackage.name).toContain('already ends in `-facts`')
   })
 
   it('says the prefix follows the aggregate unit in aggregate-layout from the next release, and keeps the old sentence for 0.9.0', () => {
