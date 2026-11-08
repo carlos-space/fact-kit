@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.13.0...fact-kit-js/v0.14.0-alpha.1) (2026-11-08)
+
+
+### Added
+
+* check 依另一個套件的 schema 驗證 fact 值 ([#117](https://github.com/carlos-space/fact-kit/issues/117)) ([a1cf212](https://github.com/carlos-space/fact-kit/commit/a1cf2121a10be0f806f4de7866a54cc9d0de5852))
+
 ## [0.13.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.13.0-alpha.1...fact-kit-js/v0.13.0) (2026-11-03)
 
 
