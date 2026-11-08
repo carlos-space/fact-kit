@@ -1241,12 +1241,12 @@ const validatedBy = {
   target:
     'The `content.schema` at the top level of the named fact. When the named fact has `variants`, the top-level `content` is read, which is the latest published content.',
   variants:
-    'When the fact that writes `validatedBy` has `variants`, every row is checked: the `value` of each row must fit the schema.',
+    'When the fact that writes `validatedBy` has `variants`, every row is checked: the `value` of each row must fit the schema. A row with no `value` is skipped.',
   refs: 'When the named schema uses a relative `$ref` (`schemas/<file>`), `check` reads the `schemas/` directory next to the `index.json` of the named package.',
   resolution:
     'Only the packages named by `validatedBy` are read. `check` reads them from the `node_modules` of the current directory. When an `--index` already holds the same spec, `check` uses that one first.',
   scope:
-    '`check` runs the rule. `build` does not, although it also calls the check functions, so a `validatedBy` problem never stops a build.',
+    '`check` runs the rule on the facts built from the sources. The facts of an `--index` are not checked, because a published index can not be fixed from here. `build` does not run the rule, although it also calls the check functions, so a `validatedBy` problem never stops a build.',
   problems:
     'Four failures, all with the one problem code `validated-by`: the named package is not installed, the named fact does not exist, the named fact is not a schema fact, and a value does not fit the schema.',
 }
