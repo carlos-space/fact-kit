@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1-alpha.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.9.0...fact-kit-facts/v0.9.1-alpha.1) (2026-11-08)
+
+
+### Fixed
+
+* facts-name 的基底遇到已帶 -facts 的單元名時不再多加後綴 ([#122](https://github.com/carlos-space/fact-kit/issues/122)) ([13c812c](https://github.com/carlos-space/fact-kit/commit/13c812ceb897342bf769dc5ca2c20c60a77ed026))
+
 ## [0.9.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.9.0-alpha.1...fact-kit-facts/v0.9.0) (2026-11-08)
 
 
