@@ -1,0 +1,8 @@
+{
+  "name": "@fixture/shapes",
+  "version": "1.0.0",
+  "exports": {
+    "./index.json": "./index.json",
+    "./schemas/*": "./schemas/*"
+  }
+}

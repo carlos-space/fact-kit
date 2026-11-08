@@ -307,7 +307,7 @@ function formatProblems(issues: ValidationIssue[], file: string): Problem[] {
   return issues.map((i) => ({ code: 'format', message: i.message, location: at(file, i.pointer) }))
 }
 
-function* walkRefs(value: unknown, pointer: string): Generator<{ ref: string; pointer: string }> {
+export function* walkRefs(value: unknown, pointer: string): Generator<{ ref: string; pointer: string }> {
   if (Array.isArray(value)) {
     for (const [i, item] of value.entries()) yield* walkRefs(item, `${pointer}/${i}`)
   } else if (value && typeof value === 'object') {
