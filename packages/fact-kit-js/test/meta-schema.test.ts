@@ -42,6 +42,18 @@ describe('c001 meta-schema', () => {
     ).toEqual([])
   })
 
+  test('validatedBy takes a fact location, so a value with a space is a format problem', () => {
+    expect(validateFact({ ...valid, validatedBy: 'pkg/entry:some.id' })).toEqual([])
+    expect(validateFact({ ...valid, validatedBy: 'some.id' })).toEqual([])
+  })
+
+  test('a validatedBy value with a space is reported as format at /validatedBy', () => {
+    const problems = validateFact({ ...valid, validatedBy: 'pkg/entry: some id' })
+    expect(problems.length).toBeGreaterThan(0)
+    expect(problems.map((p) => p.pointer)).toEqual(['/validatedBy'])
+    expect(problems[0]?.message).toContain('must match pattern')
+  })
+
   test('an observed source takes fetched and note, and stays valid without them', () => {
     const observed = (source: unknown): unknown => ({ ...valid, id: 'claude-code.thing', tool: 'claude-code', source })
     // The old shape, with neither field.

@@ -104,6 +104,7 @@ export const factSchema = {
       },
     },
     derivedFrom: { type: 'array', items: factLocation },
+    validatedBy: factLocation,
     when: {
       type: 'object',
       additionalProperties: false,
