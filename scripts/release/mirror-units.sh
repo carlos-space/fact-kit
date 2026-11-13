@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Mirror the Go and Swift units into their own repositories. Neither has a registry: the Go proxy and SwiftPM read
 # the tags of a repository whose root is the package, so each release is pushed from packages/<unit>/ to the
-# default branch of carlos-space/<component> and tagged there with the bare version.
+# default branch of promptex-ai/<component> and tagged there with the bare version.
 #
 #   Go     v<version>    (0.3.0-alpha.2 -> v0.3.0-alpha.2)    the Go proxy needs the "v"
 #   Swift  <version>     (0.3.0-alpha.2 -> 0.3.0-alpha.2)     SwiftPM reads SemVer tags without the "v"
@@ -21,7 +21,7 @@
 # usage: mirror-units.sh [--dry-run] <path>...      units that are not Go or Swift are skipped
 #   --dry-run         print what would be pushed (commit, tag, file list); nothing is written. Without a release tag
 #                     the unit's tree is taken from HEAD, so the unit can be rehearsed on a branch.
-#   MIRROR_OWNER      owner of the mirror repositories (default carlos-space); the repository is the component name
+#   MIRROR_OWNER      owner of the mirror repositories (default promptex-ai); the repository is the component name
 #   MIRROR_REMOTE     full remote URL or path, replaces owner/component (tests use a local bare repository)
 #   MIRROR_PUSH_TOKEN GitHub App token with contents: write on the mirror repositories; sent as an HTTP header, never in a URL
 set -euo pipefail
@@ -71,7 +71,7 @@ mirror_unit() { # mirror_unit <path>
   ver="$(manifest_version "$p")"
   version_stage "$ver" >/dev/null || die "$p: version \"$ver\" is not X.Y.Z or X.Y.Z-<alpha|beta|rc>.N"
   comp="$(unit_component "$p")"
-  remote="${MIRROR_REMOTE:-https://github.com/${MIRROR_OWNER:-carlos-space}/$comp.git}"
+  remote="${MIRROR_REMOTE:-https://github.com/${MIRROR_OWNER:-promptex-ai}/$comp.git}"
   mtag="$(mirror_tag "$reg" "$ver")"
 
   ref="$(unit_tag "$p" "$ver")"
