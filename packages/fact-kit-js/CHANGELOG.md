@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.2](https://github.com/promptex-ai/fact-kit/compare/fact-kit-js/v0.14.2-alpha.1...fact-kit-js/v0.14.2) (2026-11-13)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-js 0.14.2 ([720eff9](https://github.com/promptex-ai/fact-kit/commit/720eff927684a77a1d72662be46c4ffa6ce59b63))
+
+## [0.14.2-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-js/v0.14.1...fact-kit-js/v0.14.2-alpha.1) (2026-11-13)
+
+
+### Fixed
+
+* 倉庫位置改到 promptex-ai，著作權人改成 Promptex-AI ([#127](https://github.com/promptex-ai/fact-kit/issues/127)) ([21e19fc](https://github.com/promptex-ai/fact-kit/commit/21e19fc859d8c186d3f088810eef9048f737c8c2))
+
 ## [0.14.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-js/v0.14.1-alpha.1...fact-kit-js/v0.14.1) (2026-11-08)
 
 
