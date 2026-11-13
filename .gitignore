@@ -161,3 +161,6 @@ tmp/
 
 # Samples
 samples/rust/target/
+
+# macOS Finder metadata
+.DS_Store
