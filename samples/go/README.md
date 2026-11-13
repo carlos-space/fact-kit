@@ -1,6 +1,6 @@
 # Go 樣本：讀私有的 -facts 套件
 
-這個專案證明外部專案能用 pnpm 從 GitHub Packages 安裝私有的 -facts 套件，再用 `github.com/carlos-space/fact-kit-go` 從 `node_modules` 讀到內容。它讀的是 fact-kit 倉庫自己發的私有樣本套件 `@carlos-space/fact-kit-sample-facts`（源碼在 `samples/sample-facts`）。
+這個專案證明外部專案能用 pnpm 從 GitHub Packages 安裝私有的 -facts 套件，再用 `github.com/promptex-ai/fact-kit-go` 從 `node_modules` 讀到內容。它讀的是 fact-kit 倉庫自己發的私有樣本套件 `@promptex-ai/fact-kit-sample-facts`（源碼在 `samples/sample-facts`）。
 
 ## 安裝設定
 

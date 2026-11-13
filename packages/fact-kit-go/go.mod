@@ -1,4 +1,4 @@
-module github.com/carlos-space/fact-kit-go
+module github.com/promptex-ai/fact-kit-go
 
 go 1.26
 
