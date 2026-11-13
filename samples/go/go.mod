@@ -2,7 +2,7 @@ module example.com/facts-sample-go
 
 go 1.26
 
-require github.com/carlos-space/fact-kit-go v0.4.0
+require github.com/promptex-ai/fact-kit-go v0.6.0
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect

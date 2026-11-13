@@ -17,7 +17,7 @@ afterAll(() => {
 const identity = ['-c', 'user.name=t', '-c', 'user.email=t@example.com']
 const tagShape = { 'include-component-in-tag': true, 'include-v-in-tag': true, 'tag-separator': '/' }
 const units = {
-  go: { path: 'packages/fact-kit-go', file: 'go.mod', body: 'module github.com/carlos-space/fact-kit-go\n' },
+  go: { path: 'packages/fact-kit-go', file: 'go.mod', body: 'module github.com/promptex-ai/fact-kit-go\n' },
   swift: { path: 'packages/fact-kit-swift', file: 'Package.swift', body: '// swift-tools-version: 5.9\n' },
 }
 
@@ -212,7 +212,7 @@ describe('mirror-units.sh', () => {
     expect(r.out).toMatch(/mirror tag\s+v0\.3\.0-alpha\.2/)
     expect(r.out).toMatch(/mirror commit\s+[0-9a-f]{40}/)
     expect(r.out).toMatch(/^ {2}go\.mod$/m)
-    expect(r.out).toMatch(/^go\.mod: module github\.com\/carlos-space\/fact-kit-go$/m)
+    expect(r.out).toMatch(/^go\.mod: module github\.com\/promptex-ai\/fact-kit-go$/m)
     expect(t.mirrorGit('for-each-ref')).toBe('')
   })
 

@@ -203,7 +203,7 @@ function allKinds(version: string) {
   r.json('packages/fact-kit-js/package.json', { name: 'fact-kit', version })
   r.write('packages/fact-kit-py/pyproject.toml', `[project]\nname = "fact-kit"\nversion = "${version}"\n`)
   r.write('packages/fact-kit-rs/Cargo.toml', `[package]\nname = "fact-kit"\nversion = "${version}"\n`)
-  r.write('packages/fact-kit-go/go.mod', 'module github.com/carlos-space/fact-kit-go\n\ngo 1.26\n')
+  r.write('packages/fact-kit-go/go.mod', 'module github.com/promptex-ai/fact-kit-go\n\ngo 1.26\n')
   r.write('packages/fact-kit-swift/Package.swift', 'let package = Package(\n  name: "FactKit",\n  products: []\n)\n')
   r.write('packages/fact-kit-swift/Sources/FactKit/Read.swift', '// swift\n')
   r.write('packages/fact-kit-js/src/index.ts', 'export {}\n')
@@ -235,7 +235,7 @@ describe('publish-units.sh with the reader units', () => {
     ['packages/fact-kit-rs', /check only: fact-kit 0\.3\.0-alpha\.1 passed \(stage alpha, crates\.io\)/],
     [
       'packages/fact-kit-go',
-      /check only: Go module github\.com\/carlos-space\/fact-kit-go 0\.3\.0-alpha\.1 passed \(stage alpha, tag fact-kit-go\/v0\.3\.0-alpha\.1\)/,
+      /check only: Go module github\.com\/promptex-ai\/fact-kit-go 0\.3\.0-alpha\.1 passed \(stage alpha, tag fact-kit-go\/v0\.3\.0-alpha\.1\)/,
     ],
     [
       'packages/fact-kit-swift',
