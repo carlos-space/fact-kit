@@ -1,5 +1,7 @@
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=
 github.com/Masterminds/semver/v3 v3.5.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
+github.com/promptex-ai/fact-kit-go v0.6.0 h1:1JfWWzQpeHHdUjmfZh7YqOL5mVofpQTkwelbjK4x1G8=
+github.com/promptex-ai/fact-kit-go v0.6.0/go.mod h1:aAShLNOGA3skrWLcbGCL345rHKfXsnJbPOXGxf4JFE0=
 github.com/tidwall/gjson v1.20.0 h1:+agJ3rEzKcCXKDKo0ml26UROcpcAlnZyjq+TjbY5Fto=
 github.com/tidwall/gjson v1.20.0/go.mod h1:V37/opeE/JbLUOfH0QTXiNez2l0RUjYUhpT4szFQAfc=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
