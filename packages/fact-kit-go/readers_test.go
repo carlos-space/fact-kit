@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	factkit "github.com/carlos-space/fact-kit-go"
+	factkit "github.com/promptex-ai/fact-kit-go"
 )
 
 // c009: the Go reader reads the facts about itself, which fact-kit-facts ships in this repository. They name the
