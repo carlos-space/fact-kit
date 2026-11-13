@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-py/v0.5.1-alpha.1...fact-kit-py/v0.5.1) (2026-11-13)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-py 0.5.1 ([d976016](https://github.com/promptex-ai/fact-kit/commit/d976016a258ff4242729e188910cf9886f39819d))
+
 ## [0.5.1-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-py/v0.5.0...fact-kit-py/v0.5.1-alpha.1) (2026-11-13)
 
 

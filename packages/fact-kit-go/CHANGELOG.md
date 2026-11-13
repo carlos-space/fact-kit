@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/promptex-ai/fact-kit/compare/fact-kit-go/v0.6.0-alpha.1...fact-kit-go/v0.6.0) (2026-11-13)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-go 0.6.0 ([7c75682](https://github.com/promptex-ai/fact-kit/commit/7c7568297bc6ffb2ec982f239ccb505642bf8ceb))
+
 ## [0.6.0-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-go/v0.5.0...fact-kit-go/v0.6.0-alpha.1) (2026-11-13)
 
 
