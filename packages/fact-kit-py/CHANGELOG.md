@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-py/v0.5.1-alpha.1...fact-kit-py/v0.5.1) (2026-11-13)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-py 0.5.1 ([d976016](https://github.com/promptex-ai/fact-kit/commit/d976016a258ff4242729e188910cf9886f39819d))
+
+## [0.5.1-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-py/v0.5.0...fact-kit-py/v0.5.1-alpha.1) (2026-11-13)
+
+
+### Fixed
+
+* 倉庫位置改到 promptex-ai，著作權人改成 Promptex-AI ([#127](https://github.com/promptex-ai/fact-kit/issues/127)) ([21e19fc](https://github.com/promptex-ai/fact-kit/commit/21e19fc859d8c186d3f088810eef9048f737c8c2))
+
 ## [0.5.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-py/v0.5.0-alpha.1...fact-kit-py/v0.5.0) (2026-11-02)
 
 
