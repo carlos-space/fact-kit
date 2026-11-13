@@ -1,4 +1,4 @@
-//! Reads the private @carlos-space/fact-kit-sample-facts (samples/sample-facts), installed with pnpm from GitHub
+//! Reads the private @promptex-ai/fact-kit-sample-facts (samples/sample-facts), installed with pnpm from GitHub
 //! Packages, through the published fact-kit crate. Needs `pnpm install` with NODE_AUTH_TOKEN set (see README.md).
 
 use std::path::PathBuf;
@@ -11,9 +11,9 @@ fn installed_private_facts_are_read() {
         root: Some(PathBuf::from(env!("CARGO_MANIFEST_DIR"))),
         ..ReadFactsOptions::default()
     };
-    let reader = read_facts("@carlos-space/fact-kit-sample-facts/sample", &options).unwrap_or_else(|e| {
+    let reader = read_facts("@promptex-ai/fact-kit-sample-facts/sample", &options).unwrap_or_else(|e| {
         panic!(
-            "cannot read @carlos-space/fact-kit-sample-facts/sample ({}). Is the package installed? Run `pnpm install` with NODE_AUTH_TOKEN set.",
+            "cannot read @promptex-ai/fact-kit-sample-facts/sample ({}). Is the package installed? Run `pnpm install` with NODE_AUTH_TOKEN set.",
             e.code()
         )
     });

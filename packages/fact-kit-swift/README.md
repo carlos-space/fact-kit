@@ -4,12 +4,12 @@ fact-kit 的 Swift 讀取套件。它讀 `-facts` 套件建好的 `index.json`�
 
 ## 安裝
 
-用 SwiftPM 依賴 `https://github.com/carlos-space/fact-kit`。版號是純 semver tag，例如 `0.3.0`，沒有 `v` 前綴也沒有 component 前綴。
+用 SwiftPM 依賴 `https://github.com/promptex-ai/fact-kit`。版號是純 semver tag，例如 `0.3.0`，沒有 `v` 前綴也沒有 component 前綴。
 
 ```swift
 // Package.swift
 dependencies: [
-  .package(url: "https://github.com/carlos-space/fact-kit", from: "0.3.0")
+  .package(url: "https://github.com/promptex-ai/fact-kit", from: "0.3.0")
 ],
 targets: [
   .target(name: "MyApp", dependencies: [.product(name: "FactKit", package: "fact-kit")])

@@ -4,6 +4,6 @@
   "private": true,
   "description": "Go sample that reads a private -facts package installed with pnpm from GitHub Packages",
   "devDependencies": {
-    "@carlos-space/fact-kit-sample-facts": "0.1.0"
+    "@promptex-ai/fact-kit-sample-facts": "0.1.0"
   }
 }

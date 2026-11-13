@@ -1,6 +1,6 @@
 # 私有樣本 -facts 套件
 
-`@carlos-space/fact-kit-sample-facts` 是給 `samples/rust` 與 `samples/go` 讀的私有 -facts 套件，發在 GitHub Packages。內容只有兩筆示範用的 fact，不描述任何產品。
+`@promptex-ai/fact-kit-sample-facts` 是給 `samples/rust` 與 `samples/go` 讀的私有 -facts 套件，發在 GitHub Packages。內容只有兩筆示範用的 fact，不描述任何產品。
 
 ## 為什麼由 fact-kit 自己發
 

@@ -1,6 +1,6 @@
 # Rust 樣本：讀私有的 -facts 套件
 
-這個專案證明外部專案能用 pnpm 從 GitHub Packages 安裝私有的 -facts 套件，再用 crates.io 的 `fact-kit` 從 `node_modules` 讀到內容。它讀的是 fact-kit 倉庫自己發的私有樣本套件 `@carlos-space/fact-kit-sample-facts`（源碼在 `samples/sample-facts`）。它自己也有一組 `facts/`，用 npm 的 `fact-kit` 建置，測試讀同一個 commit 的 `facts/dist`。
+這個專案證明外部專案能用 pnpm 從 GitHub Packages 安裝私有的 -facts 套件，再用 crates.io 的 `fact-kit` 從 `node_modules` 讀到內容。它讀的是 fact-kit 倉庫自己發的私有樣本套件 `@promptex-ai/fact-kit-sample-facts`（源碼在 `samples/sample-facts`）。它自己也有一組 `facts/`，用 npm 的 `fact-kit` 建置，測試讀同一個 commit 的 `facts/dist`。
 
 ## 安裝設定
 
