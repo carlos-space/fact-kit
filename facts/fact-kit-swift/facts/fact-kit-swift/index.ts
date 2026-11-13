@@ -37,9 +37,9 @@ export default readerFacts(
           requires: 'swift-tools-version 6.0',
         },
       },
-      // From 0.5.1 the package URL is under the promptex-ai owner, after the repositories moved there.
+      // From 0.5.1-alpha.1 the package URL is under the promptex-ai owner, after the repositories moved there.
       {
-        since: '0.5.1',
+        since: '0.5.1-alpha.1',
         value: {
           registry: 'swiftpm',
           name: 'https://github.com/promptex-ai/fact-kit-swift',

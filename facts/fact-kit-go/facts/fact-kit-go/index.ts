@@ -37,9 +37,9 @@ export default readerFacts(
           requires: 'go>=1.26',
         },
       },
-      // From 0.6.0 the module path is under the promptex-ai owner, after the repositories moved there.
+      // From 0.6.0-alpha.1 the module path is under the promptex-ai owner, after the repositories moved there.
       {
-        since: '0.6.0',
+        since: '0.6.0-alpha.1',
         value: {
           registry: 'go module proxy',
           name: 'github.com/promptex-ai/fact-kit-go',
