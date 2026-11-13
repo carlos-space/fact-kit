@@ -65,7 +65,7 @@ main 只收 PR，以 squash 合併，所以 PR 標題要符合 Conventional Comm
 | `fact-kit-go`                | `packages/fact-kit-go/`    | Go module（沒有上傳） | `fact-kit-go/vX.Y.Z`    |
 | `fact-kit-swift`             | `packages/fact-kit-swift/` | SwiftPM（沒有上傳）   | `fact-kit-swift/vX.Y.Z` |
 
-`facts/fact-kit-*/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 是發布紀錄，`publish.yml` 的 `mirror` job 再把套件鏡像到 `carlos-space/fact-kit-go`、`carlos-space/fact-kit-swift` 倉庫，Go proxy 與 SwiftPM 讀鏡像倉庫的 tag。
+`facts/fact-kit-*/` 底下的 component 套件是 private，不是發版單元。Go 與 Swift 沒有上傳，合併 Release PR 時 release-please 建的 tag 是發布紀錄，`publish.yml` 的 `mirror` job 再把套件鏡像到 `promptex-ai/fact-kit-go`、`promptex-ai/fact-kit-swift` 倉庫，Go proxy 與 SwiftPM 讀鏡像倉庫的 tag。
 
 版號靠 `.release-please-manifest.json` 接續：release-please 找不到 component 的 release 時，改用 manifest 裡的版號當上一版（`packages/fact-kit-js` 是 0.8.0，其他讀取單元是 0.3.0-alpha.1）。
 

@@ -37,6 +37,18 @@ export default readerFacts(
           requires: 'go>=1.26',
         },
       },
+      // From 0.6.0 the module path is under the promptex-ai owner, after the repositories moved there.
+      {
+        since: '0.6.0',
+        value: {
+          registry: 'go module proxy',
+          name: 'github.com/promptex-ai/fact-kit-go',
+          import: 'factkit',
+          tagPrefix: 'v',
+          sourceTagPrefix: 'fact-kit-go/v',
+          requires: 'go>=1.26',
+        },
+      },
     ],
     read: {
       name: 'ReadFacts',

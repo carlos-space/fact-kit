@@ -2,7 +2,7 @@ name: publish
 
 # Publishes the units a release created: npm (fact-kit-js, fact-kit-facts), PyPI (fact-kit-py), crates.io (fact-kit-rs), and the
 # Go module (fact-kit-go) and the Swift package (fact-kit-swift), which have no registry: their tag is the release record,
-# and the mirror job pushes each package to its own repository (carlos-space/fact-kit-go, carlos-space/fact-kit-swift),
+# and the mirror job pushes each package to its own repository (promptex-ai/fact-kit-go, promptex-ai/fact-kit-swift),
 # where the Go proxy and SwiftPM read it.
 # release-please.yml dispatches it (gh workflow run) after each release, on the release branch and with the
 # train's stage; it can also be run by hand. It is not a workflow_call target: npm, PyPI and crates.io trust this
@@ -16,7 +16,7 @@ name: publish
 #
 # One job per registry, so each can fail and be re-run alone. No job runs in a GitHub Environment: the approval
 # for a release is given once, before its Release PR merges, and every registry then publishes without waiting.
-# Trusted Publishing is registered with this file name and no environment (PyPI: owner carlos-space, repository
+# Trusted Publishing is registered with this file name and no environment (PyPI: owner promptex-ai, repository
 # fact-kit, workflow publish.yml; crates.io: the same). npm and PyPI accept OIDC tokens only from GitHub-hosted runners. Every job is idempotent: a
 # version already in a registry is skipped, so re-running after a partial failure is safe.
 #

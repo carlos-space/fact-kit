@@ -1,6 +1,6 @@
 name: facts-samples
 
-# Samples/rust and samples/go install the private @carlos-space/fact-kit-sample-facts (samples/sample-facts, published
+# Samples/rust and samples/go install the private @promptex-ai/fact-kit-sample-facts (samples/sample-facts, published
 # by publish-sample-facts.yml) from GitHub Packages with pnpm, as an outside project would, and read it through the
 # published readers (crates.io fact-kit, Go module fact-kit-go). The package links to this repository, so
 # GITHUB_TOKEN reads it. Samples/rust also builds its own facts.
