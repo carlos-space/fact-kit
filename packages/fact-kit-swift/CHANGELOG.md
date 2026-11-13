@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-swift/v0.5.1-alpha.1...fact-kit-swift/v0.5.1) (2026-11-13)
+
+
+### chore
+
+* **release/v0.9:** fact-kit-swift 0.5.1 ([15e3415](https://github.com/promptex-ai/fact-kit/commit/15e341588303e0d9cb07e4ee2817f320591fb9b7))
+
 ## [0.5.1-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-swift/v0.5.0...fact-kit-swift/v0.5.1-alpha.1) (2026-11-13)
 
 
