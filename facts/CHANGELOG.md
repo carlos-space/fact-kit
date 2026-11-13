@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-facts/v0.9.1...fact-kit-facts/v0.9.2-alpha.1) (2026-11-13)
+
+
+### Fixed
+
+* **facts:** fact-kit-go 與 fact-kit-swift 的新位置從第一個 alpha 版起算 ([#128](https://github.com/promptex-ai/fact-kit/issues/128)) ([f88fe14](https://github.com/promptex-ai/fact-kit/commit/f88fe14182cdcccda9664b546fd8cebe908efae4))
+* 倉庫位置改到 promptex-ai，著作權人改成 Promptex-AI ([#127](https://github.com/promptex-ai/fact-kit/issues/127)) ([21e19fc](https://github.com/promptex-ai/fact-kit/commit/21e19fc859d8c186d3f088810eef9048f737c8c2))
+
 ## [0.9.1](https://github.com/carlos-space/fact-kit/compare/fact-kit-facts/v0.9.1-alpha.1...fact-kit-facts/v0.9.1) (2026-11-08)
 
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0-alpha.1](https://github.com/promptex-ai/fact-kit/compare/fact-kit-go/v0.5.0...fact-kit-go/v0.6.0-alpha.1) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fact-kit-go:** 模組路徑改成 github.com/promptex-ai/fact-kit-go ([#126](https://github.com/promptex-ai/fact-kit/issues/126))
+
+### Added
+
+* **fact-kit-go:** 模組路徑改成 github.com/promptex-ai/fact-kit-go ([#126](https://github.com/promptex-ai/fact-kit/issues/126)) ([a3cd543](https://github.com/promptex-ai/fact-kit/commit/a3cd543c262d7fa18b3651ee20237984e2e5e459))
+
+
+### Fixed
+
+* 倉庫位置改到 promptex-ai，著作權人改成 Promptex-AI ([#127](https://github.com/promptex-ai/fact-kit/issues/127)) ([21e19fc](https://github.com/promptex-ai/fact-kit/commit/21e19fc859d8c186d3f088810eef9048f737c8c2))
+
 ## [0.5.0](https://github.com/carlos-space/fact-kit/compare/fact-kit-go/v0.5.0-alpha.1...fact-kit-go/v0.5.0) (2026-11-02)
 
 
