@@ -17,8 +17,8 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/carlos-space/fact-kit"
-Issues = "https://github.com/carlos-space/fact-kit/issues"
+Repository = "https://github.com/promptex-ai/fact-kit"
+Issues = "https://github.com/promptex-ai/fact-kit/issues"
 
 [dependency-groups]
 dev = ["pytest>=8"]

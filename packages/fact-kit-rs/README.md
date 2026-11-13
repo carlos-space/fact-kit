@@ -1,6 +1,6 @@
 # fact-kit（Rust）
 
-讀取 fact-kit 建出的 `index.json`。這是 [fact-kit](https://github.com/carlos-space/fact-kit) 的 Rust 讀取套件，行為和 JS 版一致，共用 `conformance/` 的樣本驗證。
+讀取 fact-kit 建出的 `index.json`。這是 [fact-kit](https://github.com/promptex-ai/fact-kit) 的 Rust 讀取套件，行為和 JS 版一致，共用 `conformance/` 的樣本驗證。
 
 ## 安裝
 

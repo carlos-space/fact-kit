@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a small package that depends on FactKit and run the shared samples through it.
-#   run.sh <version>         depend on https://github.com/carlos-space/fact-kit-swift at exactly <version>; SwiftPM
+#   run.sh <version>         depend on https://github.com/promptex-ai/fact-kit-swift at exactly <version>; SwiftPM
 #                            reads the tag of that repository (the check against the mirror repository)
 #   run.sh --local <dir>     depend on a local copy by path: a directory that holds Package.swift and Sources/
 #                            (the local check)
@@ -18,7 +18,7 @@ if [[ "${1:-}" == --local ]]; then
   mkdir -p "$work/fact-kit-swift"; rsync -a --exclude .build --exclude .git "$2/" "$work/fact-kit-swift/"
   dependency='.package(path: "fact-kit-swift")'
 elif [[ -n "${1:-}" ]]; then
-  dependency=".package(url: \"https://github.com/carlos-space/fact-kit-swift\", exact: \"${1#v}\")"
+  dependency=".package(url: \"https://github.com/promptex-ai/fact-kit-swift\", exact: \"${1#v}\")"
 else
   echo "usage: run.sh <version> | run.sh --local <package dir>" >&2; exit 2
 fi
